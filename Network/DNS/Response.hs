@@ -99,6 +99,7 @@ decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
     combine [] = []
     combine [_] = error "combine"
     combine (a:b:cs) =  a * 256 + b : combine cs
+decodeRData CNAME _ = RD_CNAME <$> decodeDomain
 decodeRData _  len = RD_OTH <$> getNBytes len
 
 ----------------------------------------------------------------
@@ -115,7 +116,7 @@ decodeDomain = do
           then do
             d <- getInt8
             let offset = n * 256 + d
-            maybe (error "decodeDomain") id <$> pop offset
+            maybe (error $ "decodeDomain: " ++ show offset) id <$> pop offset
           else do
             hs <- decodeString n
             ds <- decodeDomain

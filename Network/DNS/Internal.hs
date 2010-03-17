@@ -5,12 +5,13 @@ import Data.IP
 
 ----------------------------------------------------------------
 
-data TYPE = A | AAAA | NS | TXT | MX | UNKNOWN deriving (Eq, Show, Read)
+data TYPE = A | AAAA | NS | TXT | MX | CNAME | UNKNOWN deriving (Eq, Show, Read)
 
 rrDB :: [(TYPE, Int)]
 rrDB = [
     (A,     1)
   , (NS,    2)
+  , (CNAME, 5)
   , (MX,   15)
   , (TXT,  16)
   , (AAAA, 28)
@@ -59,7 +60,16 @@ data ResourceRecord = ResourceRecord {
   , rdata  :: RDATA
   } deriving (Eq, Show)
 
-data RDATA = RD_NS Domain | RD_A IPv4 | RD_AAAA IPv6 | RD_OTH [Int] deriving (Eq, Show)
+data RDATA = RD_NS Domain | RD_CNAME Domain
+           | RD_A IPv4 | RD_AAAA IPv6
+           | RD_OTH [Int] deriving (Eq)
+
+instance Show RDATA where
+  show (RD_NS dom) = dom
+  show (RD_CNAME dom) = dom
+  show (RD_A a) = show a
+  show (RD_AAAA aaaa) = show aaaa
+  show (RD_OTH is) = show is
 
 ----------------------------------------------------------------
 
