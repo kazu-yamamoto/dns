@@ -15,9 +15,10 @@ Build-Type:             Simple
 library
   GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
-  Other-Modules:        Network.DNS.Types
+                        Network.DNS.Types
                         Network.DNS.Query
                         Network.DNS.Response
+  Other-Modules:        Network.DNS.Internal
                         Network.DNS.StateBinary
   Build-Depends:        base >= 4.0 && < 10, binary, iproute, bytestring,
                         containers, mtl

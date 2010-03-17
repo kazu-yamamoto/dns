@@ -6,7 +6,7 @@ import Data.ByteString.Lazy (ByteString)
 import Data.Char
 import Data.IP
 import Network.DNS.StateBinary
-import Network.DNS.Types
+import Network.DNS.Internal
 
 ----------------------------------------------------------------
 
