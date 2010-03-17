@@ -92,14 +92,24 @@ decodeRR = do
     decodeRLen = getInt16
 
 decodeRData :: TYPE -> Int -> SGet RDATA
-decodeRData NS _   = RD_NS <$> decodeDomain
+decodeRData NS _ = RD_NS <$> decodeDomain
+decodeRData MX _ = RD_MX <$> decodePreference <*> decodeDomain
+  where
+    decodePreference = getInt16
+decodeRData CNAME _ = RD_CNAME <$> decodeDomain
 decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
 decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
   where
     combine [] = []
     combine [_] = error "combine"
     combine (a:b:cs) =  a * 256 + b : combine cs
-decodeRData CNAME _ = RD_CNAME <$> decodeDomain
+decodeRData SOA _ = RD_SOA <$> decodeDomain
+                           <*> decodeDomain
+                           <*> getInt32
+                           <*> getInt32
+                           <*> getInt32
+                           <*> getInt32
+                           <*> getInt32
 decodeRData _  len = RD_OTH <$> getNBytes len
 
 ----------------------------------------------------------------

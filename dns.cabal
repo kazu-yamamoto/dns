@@ -16,9 +16,11 @@ library
   GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
                         Network.DNS.Types
-                        Network.DNS.Query
-                        Network.DNS.Response
   Other-Modules:        Network.DNS.Internal
                         Network.DNS.StateBinary
-  Build-Depends:        base >= 4.0 && < 10, binary, iproute, bytestring,
-                        containers, mtl
+                        Network.DNS.Query
+                        Network.DNS.Response
+  Build-Depends:        base >= 4.0 && < 10, haskell98,
+                        binary, iproute,
+                        containers, mtl, bytestring,
+                        network, network-bytestring

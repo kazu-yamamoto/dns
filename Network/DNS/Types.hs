@@ -1,5 +1,5 @@
 module Network.DNS.Types (
-    TYPE (..), intToType, typeToInt
+    TYPE (..), intToType, typeToInt, toType
   , QorR (..)
   , OPCODE (..)
   , RCODE (..)

@@ -1,20 +1,23 @@
 module Network.DNS.Internal where
 
-import Data.Maybe
+import Data.Char
 import Data.IP
+import Data.Maybe
 
 ----------------------------------------------------------------
 
-data TYPE = A | AAAA | NS | TXT | MX | CNAME | UNKNOWN deriving (Eq, Show, Read)
+data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA
+          | UNKNOWN Int deriving (Eq, Show, Read)
 
 rrDB :: [(TYPE, Int)]
 rrDB = [
-    (A,     1)
-  , (NS,    2)
-  , (CNAME, 5)
-  , (MX,   15)
-  , (TXT,  16)
-  , (AAAA, 28)
+    (A,      1)
+  , (NS,     2)
+  , (CNAME,  5)
+  , (SOA,    6)
+  , (MX,    15)
+  , (TXT,   16)
+  , (AAAA,  28)
   ]
 
 rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
@@ -24,9 +27,13 @@ rookup  key ((x,y):xys)
   | otherwise         =  rookup key xys
 
 intToType :: Int -> TYPE
-intToType n = maybe UNKNOWN id $ rookup n rrDB
+intToType n = maybe (UNKNOWN n) id $ rookup n rrDB
 typeToInt :: TYPE -> Int
+typeToInt (UNKNOWN x)  = x
 typeToInt t = maybe 0 id $ lookup t rrDB
+
+toType :: String -> TYPE
+toType = read . map toUpper
 
 ----------------------------------------------------------------
 
@@ -60,15 +67,18 @@ data ResourceRecord = ResourceRecord {
   , rdata  :: RDATA
   } deriving (Eq, Show)
 
-data RDATA = RD_NS Domain | RD_CNAME Domain
+data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain
+           | RD_SOA Domain Domain Int Int Int Int Int
            | RD_A IPv4 | RD_AAAA IPv6
            | RD_OTH [Int] deriving (Eq)
 
 instance Show RDATA where
   show (RD_NS dom) = dom
+  show (RD_MX prf dom) = dom ++ " " ++ show prf
   show (RD_CNAME dom) = dom
   show (RD_A a) = show a
   show (RD_AAAA aaaa) = show aaaa
+  show (RD_SOA mn _ _ _ _ _ mi) = mn ++ " " ++ show mi
   show (RD_OTH is) = show is
 
 ----------------------------------------------------------------
