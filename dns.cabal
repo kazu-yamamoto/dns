@@ -1,0 +1,23 @@
+Name:                   dns
+Version:                0.1.0
+Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
+Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
+License:                BSD3
+License-File:           LICENSE
+Synopsis:               DNS libary
+Description:            DNS libary. Currently only resolver side
+                        is supported. That is, this library includes
+                        a composer of DNS query and a parser of DNS
+                        response.
+Category:               Network
+Cabal-Version:          >= 1.6
+Build-Type:             Simple
+library
+  GHC-Options:          -Wall
+  Exposed-Modules:      Network.DNS
+  Other-Modules:        Network.DNS.Types
+                        Network.DNS.Query
+                        Network.DNS.Response
+                        Network.DNS.StateBinary
+  Build-Depends:        base >= 4.0 && < 10, binary, iproute, bytestring,
+                        containers, mtl
