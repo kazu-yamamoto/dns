@@ -6,6 +6,16 @@ import Data.Maybe
 
 ----------------------------------------------------------------
 
+{-|
+  Type for domain.
+-}
+type Domain = String
+
+----------------------------------------------------------------
+
+{-|
+  Types for resource records.
+-}
 data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA
           | UNKNOWN Int deriving (Eq, Show, Read)
 
@@ -37,6 +47,44 @@ toType = read . map toUpper
 
 ----------------------------------------------------------------
 
+{-|
+  Raw data format for DNS Query and Response.
+-}
+data DNSFormat = DNSFormat {
+    header     :: DNSHeader
+  , question   :: [Question]
+  , answer     :: [ResourceRecord]
+  , authority  :: [ResourceRecord]
+  , additional :: [ResourceRecord]
+  } deriving (Eq, Show)
+
+{-|
+  Raw data format for the header of DNS Query and Response.
+-}
+data DNSHeader = DNSHeader {
+    identifier :: Int
+  , flags      :: DNSFlags
+  , qdCount    :: Int
+  , anCount    :: Int
+  , nsCount    :: Int
+  , arCount    :: Int
+  } deriving (Eq, Show)
+
+{-|
+  Raw data format for the flags of DNS Query and Response.
+-}
+data DNSFlags = DNSFlags {
+    qOrR         :: QorR
+  , opcode       :: OPCODE
+  , authAnswer   :: Bool
+  , trunCation   :: Bool
+  , recDesired   :: Bool
+  , recAvailable :: Bool
+  , rcode        :: RCODE
+  } deriving (Eq, Show)
+
+----------------------------------------------------------------
+
 data QorR = QR_Query | QR_Response deriving (Eq, Show)
 
 data OPCODE = OP_STD | OP_INV | OP_SSR deriving (Eq, Show, Enum)
@@ -45,20 +93,25 @@ data RCODE = NoErr | FormatErr | ServFail | NameErr | NotImpl | Refused deriving
 
 ----------------------------------------------------------------
 
-type Domain = String
-
-----------------------------------------------------------------
-
+{-|
+  Raw data format for DNS questions.
+-}
 data Question = Question {
     qname  :: Domain
   , qtype  :: TYPE
   } deriving (Eq, Show)
 
+{-|
+  Making "Question".
+-}
 makeQuestion :: Domain -> TYPE -> Question
 makeQuestion dom typ = Question dom typ
 
 ----------------------------------------------------------------
 
+{-|
+  Raw data format for resource records.
+-}
 data ResourceRecord = ResourceRecord {
     rrname :: Domain
   , rrtype :: TYPE
@@ -67,6 +120,9 @@ data ResourceRecord = ResourceRecord {
   , rdata  :: RDATA
   } deriving (Eq, Show)
 
+{-|
+  Raw data format for each type.
+-}
 data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain
            | RD_SOA Domain Domain Int Int Int Int Int
            | RD_A IPv4 | RD_AAAA IPv6
@@ -80,35 +136,6 @@ instance Show RDATA where
   show (RD_AAAA aaaa) = show aaaa
   show (RD_SOA mn _ _ _ _ _ mi) = mn ++ " " ++ show mi
   show (RD_OTH is) = show is
-
-----------------------------------------------------------------
-
-data DNSFlags = DNSFlags {
-    qOrR         :: QorR
-  , opcode       :: OPCODE
-  , authAnswer   :: Bool
-  , trunCation   :: Bool
-  , recDesired   :: Bool
-  , recAvailable :: Bool
-  , rcode        :: RCODE
-  } deriving (Eq, Show)
-
-data DNSHeader = DNSHeader {
-    identifier :: Int
-  , flags      :: DNSFlags
-  , qdCount    :: Int
-  , anCount    :: Int
-  , nsCount    :: Int
-  , arCount    :: Int
-  } deriving (Eq, Show)
-
-data DNSFormat = DNSFormat {
-    header     :: DNSHeader
-  , question   :: [Question]
-  , answer     :: [ResourceRecord]
-  , authority  :: [ResourceRecord]
-  , additional :: [ResourceRecord]
-  } deriving (Eq, Show)
 
 ----------------------------------------------------------------
 
