@@ -11,7 +11,7 @@
     import qualified Network.DNS as DNS (lookup)
     import Network.DNS hiding (lookup)
     main :: IO ()
-    main = makeDefaultResolver >>= DNS.lookup "www.iij.ad.jp" A >>= print
+    main = makeDefaultResolver >>= DNS.lookup \"www.example.com\" A >>= print
 @
 -}
 
