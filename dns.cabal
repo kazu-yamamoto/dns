@@ -16,6 +16,7 @@ library
   GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
                         Network.DNS.Types
+                        Network.DNS.Resolver
   Other-Modules:        Network.DNS.Internal
                         Network.DNS.StateBinary
                         Network.DNS.Query
