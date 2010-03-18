@@ -105,11 +105,18 @@ decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
     combine (a:b:cs) =  a * 256 + b : combine cs
 decodeRData SOA _ = RD_SOA <$> decodeDomain
                            <*> decodeDomain
-                           <*> getInt32
-                           <*> getInt32
-                           <*> getInt32
-                           <*> getInt32
-                           <*> getInt32
+                           <*> decodeSerial
+                           <*> decodeRefesh
+                           <*> decodeRetry
+                           <*> decodeExpire
+                           <*> decodeMinumun
+  where
+    decodeSerial  = getInt32
+    decodeRefesh  = getInt32
+    decodeRetry   = getInt32
+    decodeExpire  = getInt32
+    decodeMinumun = getInt32
+
 decodeRData _  len = RD_OTH <$> getNBytes len
 
 ----------------------------------------------------------------
