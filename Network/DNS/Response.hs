@@ -97,7 +97,9 @@ decodeRData MX _ = RD_MX <$> decodePreference <*> decodeDomain
   where
     decodePreference = getInt16
 decodeRData CNAME _ = RD_CNAME <$> decodeDomain
-decodeRData TXT len = (RD_TXT . map chr) <$> getNBytes len
+decodeRData TXT len = (RD_TXT . map chr . ignoreLength) <$> getNBytes len
+  where
+    ignoreLength = tail
 decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
 decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
   where
