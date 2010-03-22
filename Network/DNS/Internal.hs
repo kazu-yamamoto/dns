@@ -125,7 +125,7 @@ data ResourceRecord = ResourceRecord {
 -}
 data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain
            | RD_SOA Domain Domain Int Int Int Int Int
-           | RD_A IPv4 | RD_AAAA IPv6
+           | RD_A IPv4 | RD_AAAA IPv6 | RD_TXT String
            | RD_OTH [Int] deriving (Eq)
 
 instance Show RDATA where
@@ -134,6 +134,7 @@ instance Show RDATA where
   show (RD_CNAME dom) = dom
   show (RD_A a) = show a
   show (RD_AAAA aaaa) = show aaaa
+  show (RD_TXT txt) = txt
   show (RD_SOA mn _ _ _ _ _ mi) = mn ++ " " ++ show mi
   show (RD_OTH is) = show is
 
