@@ -12,7 +12,7 @@ import Network.DNS.Types
 import Prelude hiding (lookup)
 
 ----------------------------------------------------------------
-  
+
 type SGet = StateT PState Get
 
 type PState = IntMap Domain

@@ -49,7 +49,7 @@ encodeFlags _ = put16 0x0100 -- xxx
 
 encodeQuestion :: [Question] -> SPut
 encodeQuestion qs = do
-  let q = head qs 
+  let q = head qs
       dom = qname q
       typ = qtype q
   encodeDomain dom

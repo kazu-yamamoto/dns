@@ -1,13 +1,15 @@
 {-|
-  APIs of DNS Resolver.
+  DNS Resolver and lookup functions.
 -}
 
 module Network.DNS.Resolver (
-    Resolver, makeResolver, makeDefaultResolver
+    ResolvSeed, makeResolvSeed, makeDefaultResolvSeed
+  , Resolver, withResolver
   , lookup, lookupRaw
   ) where
 
 import Control.Applicative
+import Control.Exception
 import Data.List hiding (find, lookup)
 import Data.Int
 import Network.DNS.Types
@@ -22,11 +24,15 @@ import Prelude hiding (lookup)
 ----------------------------------------------------------------
 
 {-|
-  Abstract data type of DNS Resolver
+  Abstract data type of DNS Resolver seed
 -}
+data ResolvSeed = ResolvSeed {
+    addrInfo :: AddrInfo
+}
+
 data Resolver = Resolver {
-    genId    :: IO Int
-  , addrInfo :: AddrInfo
+    genId   :: IO Int
+  , dnsSock :: Socket
 }
 
 ----------------------------------------------------------------
@@ -40,21 +46,19 @@ dnsBufferSize = 512
 ----------------------------------------------------------------
 
 {-|
-  Making Resolver from an IP address of a DNS cache server.
+  Making 'ResolvSeed' from an IP address of a DNS cache server.
 -}
-makeResolver :: HostName -> IO Resolver
-makeResolver addr = do
-    ai <- makeAddrInfo addr
-    return $ Resolver { genId = getRandom, addrInfo = ai }
+makeResolvSeed :: HostName -> IO ResolvSeed
+makeResolvSeed addr = ResolvSeed <$> makeAddrInfo addr
 
 {-|
-  Making Resolver from \"/etc/resolv.conf\".
+  Making 'ResolvSeed' from \"/etc/resolv.conf\".
 -}
-makeDefaultResolver :: IO Resolver
-makeDefaultResolver = do
-  cs <- readFile resolvConf
-  let l:_ = filter ("nameserver" `isPrefixOf`) $ lines cs
-  makeResolver $ drop 11 l
+makeDefaultResolvSeed :: IO ResolvSeed
+makeDefaultResolvSeed = toAddr <$> readFile resolvConf >>= makeResolvSeed
+  where
+    toAddr cs = let l:_ = filter ("nameserver" `isPrefixOf`) $ lines cs
+                in drop 11 l
 
 ----------------------------------------------------------------
 
@@ -74,15 +78,26 @@ makeAddrInfo addr = do
 
 ----------------------------------------------------------------
 
+withResolver :: ResolvSeed -> (Resolver -> IO ()) -> IO ()
+withResolver seed func = do
+  let ai = addrInfo seed
+  sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
+  connect sock (addrAddress ai)
+  let resolv = Resolver getRandom sock
+  func resolv `finally` sClose sock
+
+----------------------------------------------------------------
+
 {-|
   Looking up resource records of a domain.
 -}
-lookup :: Domain -> TYPE -> Resolver -> IO (Maybe [RDATA])
-lookup dom typ rlv = do
-    idnt <- genId rlv
-    res <- lookupRaw' dom typ rlv idnt
+lookup :: Resolver -> Domain -> TYPE -> IO (Maybe [RDATA])
+lookup rlv dom typ = do
+    let sock = dnsSock rlv
+    seqno <- genId rlv
+    res <- lookupRaw' sock seqno dom typ
     let hdr = header res
-    if identifier hdr == idnt && anCount hdr /= 0
+    if identifier hdr == seqno && anCount hdr /= 0
        then return . listToMaybe . map rdata . filter correct $ answer res
        else return Nothing
   where
@@ -99,16 +114,14 @@ lookup dom typ rlv = do
 {-|
   Looking up a domain and returning an entire DNS Response.
 -}
-lookupRaw :: Domain -> TYPE -> Resolver -> IO DNSFormat
-lookupRaw dom typ rlv = genId rlv >>= lookupRaw' dom typ rlv
+lookupRaw :: Resolver -> Domain -> TYPE -> IO DNSFormat
+lookupRaw rlv dom typ = do
+   let sock = dnsSock rlv
+   seqno <- genId rlv
+   lookupRaw' sock seqno dom typ
 
-lookupRaw' :: Domain -> TYPE -> Resolver -> Int -> IO DNSFormat
-lookupRaw' dom typ rlv idnt = do
-  let ai = addrInfo rlv
-      q = makeQuestion dom typ
-  sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
-  connect sock (addrAddress ai)
-  sendAll sock (composeQuery idnt [q])
-  fmt <- parseResponse <$> recv sock dnsBufferSize
-  sClose sock
-  return fmt
+lookupRaw' :: Socket -> Int -> Domain -> TYPE -> IO DNSFormat
+lookupRaw' sock seqno dom typ = do
+  let q = makeQuestion dom typ
+  sendAll sock (composeQuery seqno [q])
+  parseResponse <$> recv sock dnsBufferSize

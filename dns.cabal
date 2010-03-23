@@ -15,8 +15,9 @@ Build-Type:             Simple
 library
   GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
-                        Network.DNS.Types
+                        Network.DNS.Lookup
                         Network.DNS.Resolver
+                        Network.DNS.Types
   Other-Modules:        Network.DNS.Internal
                         Network.DNS.StateBinary
                         Network.DNS.Query

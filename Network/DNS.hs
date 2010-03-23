@@ -11,14 +11,19 @@
     import qualified Network.DNS as DNS (lookup)
     import Network.DNS hiding (lookup)
     main :: IO ()
-    main = makeDefaultResolver >>= DNS.lookup \"www.example.com\" A >>= print
+    main = do
+        rs <- makeDefaultResolvSeed
+        withResolver rs $ \\resolver -> do
+            DNS.lookup resolver \"www.example.com\" A >>= print
 @
 -}
 
 module Network.DNS (
-    module Network.DNS.Types
+    module Network.DNS.Lookup
   , module Network.DNS.Resolver
+  , module Network.DNS.Types
   ) where
 
-import Network.DNS.Types
+import Network.DNS.Lookup
 import Network.DNS.Resolver
+import Network.DNS.Types
