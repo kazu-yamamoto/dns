@@ -1,5 +1,5 @@
 {-|
-  DNS library written in Haskell.
+  Thread-safe DNS library written in Haskell.
 
   Currently, only resolver side is supported. This code is written in
   Haskell, not using FFI. So, the \"-threaded\" option for GHC is not

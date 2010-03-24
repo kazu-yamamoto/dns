@@ -78,6 +78,11 @@ makeAddrInfo addr = do
 
 ----------------------------------------------------------------
 
+{-|
+  Giving a thread-safe 'Resolver' to the function of the second
+  argument. 'withResolver' should be passed to 'forkIO'.
+-}
+
 withResolver :: ResolvSeed -> (Resolver -> IO ()) -> IO ()
 withResolver seed func = do
   let ai = addrInfo seed
