@@ -2,7 +2,6 @@ module Network.DNS.Internal where
 
 import Data.Char
 import Data.IP
-import Data.Maybe
 
 ----------------------------------------------------------------
 

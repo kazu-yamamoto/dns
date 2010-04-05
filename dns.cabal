@@ -13,7 +13,7 @@ Category:               Network
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
 library
-  GHC-Options:          -Wall
+  GHC-Options:          -Wall -fno-warn-unused-do-bind
   Exposed-Modules:      Network.DNS
                         Network.DNS.Lookup
                         Network.DNS.Resolver
@@ -22,7 +22,7 @@ library
                         Network.DNS.StateBinary
                         Network.DNS.Query
                         Network.DNS.Response
-  Build-Depends:        base >= 4.0 && < 10, haskell98,
+  Build-Depends:        base == 4.2.*, haskell98,
                         binary, iproute,
                         containers, mtl, bytestring,
                         network, network-bytestring
