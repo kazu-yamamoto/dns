@@ -9,10 +9,11 @@ module Network.DNS.Lookup (
   ) where
 
 import Control.Applicative
+import qualified Data.ByteString.Lazy.Char8 as L
 import Data.IP
 import Data.Maybe
-import Network.DNS.Types
 import Network.DNS.Resolver as DNS
+import Network.DNS.Types
 
 ----------------------------------------------------------------
 
@@ -76,7 +77,7 @@ lookupXviaMX rlv dom func = do
 {-|
   Resolving 'String' by 'TXT'.
 -}
-lookupTXT :: Resolver -> Domain -> IO (Maybe [String])
+lookupTXT :: Resolver -> Domain -> IO (Maybe [L.ByteString])
 lookupTXT rlv dom = toTXT <$> DNS.lookup rlv dom TXT
   where
     toTXT = maybe Nothing (Just . map unTag)

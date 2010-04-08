@@ -1,13 +1,13 @@
 module Network.DNS.Query (composeQuery) where
 
-import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Char
 import Network.DNS.StateBinary
 import Network.DNS.Internal
 
 ----------------------------------------------------------------
 
-composeQuery :: Int -> [Question] -> ByteString
+composeQuery :: Int -> [Question] -> L.ByteString
 composeQuery idt qs = runSPut (encodeQuery qry)
   where
     hdr = header defaultQuery

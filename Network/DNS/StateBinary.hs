@@ -3,8 +3,8 @@ module Network.DNS.StateBinary where
 import Control.Monad.State
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.ByteString.Lazy (ByteString)
-import qualified Data.ByteString.Lazy as BS hiding (ByteString)
+import qualified Data.ByteString.Lazy.Char8 as L
+import Data.Char
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM (insert, lookup, empty)
 import Data.Word
@@ -82,10 +82,12 @@ getPosition :: SGet Int
 getPosition = fromIntegral <$> lift bytesRead
 
 getNBytes :: Int -> SGet [Int]
-getNBytes len = toInts <$> getNbytes len
+getNBytes len = toInts <$> getNByteString len
   where
-    toInts = map fromIntegral . BS.unpack
-    getNbytes = lift . getLazyByteString . fromIntegral
+    toInts = map ord . L.unpack
+
+getNByteString :: Int -> SGet L.ByteString
+getNByteString len = lift . getLazyByteString . fromIntegral $ len
 
 ----------------------------------------------------------------
 
@@ -100,8 +102,8 @@ pop n = IM.lookup n <$> get
 initialState :: IntMap Domain
 initialState = IM.empty
 
-runSGet :: SGet DNSFormat -> ByteString -> DNSFormat
+runSGet :: SGet DNSFormat -> L.ByteString -> DNSFormat
 runSGet res bs = fst $ runGet (runStateT res initialState) bs
 
-runSPut :: Put -> ByteString
+runSPut :: Put -> L.ByteString
 runSPut = runPut

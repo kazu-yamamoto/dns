@@ -2,7 +2,7 @@ module Network.DNS.Response (parseResponse) where
 
 import Control.Monad
 import Data.Bits
-import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Char
 import Data.IP
 import Network.DNS.StateBinary
@@ -10,7 +10,7 @@ import Network.DNS.Internal
 
 ----------------------------------------------------------------
 
-parseResponse :: ByteString -> DNSFormat
+parseResponse :: L.ByteString -> DNSFormat
 parseResponse bs = runSGet decodeResponse bs
 
 ----------------------------------------------------------------
@@ -97,9 +97,9 @@ decodeRData MX _ = RD_MX <$> decodePreference <*> decodeDomain
   where
     decodePreference = getInt16
 decodeRData CNAME _ = RD_CNAME <$> decodeDomain
-decodeRData TXT len = (RD_TXT . map chr . ignoreLength) <$> getNBytes len
+decodeRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
-    ignoreLength = tail
+    ignoreLength = L.tail
 decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
 decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
   where
