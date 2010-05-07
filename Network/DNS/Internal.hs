@@ -3,6 +3,7 @@ module Network.DNS.Internal where
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Char
 import Data.IP
+import Data.Maybe
 
 ----------------------------------------------------------------
 
@@ -37,10 +38,10 @@ rookup  key ((x,y):xys)
   | otherwise         =  rookup key xys
 
 intToType :: Int -> TYPE
-intToType n = maybe (UNKNOWN n) id $ rookup n rrDB
+intToType n = fromMaybe (UNKNOWN n) $ rookup n rrDB
 typeToInt :: TYPE -> Int
 typeToInt (UNKNOWN x)  = x
-typeToInt t = maybe 0 id $ lookup t rrDB
+typeToInt t = fromMaybe 0 $ lookup t rrDB
 
 toType :: String -> TYPE
 toType = read . map toUpper
@@ -105,7 +106,7 @@ data Question = Question {
   Making "Question".
 -}
 makeQuestion :: Domain -> TYPE -> Question
-makeQuestion dom typ = Question dom typ
+makeQuestion = Question
 
 ----------------------------------------------------------------
 

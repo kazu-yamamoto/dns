@@ -92,7 +92,7 @@ getNByteString len = lift . getLazyByteString . fromIntegral $ len
 ----------------------------------------------------------------
 
 push :: Int -> Domain -> SGet ()
-push n d = modify (\m -> IM.insert n d m)
+push n d = modify (IM.insert n d)
 
 pop :: Int -> SGet (Maybe Domain)
 pop n = IM.lookup n <$> get

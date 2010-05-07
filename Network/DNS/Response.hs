@@ -5,23 +5,24 @@ import Data.Bits
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Char
 import Data.IP
-import Network.DNS.StateBinary
+import Data.Maybe
 import Network.DNS.Internal
+import Network.DNS.StateBinary
 
 ----------------------------------------------------------------
 
 parseResponse :: L.ByteString -> DNSFormat
-parseResponse bs = runSGet decodeResponse bs
+parseResponse = runSGet decodeResponse
 
 ----------------------------------------------------------------
 
 decodeResponse :: SGet DNSFormat
 decodeResponse = do
     hd <- decodeHeader
-    DNSFormat hd <$> (decodeQueries $ qdCount hd)
-                 <*> (decodeRRs $ anCount hd)
-                 <*> (decodeRRs $ nsCount hd)
-                 <*> (decodeRRs $ arCount hd)
+    DNSFormat hd <$> decodeQueries (qdCount hd)
+                 <*> decodeRRs (anCount hd)
+                 <*> decodeRRs (nsCount hd)
+                 <*> decodeRRs (arCount hd)
 
 ----------------------------------------------------------------
 
@@ -136,7 +137,7 @@ decodeDomain = do
           then do
             d <- getInt8
             let offset = n * 256 + d
-            maybe (error $ "decodeDomain: " ++ show offset) id <$> pop offset
+            fromMaybe (error $ "decodeDomain: " ++ show offset) <$> pop offset
           else do
             hs <- decodeString n
             ds <- decodeDomain
