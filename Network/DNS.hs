@@ -12,7 +12,7 @@
     import Network.DNS hiding (lookup)
     main :: IO ()
     main = do
-        rs <- makeDefaultResolvSeed
+        rs <- makeResolvSeed defaultResolvConf
         withResolver rs $ \\resolver -> do
             DNS.lookup resolver \"www.example.com\" A >>= print
 @
