@@ -131,8 +131,7 @@ getRandom = getStdRandom (randomR (0,65535))
 -}
 lookup :: Resolver -> Domain -> TYPE -> IO (Maybe [RDATA])
 lookup rlv dom typ = do
-    mres <- lookupRaw rlv dom typ
-    return (mres >>= toRDATA)
+    (>>= toRDATA) <$> lookupRaw rlv dom typ
   where
     {- CNAME hack
     dom' = if "." `isSuffixOf` dom
@@ -152,8 +151,7 @@ lookupRaw :: Resolver -> Domain -> TYPE -> IO (Maybe DNSFormat)
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
     sendAll sock (composeQuery seqno [q])
-    mres <- timeout tm (parseResponse <$> recv sock bufsize)
-    return (mres >>= check seqno)
+    (>>= check seqno) <$> timeout tm (parseResponse <$> recv sock bufsize)
   where
     sock = dnsSock rlv
     bufsize = dnsBufsize rlv
