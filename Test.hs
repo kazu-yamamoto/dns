@@ -10,8 +10,8 @@ import Test.Framework.Providers.HUnit
 import Test.HUnit hiding (Test)
 
 tests :: [Test]
-tests =  [
-    testGroup "Property Test" [
+tests = [
+    testGroup "Test case" [
          testCase "lookupA" test_lookupA
        , testCase "lookupAAAA" test_lookupAAAA
        , testCase "lookupTXT" test_lookupTXT
