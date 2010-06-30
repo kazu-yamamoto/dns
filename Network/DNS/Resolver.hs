@@ -11,6 +11,7 @@ module Network.DNS.Resolver (
 
 import Control.Applicative
 import Control.Exception
+import Data.Char
 import Data.Int
 import Data.List hiding (find, lookup)
 import Network.BSD
@@ -88,7 +89,8 @@ makeResolvSeed conf = ResolvSeed <$> addr
         RCHostName numhost -> makeAddrInfo numhost
         RCFilePath file -> toAddr <$> readFile file >>= makeAddrInfo
     toAddr cs = let l:_ = filter ("nameserver" `isPrefixOf`) $ lines cs
-                in drop 11 l
+                in extract l
+    extract = reverse . dropWhile isSpace . reverse . dropWhile isSpace . drop 11
 
 makeAddrInfo :: HostName -> IO AddrInfo
 makeAddrInfo addr = do
@@ -130,8 +132,7 @@ getRandom = getStdRandom (randomR (0,65535))
   Looking up resource records of a domain.
 -}
 lookup :: Resolver -> Domain -> TYPE -> IO (Maybe [RDATA])
-lookup rlv dom typ = do
-    (>>= toRDATA) <$> lookupRaw rlv dom typ
+lookup rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
   where
     {- CNAME hack
     dom' = if "." `isSuffixOf` dom
