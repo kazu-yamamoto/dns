@@ -1,11 +1,28 @@
 {-|
   DNS Resolver and lookup functions.
+
+  Sample code:
+
+@
+    import qualified Network.DNS as DNS (lookup)
+    import Network.DNS hiding (lookup)
+    main :: IO ()
+    main = do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \\resolver -> do
+            DNS.lookup resolver \"www.example.com\" A >>= print
+@
 -}
 
 module Network.DNS.Resolver (
+  -- * Documentation
+  -- ** Configuration for resolver
     FileOrNumericHost(..), ResolvConf(..), defaultResolvConf
+  -- ** Intermediate data type for resolver
   , ResolvSeed, makeResolvSeed
+  -- ** Type and function for resolver
   , Resolver, withResolver
+  -- ** Looking up functions
   , lookup, lookupRaw
   ) where
 
