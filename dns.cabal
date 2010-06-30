@@ -12,6 +12,7 @@ Description:            DNS libary. Currently only resolver side
 Category:               Network
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
+Extra-Source-Files:     Test.hs
 library
   if impl(ghc >= 6.12)
     GHC-Options:        -Wall -fno-warn-unused-do-bind
