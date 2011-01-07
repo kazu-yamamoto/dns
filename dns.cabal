@@ -1,5 +1,5 @@
 Name:                   dns
-Version:                0.1.1
+Version:                0.1.2
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -26,10 +26,16 @@ library
                         Network.DNS.StateBinary
                         Network.DNS.Query
                         Network.DNS.Response
-  Build-Depends:        base >= 4 && < 5, haskell98,
+  if impl(ghc >= 7)
+    Build-Depends:      base >= 4 && < 5, haskell98,
                         binary, iproute,
                         containers, mtl, bytestring,
                         network >= 2.3
+  else
+    Build-Depends:      base >= 4 && < 5, haskell98,
+                        binary, iproute,
+                        containers, mtl, bytestring,
+                        network, network-bytestring
 Source-Repository head
   Type:                 git
   Location:             git://github.com/kazu-yamamoto/dns.git
