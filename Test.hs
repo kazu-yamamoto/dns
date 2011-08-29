@@ -58,7 +58,7 @@ test_lookupAviaCNAME :: IO ()
 test_lookupAviaCNAME = do
     rs <- makeResolvSeed defaultResolvConf
     withResolver rs $ \resolver ->
-        DNS.lookupA resolver "ghs.google.com" ??= ["64.233.183.121"]
+        DNS.lookupA resolver "ghs.google.com" ??= ["72.14.203.121"]
 
 main :: IO ()
 main = defaultMain tests
