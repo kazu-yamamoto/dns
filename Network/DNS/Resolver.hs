@@ -38,7 +38,7 @@ import Network.DNS.Types
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
 import Prelude hiding (lookup)
-import Random
+import System.Random
 import System.Timeout
 
 ----------------------------------------------------------------
