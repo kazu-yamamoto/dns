@@ -1,10 +1,11 @@
 module Network.DNS.StateBinary where
 
+import Blaze.ByteString.Builder
 import Control.Monad.State
 import Data.Binary.Get
-import Data.Binary.Put
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Char
+import Data.Int
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM (insert, lookup, empty)
 import Data.Word
@@ -36,25 +37,25 @@ x <$ y = y >> return x
 
 ----------------------------------------------------------------
 
-type SPut = Put
+type SPut = Write
 
 put8 :: Word8 -> SPut
-put8  = putWord8
+put8  = writeWord8
 
 put16 :: Word16 -> SPut
-put16 = putWord16be
+put16 = writeWord16be
 
 put32 :: Word32 -> SPut
-put32 = putWord32be
+put32 = writeWord32be
 
-putInt8 :: Int -> SPut
-putInt8  = put8  . fromIntegral
+putInt8 :: Int8 -> SPut
+putInt8  = writeInt8
 
-putInt16 :: Int -> SPut
-putInt16 = put16 . fromIntegral
+putInt16 :: Int16 -> SPut
+putInt16 = writeInt16be
 
-putInt32 :: Int -> SPut
-putInt32 = put32 . fromIntegral
+putInt32 :: Int32 -> SPut
+putInt32 = writeInt32be
 
 ----------------------------------------------------------------
 
@@ -105,5 +106,5 @@ initialState = IM.empty
 runSGet :: SGet DNSFormat -> L.ByteString -> DNSFormat
 runSGet res bs = fst $ runGet (runStateT res initialState) bs
 
-runSPut :: Put -> L.ByteString
-runSPut = runPut
+runSPut :: SPut -> L.ByteString
+runSPut = toLazyByteString . fromWrite

@@ -4,6 +4,10 @@ import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Char
 import Network.DNS.StateBinary
 import Network.DNS.Internal
+import Data.Monoid
+
+(+++) :: Monoid a => a -> a -> a
+(+++) = mappend
 
 ----------------------------------------------------------------
 
@@ -22,52 +26,47 @@ composeQuery idt qs = runSPut (encodeQuery qry)
 ----------------------------------------------------------------
 
 encodeQuery :: DNSFormat -> SPut
-encodeQuery fmt = do
-  let hdr = header fmt
-      qs = question fmt
-  encodeHeader hdr
-  encodeQuestion qs
-  return ()
+encodeQuery fmt = encodeHeader hdr
+              +++ encodeQuestion qs
+  where
+    hdr = header fmt
+    qs = question fmt
 
 encodeHeader :: DNSHeader -> SPut
-encodeHeader hdr = do
-    encodeIdentifier $ identifier hdr
-    encodeFlags $ flags hdr
-    decodeQdCount $ qdCount hdr
-    decodeAnCount $ anCount hdr
-    decodeNsCount $ nsCount hdr
-    decodeArCount $ arCount hdr
+encodeHeader hdr = encodeIdentifier (identifier hdr)
+               +++ encodeFlags (flags hdr)
+               +++ decodeQdCount (qdCount hdr)
+               +++ decodeAnCount (anCount hdr)
+               +++ decodeNsCount (nsCount hdr)
+               +++ decodeArCount (arCount hdr)
   where
-    encodeIdentifier = putInt16
-    decodeQdCount = putInt16
-    decodeAnCount = putInt16
-    decodeNsCount = putInt16
-    decodeArCount = putInt16
+    encodeIdentifier = putInt16 . fromIntegral
+    decodeQdCount = putInt16 . fromIntegral
+    decodeAnCount = putInt16 . fromIntegral
+    decodeNsCount = putInt16 . fromIntegral
+    decodeArCount = putInt16 . fromIntegral
 
 encodeFlags :: DNSFlags -> SPut
 encodeFlags _ = put16 0x0100 -- xxx
 
 encodeQuestion :: [Question] -> SPut
-encodeQuestion qs = do
-  let q = head qs
-      dom = qname q
-      typ = qtype q
-  encodeDomain dom
-  putInt16 . typeToInt $ typ
-  put16 1
+encodeQuestion qs = encodeDomain dom
+                +++ putInt16 (fromIntegral (typeToInt typ))
+                +++ put16 1
+  where
+    q = head qs
+    dom = qname q
+    typ = qtype q
 
 ----------------------------------------------------------------
 
 encodeDomain :: Domain -> SPut
-encodeDomain dom = do
-    let ss = split '.' dom
-        ls = map length ss
-    mapM_ encodeSubDomain $ zip ls ss
-    put8 0
+encodeDomain dom = foldr (+++) (put8 0) (map encodeSubDomain $ zip ls ss)
   where
-    encodeSubDomain (len,sub) = do
-      putInt8 len
-      mapM_ (putInt8 . ord) sub
+    ss = split '.' dom
+    ls = map length ss
+    encodeSubDomain (len,sub) = putInt8 (fromIntegral len)
+                            +++ foldr (+++) mempty (map (putInt8 . fromIntegral . ord) sub)
 
 split :: Char -> String -> [String]
 split _ "" = []
