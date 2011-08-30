@@ -3,11 +3,17 @@
 -}
 
 module Network.DNS.Types (
+  -- * Domain
     Domain
+  -- * TYPE
   , TYPE (..), intToType, typeToInt, toType
+  -- * DNS Format
   , DNSFormat, header, question, answer, authority, additional
+  -- * DNS Header
   , DNSHeader, identifier, flags, qdCount, anCount, nsCount, arCount
+  -- * DNS Flags
   , DNSFlags, qOrR, opcode, authAnswer, trunCation, recDesired, recAvailable, rcode
+  -- * DNS Body
   , QorR (..)
   , OPCODE (..)
   , RCODE (..)
