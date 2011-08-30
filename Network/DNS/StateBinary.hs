@@ -7,7 +7,7 @@ import Data.Attoparsec
 import Data.Attoparsec.Enumerator
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS (unpack)
-import qualified Data.ByteString.Lazy as L (ByteString)
+import qualified Data.ByteString.Lazy as BL (ByteString)
 import Data.Enumerator (Iteratee)
 import Data.Int
 import Data.IntMap (IntMap)
@@ -117,5 +117,5 @@ initialState = PState IM.empty 0
 runSGet :: SGet a -> Iteratee ByteString IO (a, PState)
 runSGet parser = iterParser (runStateT parser initialState)
 
-runSPut :: SPut -> L.ByteString
+runSPut :: SPut -> BL.ByteString
 runSPut = toLazyByteString . fromWrite
