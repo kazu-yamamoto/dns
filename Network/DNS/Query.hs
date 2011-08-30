@@ -1,6 +1,7 @@
 module Network.DNS.Query (composeQuery) where
 
-import qualified Data.ByteString.Lazy.Char8 as L
+import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
+import qualified Data.ByteString.Char8 as BS (length, split, unpack, null)
 import Data.Char
 import Network.DNS.StateBinary
 import Network.DNS.Internal
@@ -11,7 +12,7 @@ import Data.Monoid
 
 ----------------------------------------------------------------
 
-composeQuery :: Int -> [Question] -> L.ByteString
+composeQuery :: Int -> [Question] -> BL.ByteString
 composeQuery idt qs = runSPut (encodeQuery qry)
   where
     hdr = header defaultQuery
@@ -63,15 +64,7 @@ encodeQuestion qs = encodeDomain dom
 encodeDomain :: Domain -> SPut
 encodeDomain dom = foldr (+++) (put8 0) (map encodeSubDomain $ zip ls ss)
   where
-    ss = split '.' dom
-    ls = map length ss
+    ss = filter (not . BS.null) $ BS.split '.' dom
+    ls = map BS.length ss
     encodeSubDomain (len,sub) = putInt8 (fromIntegral len)
-                            +++ foldr (+++) mempty (map (putInt8 . fromIntegral . ord) sub)
-
-split :: Char -> String -> [String]
-split _ "" = []
-split c cs
-  | null rest = s : split c rest
-  | otherwise = s : split c (tail rest)
-  where
-    (s,rest) = break (c ==) cs
+                            +++ foldr (+++) mempty (map (putInt8 . fromIntegral . ord) (BS.unpack sub))

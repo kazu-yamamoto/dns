@@ -3,6 +3,8 @@ module Network.DNS.StateBinary where
 import Blaze.ByteString.Builder
 import Control.Monad.State
 import Data.Binary.Get
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as L
 import Data.Char
 import Data.Int
@@ -85,10 +87,10 @@ getPosition = fromIntegral <$> lift bytesRead
 getNBytes :: Int -> SGet [Int]
 getNBytes len = toInts <$> getNByteString len
   where
-    toInts = map ord . L.unpack
+    toInts = map ord . BS.unpack
 
-getNByteString :: Int -> SGet L.ByteString
-getNByteString len = lift . getLazyByteString . fromIntegral $ len
+getNByteString :: Int -> SGet ByteString
+getNByteString = lift . getByteString . fromIntegral
 
 ----------------------------------------------------------------
 

@@ -1,9 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Network.DNS.Response (parseResponse) where
 
 import Control.Monad
 import Data.Bits
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as L
-import Data.Char
 import Data.IP
 import Data.Maybe
 import Network.DNS.Internal
@@ -100,7 +102,7 @@ decodeRData MX _ = RD_MX <$> decodePreference <*> decodeDomain
 decodeRData CNAME _ = RD_CNAME <$> decodeDomain
 decodeRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
-    ignoreLength = L.tail
+    ignoreLength = BS.tail
 decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
 decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
   where
@@ -139,17 +141,14 @@ decodeDomain = do
             let offset = n * 256 + d
             fromMaybe (error $ "decodeDomain: " ++ show offset) <$> pop offset
           else do
-            hs <- decodeString n
+            hs <- getNByteString n
             ds <- decodeDomain
-            let dom = hs ++ "." ++ ds
+            let dom = hs `BS.append` "." `BS.append` ds
             push pos dom
             return dom
   where
     getValue c = c .&. 0x3f
     isPointer c = testBit c 7 && testBit c 6
-
-decodeString :: Int -> SGet String
-decodeString n = map chr <$> getNBytes n
 
 ignoreClass :: SGet ()
 ignoreClass = () <$ get16

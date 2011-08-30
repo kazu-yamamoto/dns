@@ -9,7 +9,7 @@ module Network.DNS.Lookup (
   ) where
 
 import Control.Applicative
-import qualified Data.ByteString.Lazy.Char8 as L
+import Data.ByteString (ByteString)
 import Data.IP
 import Data.Maybe
 import Network.DNS.Resolver as DNS
@@ -61,7 +61,7 @@ lookupAviaMX rlv dom = lookupXviaMX rlv dom (lookupA rlv)
 lookupAAAAviaMX :: Resolver -> Domain -> IO (Maybe [IPv6])
 lookupAAAAviaMX rlv dom = lookupXviaMX rlv dom (lookupAAAA rlv)
 
-lookupXviaMX :: Resolver -> Domain -> (Domain -> IO (Maybe [a])) -> IO (Maybe [a])
+lookupXviaMX :: Show a => Resolver -> Domain -> (Domain -> IO (Maybe [a])) -> IO (Maybe [a])
 lookupXviaMX rlv dom func = do
     mdps <- lookupMX rlv dom
     maybe (return Nothing) lookup' mdps
@@ -77,7 +77,7 @@ lookupXviaMX rlv dom func = do
 {-|
   Resolving 'String' by 'TXT'.
 -}
-lookupTXT :: Resolver -> Domain -> IO (Maybe [L.ByteString])
+lookupTXT :: Resolver -> Domain -> IO (Maybe [ByteString])
 lookupTXT rlv dom = toTXT <$> DNS.lookup rlv dom TXT
   where
     toTXT = maybe Nothing (Just . map unTag)
