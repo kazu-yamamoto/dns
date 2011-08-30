@@ -1,20 +1,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Network.DNS.Response (parseResponse) where
+module Network.DNS.Response (responseIter, parseResponse) where
 
+import Control.Applicative
 import Control.Monad
 import Data.Bits
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy.Char8 as L
 import Data.IP
 import Data.Maybe
 import Network.DNS.Internal
 import Network.DNS.StateBinary
+import Data.Enumerator (Enumerator, Iteratee, run_, ($$))
+import Data.ByteString (ByteString)
 
-----------------------------------------------------------------
+responseIter :: Iteratee ByteString IO (DNSFormat, PState)
+responseIter = runSGet decodeResponse
 
-parseResponse :: L.ByteString -> DNSFormat
-parseResponse = runSGet decodeResponse
+parseResponse :: Enumerator ByteString IO (a,b)
+              -> Iteratee ByteString IO (a,b)
+              -> IO a
+parseResponse enum iter = fst <$> run_ (enum $$ iter)
 
 ----------------------------------------------------------------
 
@@ -29,16 +34,15 @@ decodeResponse = do
 ----------------------------------------------------------------
 
 decodeFlags :: SGet DNSFlags
-decodeFlags = do
-  flgs <- get16
-  return $ DNSFlags (getQorR flgs)
-                    (getOpcode flgs)
-                    (getAuthAnswer flgs)
-                    (getTrunCation flgs)
-                    (getRecDesired flgs)
-                    (getRecAvailable flgs)
-                    (getRcode flgs)
+decodeFlags = toFlags <$> get16
   where
+    toFlags flgs = DNSFlags (getQorR flgs)
+                            (getOpcode flgs)
+                            (getAuthAnswer flgs)
+                            (getTrunCation flgs)
+                            (getRecDesired flgs)
+                            (getRecAvailable flgs)
+                            (getRcode flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
     getOpcode w = toEnum $ fromIntegral $ shiftR w 11 .&. 0x0f
     getAuthAnswer w = testBit w 10

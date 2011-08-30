@@ -30,12 +30,16 @@ library
     Build-Depends:      base >= 4 && < 5,
                         binary, iproute,
                         containers, mtl, bytestring, random,
-                        network >= 2.3, blaze-builder
+                        network >= 2.3, blaze-builder,
+                        attoparsec, enumerator, attoparsec-enumerator,
+                        network-enumerator
   else
     Build-Depends:      base >= 4 && < 5,
                         binary, iproute,
                         containers, mtl, bytestring, random,
-                        network, network-bytestring, blaze-builder
+                        network, network-bytestring, blaze-builder,
+                        attoparsec, enumerator, attoparsec-enumerator,
+                        network-enumerator
 Source-Repository head
   Type:                 git
   Location:             git://github.com/kazu-yamamoto/dns.git

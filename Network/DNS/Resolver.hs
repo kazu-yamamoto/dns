@@ -40,6 +40,7 @@ import Network.Socket.ByteString.Lazy
 import Prelude hiding (lookup)
 import System.Random
 import System.Timeout
+import Network.Socket.Enumerator
 
 ----------------------------------------------------------------
 
@@ -55,7 +56,7 @@ data FileOrNumericHost = RCFilePath FilePath | RCHostName HostName
 data ResolvConf = ResolvConf {
     resolvInfo :: FileOrNumericHost
   , resolvTimeout :: Int
-  , resolvBufsize :: Int64
+  , resolvBufsize :: Integer
 }
 
 {-|
@@ -79,7 +80,7 @@ defaultResolvConf = ResolvConf {
 data ResolvSeed = ResolvSeed {
     addrInfo :: AddrInfo
   , rsTimeout :: Int
-  , rsBufsize :: Int64
+  , rsBufsize :: Integer
 }
 
 {-|
@@ -89,7 +90,7 @@ data Resolver = Resolver {
     genId   :: IO Int
   , dnsSock :: Socket
   , dnsTimeout :: Int
-  , dnsBufsize :: Int64
+  , dnsBufsize :: Integer
 }
 
 ----------------------------------------------------------------
@@ -169,7 +170,8 @@ lookupRaw :: Resolver -> Domain -> TYPE -> IO (Maybe DNSFormat)
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
     sendAll sock (composeQuery seqno [q])
-    (>>= check seqno) <$> timeout tm (parseResponse <$> recv sock bufsize)
+    let responseEnum = enumSocket bufsize sock
+    (>>= check seqno) <$> timeout tm (parseResponse responseEnum responseIter)
   where
     sock = dnsSock rlv
     bufsize = dnsBufsize rlv

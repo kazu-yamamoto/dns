@@ -62,13 +62,13 @@ encodeQuestion qs = encodeDomain dom
 ----------------------------------------------------------------
 
 encodeDomain :: Domain -> SPut
-encodeDomain dom = foldr (+++) (put8 0) (map encodeSubDomain $ zip ls ss)
+encodeDomain dom = foldr ((+++) . encodeSubDomain) (put8 0) $ zip ls ss
   where
     ss = filter (not . BS.null) $ BS.split '.' dom
     ls = map BS.length ss
 
 encodeSubDomain :: (Int, Domain) -> SPut
 encodeSubDomain (len,sub) = putInt8 len
-                        +++ foldr (+++) mempty (map put8 ss)
+                        +++ foldr ((+++) . put8) mempty ss
   where
     ss = BS.unpack sub

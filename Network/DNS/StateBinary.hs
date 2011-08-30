@@ -1,41 +1,20 @@
 module Network.DNS.StateBinary where
 
 import Blaze.ByteString.Builder
+import Control.Applicative
 import Control.Monad.State
-import Data.Binary.Get
+import Data.Attoparsec
+import Data.Attoparsec.Enumerator
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy.Char8 as L
-import Data.Char
+import qualified Data.ByteString as BS (unpack)
+import qualified Data.ByteString.Lazy as L (ByteString)
+import Data.Enumerator (Iteratee)
 import Data.Int
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM (insert, lookup, empty)
 import Data.Word
 import Network.DNS.Types
-import Prelude hiding (lookup)
-
-----------------------------------------------------------------
-
-type SGet = StateT PState Get
-
-type PState = IntMap Domain
-
-----------------------------------------------------------------
-
-(<$>) :: (Monad m) => (a -> b) -> m a -> m b
-(<$>) = liftM
-
-(<$) :: (Monad m) => b -> m a -> m b
-x <$ y = y >> return x
-
-(<*>) :: (Monad m) => m (a -> b) -> m a -> m b
-(<*>) = ap
-
-(<*) :: (Monad m) => m a -> m b -> m a
-(<*) ma mb = do
-    a <- ma
-    mb
-    return a
+import Prelude hiding (lookup, take)
 
 ----------------------------------------------------------------
 
@@ -61,14 +40,55 @@ putInt32 = writeInt32be . fromIntegral
 
 ----------------------------------------------------------------
 
+type SGet = StateT PState Parser
+
+data PState = PState {
+    psDomain :: IntMap Domain
+  , psPosition :: Int
+  }
+
+----------------------------------------------------------------
+
+getPosition :: SGet Int
+getPosition = psPosition <$> get
+
+addPosition :: Int -> SGet ()
+addPosition n = do
+    PState dom pos <- get
+    put $ PState dom (pos + n)
+
+push :: Int -> Domain -> SGet ()
+push n d = do
+    PState dom pos <- get
+    put $ PState (IM.insert n d dom) pos
+
+pop :: Int -> SGet (Maybe Domain)
+pop n = IM.lookup n . psDomain <$> get
+
+----------------------------------------------------------------
+
 get8 :: SGet Word8
-get8  = lift getWord8
+get8  = lift anyWord8 <* addPosition 1
 
 get16 :: SGet Word16
-get16 = lift getWord16be
+get16 = lift getWord16be <* addPosition 2
+  where
+    word8' = fromIntegral <$> anyWord8
+    getWord16be = do
+        a <- word8'
+        b <- word8'
+        return $ a * 256 + b
 
 get32 :: SGet Word32
-get32 = lift getWord32be
+get32 = lift getWord32be <* addPosition 4
+  where
+    word8' = fromIntegral <$> anyWord8
+    getWord32be = do
+        a <- word8'
+        b <- word8'
+        c <- word8'
+        d <- word8'
+        return $ a * 1677721 + b * 65536 + c * 256 + d
 
 getInt8 :: SGet Int
 getInt8 = fromIntegral <$> get8
@@ -81,32 +101,21 @@ getInt32 = fromIntegral <$> get32
 
 ----------------------------------------------------------------
 
-getPosition :: SGet Int
-getPosition = fromIntegral <$> lift bytesRead
-
 getNBytes :: Int -> SGet [Int]
 getNBytes len = toInts <$> getNByteString len
   where
-    toInts = map ord . BS.unpack
+    toInts = map fromIntegral . BS.unpack
 
 getNByteString :: Int -> SGet ByteString
-getNByteString = lift . getByteString . fromIntegral
+getNByteString n = lift (take n) <* addPosition n
 
 ----------------------------------------------------------------
 
-push :: Int -> Domain -> SGet ()
-push n d = modify (IM.insert n d)
+initialState :: PState
+initialState = PState IM.empty 0
 
-pop :: Int -> SGet (Maybe Domain)
-pop n = IM.lookup n <$> get
-
-----------------------------------------------------------------
-
-initialState :: IntMap Domain
-initialState = IM.empty
-
-runSGet :: SGet DNSFormat -> L.ByteString -> DNSFormat
-runSGet res bs = fst $ runGet (runStateT res initialState) bs
+runSGet :: SGet a -> Iteratee ByteString IO (a, PState)
+runSGet parser = iterParser (runStateT parser initialState)
 
 runSPut :: SPut -> L.ByteString
 runSPut = toLazyByteString . fromWrite

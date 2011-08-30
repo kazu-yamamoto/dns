@@ -66,11 +66,10 @@ lookupXviaMX rlv dom func = do
     mdps <- lookupMX rlv dom
     maybe (return Nothing) lookup' mdps
   where
-    lookup' dps = do
-        as <- catMaybes <$> mapM (func . fst) dps
-        case as of
-          []  -> return Nothing
-          ass -> return $ Just (concat ass)
+    lookup' dps = check . catMaybes <$> mapM (func . fst) dps
+    check as = case as of
+        []  -> Nothing
+        ass -> Just (concat ass)
 
 ----------------------------------------------------------------
 
