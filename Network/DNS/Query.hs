@@ -1,8 +1,8 @@
 module Network.DNS.Query (composeQuery) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
-import qualified Data.ByteString.Char8 as BS (length, split, unpack, null)
-import Data.Char
+import qualified Data.ByteString  as BS (unpack)
+import qualified Data.ByteString.Char8 as BS (length, split, null)
 import Network.DNS.StateBinary
 import Network.DNS.Internal
 import Data.Monoid
@@ -41,18 +41,18 @@ encodeHeader hdr = encodeIdentifier (identifier hdr)
                +++ decodeNsCount (nsCount hdr)
                +++ decodeArCount (arCount hdr)
   where
-    encodeIdentifier = putInt16 . fromIntegral
-    decodeQdCount = putInt16 . fromIntegral
-    decodeAnCount = putInt16 . fromIntegral
-    decodeNsCount = putInt16 . fromIntegral
-    decodeArCount = putInt16 . fromIntegral
+    encodeIdentifier = putInt16
+    decodeQdCount = putInt16
+    decodeAnCount = putInt16
+    decodeNsCount = putInt16
+    decodeArCount = putInt16
 
 encodeFlags :: DNSFlags -> SPut
 encodeFlags _ = put16 0x0100 -- xxx
 
 encodeQuestion :: [Question] -> SPut
 encodeQuestion qs = encodeDomain dom
-                +++ putInt16 (fromIntegral (typeToInt typ))
+                +++ putInt16 (typeToInt typ)
                 +++ put16 1
   where
     q = head qs
@@ -66,5 +66,9 @@ encodeDomain dom = foldr (+++) (put8 0) (map encodeSubDomain $ zip ls ss)
   where
     ss = filter (not . BS.null) $ BS.split '.' dom
     ls = map BS.length ss
-    encodeSubDomain (len,sub) = putInt8 (fromIntegral len)
-                            +++ foldr (+++) mempty (map (putInt8 . fromIntegral . ord) (BS.unpack sub))
+
+encodeSubDomain :: (Int, Domain) -> SPut
+encodeSubDomain (len,sub) = putInt8 len
+                        +++ foldr (+++) mempty (map put8 ss)
+  where
+    ss = BS.unpack sub

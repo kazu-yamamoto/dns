@@ -50,14 +50,14 @@ put16 = writeWord16be
 put32 :: Word32 -> SPut
 put32 = writeWord32be
 
-putInt8 :: Int8 -> SPut
-putInt8  = writeInt8
+putInt8 :: Int -> SPut
+putInt8  = writeInt8 . fromIntegral
 
-putInt16 :: Int16 -> SPut
-putInt16 = writeInt16be
+putInt16 :: Int -> SPut
+putInt16 = writeInt16be . fromIntegral
 
-putInt32 :: Int32 -> SPut
-putInt32 = writeInt32be
+putInt32 :: Int -> SPut
+putInt32 = writeInt32be . fromIntegral
 
 ----------------------------------------------------------------
 
