@@ -126,6 +126,7 @@ decodeRData SOA _ = RD_SOA <$> decodeDomain
     decodeRetry   = getInt32
     decodeExpire  = getInt32
     decodeMinumun = getInt32
+decodeRData PTR _ = RD_PTR <$> decodeDomain
 
 decodeRData _  len = RD_OTH <$> getNBytes len
 

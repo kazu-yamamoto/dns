@@ -18,7 +18,7 @@ type Domain = ByteString
 {-|
   Types for resource records.
 -}
-data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA
+data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA | PTR
           | UNKNOWN Int deriving (Eq, Show, Read)
 
 rrDB :: [(TYPE, Int)]
@@ -27,6 +27,7 @@ rrDB = [
   , (NS,     2)
   , (CNAME,  5)
   , (SOA,    6)
+  , (PTR,   12)
   , (MX,    15)
   , (TXT,   16)
   , (AAAA,  28)
@@ -125,7 +126,7 @@ data ResourceRecord = ResourceRecord {
 {-|
   Raw data format for each type.
 -}
-data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain
+data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
            | RD_SOA Domain Domain Int Int Int Int Int
            | RD_A IPv4 | RD_AAAA IPv6 | RD_TXT ByteString
            | RD_OTH [Int] deriving (Eq)
@@ -138,6 +139,7 @@ instance Show RDATA where
   show (RD_AAAA aaaa) = show aaaa
   show (RD_TXT txt) = BS.unpack txt
   show (RD_SOA mn _ _ _ _ _ mi) = BS.unpack mn ++ " " ++ show mi
+  show (RD_PTR dom) = BS.unpack dom
   show (RD_OTH is) = show is
 
 ----------------------------------------------------------------

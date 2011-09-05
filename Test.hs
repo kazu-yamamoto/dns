@@ -7,6 +7,7 @@ import Network.DNS as DNS
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.HUnit
 import Test.HUnit hiding (Test)
+import qualified Data.ByteString.Char8 as BS
 
 tests :: [Test]
 tests = [
@@ -16,6 +17,7 @@ tests = [
        , testCase "lookupTXT" test_lookupTXT
        , testCase "lookupAviaMX" test_lookupAviaMX
        , testCase "lookupAviaCNAME" test_lookupAviaCNAME
+       , testCase "lookupPTR" test_lookupPTR
        ]
   ]
 
@@ -59,6 +61,16 @@ test_lookupAviaCNAME = do
     rs <- makeResolvSeed defaultResolvConf
     withResolver rs $ \resolver ->
         DNS.lookupA resolver "ghs.google.com" ??= ["72.14.203.121"]
+
+test_lookupPTR :: IO ()
+test_lookupPTR = do
+    rs <- makeResolvSeed defaultResolvConf
+    withResolver rs $ \resolver ->
+        DNS.lookupPTR resolver rev ?= Just ["www-v4.iij.ad.jp."]
+  where
+    target = "210.130.137.80"
+    rev = BS.intercalate "." (reverse (BS.split '.' target))
+          `BS.append` ".in-addr.arpa"
 
 main :: IO ()
 main = defaultMain tests
