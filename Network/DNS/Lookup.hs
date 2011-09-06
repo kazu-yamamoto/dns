@@ -7,6 +7,7 @@ module Network.DNS.Lookup (
   , lookupMX, lookupAviaMX, lookupAAAAviaMX
   , lookupTXT
   , lookupPTR
+  , lookupSRV
   ) where
 
 import Control.Applicative
@@ -95,3 +96,15 @@ lookupPTR rlv dom = toPTR <$> DNS.lookup rlv dom PTR
     toPTR = maybe Nothing (Just . map unTag)
     unTag (RD_PTR dm) = dm
     unTag _ = error "lookupPTR"
+
+----------------------------------------------------------------
+
+{-|
+  Resolving 'Domain' and its preference by 'SRV'.
+-}
+lookupSRV :: Resolver -> Domain -> IO (Maybe [(Int,Int,Int,Domain)])
+lookupSRV rlv dom = toSRV <$> DNS.lookup rlv dom SRV
+  where
+    toSRV = maybe Nothing (Just . map unTag)
+    unTag (RD_SRV pri wei prt dm) = (pri,wei,prt,dm)
+    unTag _ = error "lookupSRV"

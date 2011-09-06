@@ -18,6 +18,7 @@ tests = [
        , testCase "lookupAviaMX" test_lookupAviaMX
        , testCase "lookupAviaCNAME" test_lookupAviaCNAME
        , testCase "lookupPTR" test_lookupPTR
+       , testCase "lookupSRV" test_lookupSRV
        ]
   ]
 
@@ -71,6 +72,12 @@ test_lookupPTR = do
     target = "210.130.137.80"
     rev = BS.intercalate "." (reverse (BS.split '.' target))
           `BS.append` ".in-addr.arpa"
+
+test_lookupSRV :: IO ()
+test_lookupSRV = do
+    rs <- makeResolvSeed defaultResolvConf
+    withResolver rs $ \resolver ->
+        DNS.lookupSRV resolver "_sip._tcp.cisco.com" ?= Just [(1,0,5060,"vcsgw.cisco.com.")]
 
 main :: IO ()
 main = defaultMain tests
