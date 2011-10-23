@@ -15,17 +15,17 @@ import Test.HUnit hiding (Test)
 tests :: [Test]
 tests = 
   [ testGroup "Test case"
-      [ testCase "QueryA" (test_Format queryA)
-      , testCase "QueryAAAA" (test_Format queryAAAA)
-      , testCase "ResponseA" (test_Format responseA)
+      [ testCase "QueryA" (test_Format testQueryA)
+      , testCase "QueryAAAA" (test_Format testQueryAAAA)
+      , testCase "ResponseA" (test_Format $ testResponseA)
       ]
   ]
 
 defaultHeader :: DNSHeader
 defaultHeader = header defaultQuery
 
-queryA :: DNSFormat
-queryA = defaultQuery
+testQueryA :: DNSFormat
+testQueryA = defaultQuery
   { header = defaultHeader
       { identifier = 1000
       , qdCount = 1
@@ -33,8 +33,8 @@ queryA = defaultQuery
   , question = [makeQuestion "www.mew.org." A]
   }
 
-queryAAAA :: DNSFormat
-queryAAAA = defaultQuery
+testQueryAAAA :: DNSFormat
+testQueryAAAA = defaultQuery
   { header = defaultHeader
       { identifier = 1000
       , qdCount = 1
@@ -42,8 +42,8 @@ queryAAAA = defaultQuery
   , question = [makeQuestion "www.mew.org." AAAA]
   }
 
-responseA :: DNSFormat
-responseA = DNSFormat { header = DNSHeader { identifier = 61046
+testResponseA :: DNSFormat
+testResponseA = DNSFormat { header = DNSHeader { identifier = 61046
                                , flags = DNSFlags { qOrR = QR_Response
                                                   , opcode = OP_STD
                                                   , authAnswer = False
@@ -157,7 +157,7 @@ test_Format fmt = do
     assertEqual "fail" fmt fmt'
   where
     bs = composeDNSFormat fmt 
-    result = runResponse_ bs
+    result = runDNSFormat_ bs
 
 main :: IO ()
 main = defaultMain tests

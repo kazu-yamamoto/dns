@@ -2,9 +2,7 @@
 module Network.DNS.Query (composeQuery, composeDNSFormat) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
-import qualified Data.ByteString  as BS (unpack)
-import qualified Data.ByteString.Char8 as BS (length, split, null)
-import Blaze.ByteString.Builder.ByteString (writeByteString)
+import qualified Data.ByteString.Char8 as BS (length, null, break, drop)
 import Network.DNS.StateBinary
 import Network.DNS.Internal
 import Data.Monoid
@@ -109,7 +107,7 @@ encodeRDATA rd = case rd of
     (RD_CNAME dom)     -> encodeDomain dom
     (RD_PTR dom)       -> encodeDomain dom
     (RD_MX prf dom)    -> mconcat [putInt16 prf, encodeDomain dom]
-    (RD_TXT txt)       -> writeByteString txt
+    (RD_TXT txt)       -> putByteString txt
     (RD_OTH bytes)     -> mconcat $ map putInt8 bytes
     (RD_SOA d1 d2 serial refresh retry expire min') -> mconcat $
         [ encodeDomain d1
@@ -130,13 +128,23 @@ encodeRDATA rd = case rd of
 ----------------------------------------------------------------
 
 encodeDomain :: Domain -> SPut
-encodeDomain dom = foldr ((+++) . encodeSubDomain) (put8 0) $ zip ls ss
+encodeDomain dom | BS.null dom = put8 0
+encodeDomain dom = do
+    mpos <- wsPop dom
+    cur <- gets wsPosition
+    case mpos of
+        Just pos -> encodePointer pos
+        Nothing  -> wsPush dom cur >>
+                    mconcat [ encodePartialDomain hd
+                            , encodeDomain tl
+                            ]
   where
-    ss = filter (not . BS.null) $ BS.split '.' dom
-    ls = map BS.length ss
+    (hd, tl') = BS.break (=='.') dom
+    tl = if BS.null tl' then tl' else BS.drop 1 tl'
 
-encodeSubDomain :: (Int, Domain) -> SPut
-encodeSubDomain (len,sub) = putInt8 len
-                        +++ foldr ((+++) . put8) mempty ss
-  where
-    ss = BS.unpack sub
+encodePointer :: Int -> SPut
+encodePointer pos = let w = (pos .|. 0xc000) in putInt16 w
+
+encodePartialDomain :: Domain -> SPut
+encodePartialDomain sub = putInt8 (BS.length sub)
+                      +++ putByteString sub

@@ -1,43 +1,85 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module Network.DNS.StateBinary where
 
 import Blaze.ByteString.Builder
 import Control.Applicative
 import Control.Monad.State
+import Data.Monoid
 import Data.Attoparsec
 import Data.Attoparsec.Enumerator
 import qualified Data.Attoparsec.Lazy as AL
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS (unpack)
+import qualified Data.ByteString as BS (unpack, length)
 import qualified Data.ByteString.Lazy as BL (ByteString)
 import Data.Enumerator (Iteratee)
 import Data.Int
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM (insert, lookup, empty)
+import Data.Map (Map)
+import qualified Data.Map as M (insert, lookup, empty)
 import Data.Word
 import Network.DNS.Types
 import Prelude hiding (lookup, take)
 
 ----------------------------------------------------------------
 
-type SPut = Write
+type SPut = State WState Write
+
+data WState = WState {
+    wsDomain :: Map Domain Int
+  , wsPosition :: Int
+}
+
+initialWState :: WState
+initialWState = WState M.empty 0
+
+instance Monoid SPut where
+    mempty = return mempty
+    mappend a b = mconcat <$> sequence [a, b]
 
 put8 :: Word8 -> SPut
-put8  = writeWord8
+put8 = fixedSized 1 writeWord8
 
 put16 :: Word16 -> SPut
-put16 = writeWord16be
+put16 = fixedSized 2 writeWord16be
 
 put32 :: Word32 -> SPut
-put32 = writeWord32be
+put32 = fixedSized 4 writeWord32be
 
 putInt8 :: Int -> SPut
-putInt8  = writeInt8 . fromIntegral
+putInt8 = fixedSized 1 (writeInt8 . fromIntegral)
 
 putInt16 :: Int -> SPut
-putInt16 = writeInt16be . fromIntegral
+putInt16 = fixedSized 2 (writeInt16be . fromIntegral)
 
 putInt32 :: Int -> SPut
-putInt32 = writeInt32be . fromIntegral
+putInt32 = fixedSized 4 (writeInt32be . fromIntegral)
+
+putByteString :: ByteString -> SPut
+putByteString = writeSized BS.length writeByteString
+
+addPositionW :: Int -> State WState ()
+addPositionW n = do
+    (WState m cur) <- get
+    put $ WState m (cur+n)
+
+fixedSized :: Int -> (a -> Write) -> a -> SPut
+fixedSized n f a = do addPositionW n
+                      return (f a)
+
+writeSized :: Show a => (a -> Int) -> (a -> Write) -> a -> SPut
+writeSized n f a = do addPositionW (n a)
+                      return (f a)
+
+wsPop :: Domain -> State WState (Maybe Int)
+wsPop dom = do
+    doms <- gets wsDomain
+    return $ M.lookup dom doms
+
+wsPush :: Domain -> Int -> State WState ()
+wsPush dom pos = do
+    (WState m cur) <- get
+    put $ WState (M.insert dom pos m) cur
 
 ----------------------------------------------------------------
 
@@ -122,4 +164,4 @@ runSGet :: SGet a -> BL.ByteString -> Either String (a, PState)
 runSGet parser bs = AL.eitherResult $ AL.parse (runStateT parser initialState) bs
 
 runSPut :: SPut -> BL.ByteString
-runSPut = toLazyByteString . fromWrite
+runSPut = toLazyByteString . fromWrite . flip evalState initialWState
