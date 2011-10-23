@@ -8,18 +8,19 @@ module Network.DNS.Types (
   -- * TYPE
   , TYPE (..), intToType, typeToInt, toType
   -- * DNS Format
-  , DNSFormat, header, question, answer, authority, additional
+  , DNSFormat (DNSFormat), header, question, answer, authority, additional
   -- * DNS Header
-  , DNSHeader, identifier, flags, qdCount, anCount, nsCount, arCount
+  , DNSHeader (DNSHeader), identifier, flags, qdCount, anCount, nsCount, arCount
   -- * DNS Flags
-  , DNSFlags, qOrR, opcode, authAnswer, trunCation, recDesired, recAvailable, rcode
+  , DNSFlags (DNSFlags), qOrR, opcode, authAnswer, trunCation, recDesired, recAvailable, rcode
   -- * DNS Body
   , QorR (..)
   , OPCODE (..)
   , RCODE (..)
-  , ResourceRecord, rrname, rrtype, rrttl, rdlen, rdata
-  , Question, qname, qtype, makeQuestion
+  , ResourceRecord (ResourceRecord), rrname, rrtype, rrttl, rdlen, rdata
+  , Question (Question), qname, qtype, makeQuestion
   , RDATA (..)
+  , responseA, responseAAAA
   ) where
 
 import Network.DNS.Internal

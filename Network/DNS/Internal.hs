@@ -151,7 +151,15 @@ defaultQuery :: DNSFormat
 defaultQuery = DNSFormat {
     header = DNSHeader {
        identifier = 0
-     , flags = undefined
+     , flags = DNSFlags {
+           qOrR         = QR_Query
+         , opcode       = OP_STD
+         , authAnswer   = False
+         , trunCation   = False
+         , recDesired   = True
+         , recAvailable = False
+         , rcode        = NoErr
+         }
      , qdCount = 0
      , anCount = 0
      , nsCount = 0
@@ -162,3 +170,39 @@ defaultQuery = DNSFormat {
   , authority  = []
   , additional = []
   }
+
+defaultResponse :: DNSFormat
+defaultResponse =
+  let hd = header defaultQuery
+      flg = flags hd
+  in  defaultQuery {
+        header = hd {
+          flags = flg {
+              qOrR = QR_Response
+            , authAnswer = True
+            , recAvailable = True
+            }
+        }
+      }
+
+responseA :: Int -> Question -> IPv4 -> DNSFormat
+responseA ident q ip =
+  let hd = header defaultResponse
+      dom = qname q
+      an = ResourceRecord dom A 300 4 (RD_A ip)
+  in  defaultResponse {
+          header = hd { identifier=ident, qdCount = 1, anCount = 1 }
+        , question = [q]
+        , answer = [an]
+      }
+
+responseAAAA :: Int -> Question -> IPv6 -> DNSFormat
+responseAAAA ident q ip =
+  let hd = header defaultResponse
+      dom = qname q
+      an = ResourceRecord dom AAAA 300 16 (RD_AAAA ip)
+  in  defaultResponse {
+          header = hd { identifier=ident, qdCount = 1, anCount = 1 }
+        , question = [q]
+        , answer = [an]
+      }

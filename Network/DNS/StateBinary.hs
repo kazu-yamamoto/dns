@@ -5,6 +5,7 @@ import Control.Applicative
 import Control.Monad.State
 import Data.Attoparsec
 import Data.Attoparsec.Enumerator
+import qualified Data.Attoparsec.Lazy as AL
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS (unpack)
 import qualified Data.ByteString.Lazy as BL (ByteString)
@@ -114,8 +115,11 @@ getNByteString n = lift (take n) <* addPosition n
 initialState :: PState
 initialState = PState IM.empty 0
 
-runSGet :: SGet a -> Iteratee ByteString IO (a, PState)
-runSGet parser = iterParser (runStateT parser initialState)
+iterSGet :: Monad m => SGet a -> Iteratee ByteString m (a, PState)
+iterSGet parser = iterParser (runStateT parser initialState)
+
+runSGet :: SGet a -> BL.ByteString -> Either String (a, PState)
+runSGet parser bs = AL.eitherResult $ AL.parse (runStateT parser initialState) bs
 
 runSPut :: SPut -> BL.ByteString
 runSPut = toLazyByteString . fromWrite
