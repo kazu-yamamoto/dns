@@ -1,33 +1,46 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Network.DNS.Response (responseIter, parseResponse, runDNSFormat, runDNSFormat_) where
+module Network.DNS.Decode (
+    receive
+  , decode
+  ) where
 
 import Control.Applicative
 import Control.Monad
 import Data.Bits
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy as BL
+import Data.Enumerator (Enumerator, run_, ($$))
 import Data.IP
 import Data.Maybe
+import Network
 import Network.DNS.Internal
 import Network.DNS.StateBinary
-import Data.Enumerator (Enumerator, Iteratee, run_, ($$))
-import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy as BL
+import Network.Socket.Enumerator
 
-runDNSFormat :: BL.ByteString -> Either String (DNSFormat, PState)
-runDNSFormat = runSGet decodeResponse
+----------------------------------------------------------------
 
-runDNSFormat_ :: BL.ByteString -> Either String DNSFormat
-runDNSFormat_ bs = fst <$> runDNSFormat bs
+{-| Receiving DNS data from 'Socket' and parse it.
+    The second argument is a buffer size for the socket.
+-}
+receive :: Socket -> Integer -> IO DNSFormat
+receive sock bufsize = receiveDNSFormat responseEnum
+  where
+    responseEnum = enumSocket bufsize sock
 
-responseIter :: Monad m => Iteratee ByteString m (DNSFormat, PState)
-responseIter = iterSGet decodeResponse
+{-| Parsing DNS data.
+-}
+decode :: BL.ByteString -> Either String DNSFormat
+decode bs = fst <$> runSGet decodeResponse bs
 
-parseResponse :: (Functor m, Monad m)
-              => Enumerator ByteString m (a,b)
-              -> Iteratee ByteString m (a,b)
-              -> m a
-parseResponse enum iter = fst <$> run_ (enum $$ iter)
+----------------------------------------------------------------
+
+receiveDNSFormat :: Enumerator ByteString IO (DNSFormat, PState)
+                 -> IO DNSFormat
+receiveDNSFormat enum = fst <$> run_ (enum $$ iter)
+  where
+    iter = iterSGet decodeResponse
 
 ----------------------------------------------------------------
 

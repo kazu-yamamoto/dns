@@ -2,17 +2,15 @@
 
 module TestProtocol where
 
+import Data.IP
 import Network.DNS
 import Network.DNS.Internal
-import Network.DNS.Query
-import Network.DNS.Response
-import Data.IP
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.HUnit
 import Test.HUnit hiding (Test)
 
 tests :: [Test]
-tests = 
+tests =
   [ testGroup "Test case"
       [ testCase "QueryA" (test_Format testQueryA)
       , testCase "QueryAAAA" (test_Format testQueryAAAA)
@@ -155,8 +153,8 @@ test_Format fmt = do
     let (Right fmt') = result
     assertEqual "fail" fmt fmt'
   where
-    bs = composeDNSFormat fmt 
-    result = runDNSFormat_ bs
+    bs = encode fmt
+    result = decode bs
 
 main :: IO ()
 main = defaultMain tests

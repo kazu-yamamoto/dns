@@ -1,23 +1,20 @@
 {-# LANGUAGE RecordWildCards, OverloadedStrings #-}
 
-import System.Environment
-import Debug.Trace
-import Control.Monad
-import Control.Concurrent
 import Control.Applicative
-import Data.Monoid
-import Data.Maybe
+import Control.Concurrent
+import Control.Monad
 import qualified Data.ByteString as S
 import Data.ByteString.Lazy hiding (putStrLn, filter, length)
-import System.Timeout
+import Data.Default
+import Data.Maybe
+import Data.Monoid
+import Debug.Trace
 import Network.BSD
 import Network.DNS hiding (lookup)
-import Network.DNS.Response
-import Network.DNS.Query
 import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
-import Network.Socket.Enumerator
-import Data.Default
+import System.Environment
+import System.Timeout
 
 data Conf = Conf {
     bufSize :: Int
@@ -42,11 +39,9 @@ proxyRequest :: Conf -> ResolvConf -> DNSFormat -> IO (Maybe DNSFormat)
 proxyRequest Conf{..} rc req = do
     let
       worker Resolver{..} = do
-        let packet = mconcat . toChunks $ composeDNSFormat req
+        let packet = mconcat . toChunks $ encode req
         sendAll dnsSock packet
-        let responseEnum = enumSocket dnsBufsize dnsSock
-        parseResponse responseEnum responseIter
-
+        receive dnsSock dnsBufsize
     rs <- makeResolvSeed rc
     withResolver rs $ \r ->
         (>>= check) <$> timeout' "proxy timeout" timeOut (worker r)
@@ -76,7 +71,7 @@ handleRequest conf rc req = maybe (proxyRequest conf rc req) (trace "return A re
             ]
 
 handlePacket :: Conf -> Socket -> SockAddr -> S.ByteString -> IO ()
-handlePacket conf@Conf{..} sock addr bs = case runDNSFormat_ (fromChunks [bs]) of
+handlePacket conf@Conf{..} sock addr bs = case decode (fromChunks [bs]) of
     Right req -> do
         print req
         let rc = defaultResolvConf { resolvInfo = RCHostName realDNS }
@@ -84,7 +79,7 @@ handlePacket conf@Conf{..} sock addr bs = case runDNSFormat_ (fromChunks [bs]) o
         print mrsp
         case mrsp of
             Just rsp ->
-                let packet = mconcat . toChunks $ composeDNSFormat rsp
+                let packet = mconcat . toChunks $ encode rsp
                 in  timeout' "send timeout" timeOut (sendAllTo sock packet addr) >>
                     print (S.length packet) >>
                     return ()
@@ -95,7 +90,7 @@ main :: IO ()
 main = withSocketsDo $ do
     dns <- fromMaybe (realDNS def) . listToMaybe <$> getArgs
     let conf = def { realDNS=dns }
-    addrinfos <- getAddrInfo 
+    addrinfos <- getAddrInfo
                    (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
                    Nothing (Just "domain")
     addrinfo <- maybe (fail "no addr info") return (listToMaybe addrinfos)

@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Network.DNS.Query (composeQuery, composeDNSFormat) where
+module Network.DNS.Encode (encode) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
 import qualified Data.ByteString.Char8 as BS (length, null, break, drop)
@@ -16,20 +16,10 @@ import Data.IP
 
 ----------------------------------------------------------------
 
-composeDNSFormat :: DNSFormat -> BL.ByteString
-composeDNSFormat fmt = runSPut (encodeDNSFormat fmt)
-
-composeQuery :: Int -> [Question] -> BL.ByteString
-composeQuery idt qs = composeDNSFormat qry
-  where
-    hdr = header defaultQuery
-    qry = defaultQuery {
-        header = hdr {
-           identifier = idt
-         , qdCount = length qs
-         }
-      , question = qs
-      }
+{-| Composing DNS data.
+-}
+encode :: DNSFormat -> BL.ByteString
+encode fmt = runSPut (encodeDNSFormat fmt)
 
 ----------------------------------------------------------------
 

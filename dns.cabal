@@ -1,14 +1,11 @@
 Name:                   dns
-Version:                0.2.1
+Version:                0.3.0
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
 License-File:           LICENSE
 Synopsis:               DNS libary in Haskell
-Description:            DNS libary. Currently only resolver side
-                        is supported. That is, this library includes
-                        a composer of DNS query and a parser of DNS
-                        response.
+Description:            DNS libary for clients and servers.
 Category:               Network
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
@@ -22,10 +19,10 @@ library
                         Network.DNS.Lookup
                         Network.DNS.Resolver
                         Network.DNS.Types
+                        Network.DNS.Encode
+                        Network.DNS.Decode
   Other-Modules:        Network.DNS.Internal
                         Network.DNS.StateBinary
-                        Network.DNS.Query
-                        Network.DNS.Response
   if impl(ghc >= 7)
     Build-Depends:      base >= 4 && < 5,
                         binary, iproute,

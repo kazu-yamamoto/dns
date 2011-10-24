@@ -28,19 +28,20 @@ module Network.DNS.Resolver (
 
 import Control.Applicative
 import Control.Exception
+import qualified Data.ByteString.Lazy as BL
 import Data.Char
 import Data.Int
 import Data.List hiding (find, lookup)
 import Network.BSD
-import Network.DNS.Query
-import Network.DNS.Response
+import Network.DNS.Decode
+import Network.DNS.Encode
+import Network.DNS.Internal
 import Network.DNS.Types
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
 import Prelude hiding (lookup)
 import System.Random
 import System.Timeout
-import Network.Socket.Enumerator
 
 ----------------------------------------------------------------
 
@@ -170,8 +171,7 @@ lookupRaw :: Resolver -> Domain -> TYPE -> IO (Maybe DNSFormat)
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
     sendAll sock (composeQuery seqno [q])
-    let responseEnum = enumSocket bufsize sock
-    (>>= check seqno) <$> timeout tm (parseResponse responseEnum responseIter)
+    (>>= check seqno) <$> timeout tm (receive sock bufsize)
   where
     sock = dnsSock rlv
     bufsize = dnsBufsize rlv
@@ -182,3 +182,17 @@ lookupRaw rlv dom typ = do
         if identifier hdr == seqno && anCount hdr /= 0
             then Just res
             else Nothing
+
+----------------------------------------------------------------
+
+composeQuery :: Int -> [Question] -> BL.ByteString
+composeQuery idt qs = encode qry
+  where
+    hdr = header defaultQuery
+    qry = defaultQuery {
+        header = hdr {
+           identifier = idt
+         , qdCount = length qs
+         }
+      , question = qs
+      }
