@@ -7,7 +7,6 @@ import Network.DNS.Internal
 import Network.DNS.Query
 import Network.DNS.Response
 import Data.IP
-import Control.Monad.State
 import Test.Framework (defaultMain, testGroup, Test)
 import Test.Framework.Providers.HUnit
 import Test.HUnit hiding (Test)
@@ -17,7 +16,7 @@ tests =
   [ testGroup "Test case"
       [ testCase "QueryA" (test_Format testQueryA)
       , testCase "QueryAAAA" (test_Format testQueryAAAA)
-      , testCase "ResponseA" (test_Format $ testResponseA)
+      , testCase "ResponseA" (test_Format testResponseA)
       ]
   ]
 

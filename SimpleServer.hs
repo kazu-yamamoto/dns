@@ -48,7 +48,7 @@ proxyRequest Conf{..} rc req = do
         parseResponse responseEnum responseIter
 
     rs <- makeResolvSeed rc
-    withResolver rs $ \r -> do
+    withResolver rs $ \r ->
         (>>= check) <$> timeout' "proxy timeout" timeOut (worker r)
   where
     ident = identifier . header $ req
@@ -59,7 +59,7 @@ proxyRequest Conf{..} rc req = do
                         else trace "identifier not match" Nothing
 
 {--
- - 先尝试本地查询，查询不到就代理到真正的dns服务器
+ - TBD
  --}
 handleRequest :: Conf -> ResolvConf -> DNSFormat -> IO (Maybe DNSFormat)
 handleRequest conf rc req = maybe (proxyRequest conf rc req) (trace "return A record" $ return . Just) mresponse
