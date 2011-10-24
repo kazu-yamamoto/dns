@@ -1,5 +1,8 @@
 {-# LANGUAGE RecordWildCards #-}
-module Network.DNS.Encode (encode) where
+module Network.DNS.Encode (
+    encode
+  , composeQuery
+  ) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
 import qualified Data.ByteString.Char8 as BS (length, null, break, drop)
@@ -13,6 +16,22 @@ import Data.IP
 
 (+++) :: Monoid a => a -> a -> a
 (+++) = mappend
+
+----------------------------------------------------------------
+
+{-| Composing query. First argument is a number to identify response.
+-}
+composeQuery :: Int -> [Question] -> BL.ByteString
+composeQuery idt qs = encode qry
+  where
+    hdr = header defaultQuery
+    qry = defaultQuery {
+        header = hdr {
+           identifier = idt
+         , qdCount = length qs
+         }
+      , question = qs
+      }
 
 ----------------------------------------------------------------
 

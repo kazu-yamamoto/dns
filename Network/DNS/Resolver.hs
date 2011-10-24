@@ -182,17 +182,3 @@ lookupRaw rlv dom typ = do
         if identifier hdr == seqno && anCount hdr /= 0
             then Just res
             else Nothing
-
-----------------------------------------------------------------
-
-composeQuery :: Int -> [Question] -> BL.ByteString
-composeQuery idt qs = encode qry
-  where
-    hdr = header defaultQuery
-    qry = defaultQuery {
-        header = hdr {
-           identifier = idt
-         , qdCount = length qs
-         }
-      , question = qs
-      }

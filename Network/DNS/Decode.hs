@@ -1,8 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.DNS.Decode (
-    receive
-  , decode
+    decode
+  , receive
   ) where
 
 import Control.Applicative
@@ -28,6 +28,8 @@ receive :: Socket -> Integer -> IO DNSFormat
 receive sock bufsize = receiveDNSFormat responseEnum
   where
     responseEnum = enumSocket bufsize sock
+
+----------------------------------------------------------------
 
 {-| Parsing DNS data.
 -}
