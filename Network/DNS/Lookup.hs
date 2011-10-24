@@ -25,7 +25,7 @@ import Network.DNS.Types
 lookupA :: Resolver -> Domain -> IO (Maybe [IPv4])
 lookupA rlv dom = toV4 <$> DNS.lookup rlv dom A
   where
-    toV4 = maybe Nothing (Just . map unTag)
+    toV4 = fmap (map unTag)
     unTag (RD_A x) = x
     unTag _ = error "lookupA"
 
@@ -35,7 +35,7 @@ lookupA rlv dom = toV4 <$> DNS.lookup rlv dom A
 lookupAAAA :: Resolver -> Domain -> IO (Maybe [IPv6])
 lookupAAAA rlv dom = toV6 <$> DNS.lookup rlv dom AAAA
   where
-    toV6 = maybe Nothing (Just . map unTag)
+    toV6 = fmap (map unTag)
     unTag (RD_AAAA x) = x
     unTag _ = error "lookupAAAA"
 
@@ -47,7 +47,7 @@ lookupAAAA rlv dom = toV6 <$> DNS.lookup rlv dom AAAA
 lookupMX :: Resolver -> Domain -> IO (Maybe [(Domain,Int)])
 lookupMX rlv dom = toMX <$> DNS.lookup rlv dom MX
   where
-    toMX = maybe Nothing (Just . map unTag)
+    toMX = fmap (map unTag)
     unTag (RD_MX pr dm) = (dm,pr)
     unTag _ = error "lookupMX"
 
@@ -81,7 +81,7 @@ lookupXviaMX rlv dom func = do
 lookupTXT :: Resolver -> Domain -> IO (Maybe [ByteString])
 lookupTXT rlv dom = toTXT <$> DNS.lookup rlv dom TXT
   where
-    toTXT = maybe Nothing (Just . map unTag)
+    toTXT = fmap (map unTag)
     unTag (RD_TXT x) = x
     unTag _ = error "lookupTXT"
 
@@ -93,7 +93,7 @@ lookupTXT rlv dom = toTXT <$> DNS.lookup rlv dom TXT
 lookupPTR :: Resolver -> Domain -> IO (Maybe [Domain])
 lookupPTR rlv dom = toPTR <$> DNS.lookup rlv dom PTR
   where
-    toPTR = maybe Nothing (Just . map unTag)
+    toPTR = fmap (map unTag)
     unTag (RD_PTR dm) = dm
     unTag _ = error "lookupPTR"
 
@@ -105,6 +105,6 @@ lookupPTR rlv dom = toPTR <$> DNS.lookup rlv dom PTR
 lookupSRV :: Resolver -> Domain -> IO (Maybe [(Int,Int,Int,Domain)])
 lookupSRV rlv dom = toSRV <$> DNS.lookup rlv dom SRV
   where
-    toSRV = maybe Nothing (Just . map unTag)
+    toSRV = fmap (map unTag)
     unTag (RD_SRV pri wei prt dm) = (pri,wei,prt,dm)
     unTag _ = error "lookupSRV"

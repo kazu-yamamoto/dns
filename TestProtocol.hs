@@ -147,7 +147,7 @@ testResponseA = DNSFormat { header = DNSHeader { identifier = 61046
           }
 
 assertEither :: (a -> String) -> Either a b -> IO ()
-assertEither f e = either (assertFailure . f) (const $ return ()) e
+assertEither f = either (assertFailure . f) (const $ return ())
 
 test_Format :: DNSFormat -> IO ()
 test_Format fmt = do

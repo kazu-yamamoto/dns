@@ -109,7 +109,7 @@ encodeRDATA rd = case rd of
     (RD_MX prf dom)    -> mconcat [putInt16 prf, encodeDomain dom]
     (RD_TXT txt)       -> putByteString txt
     (RD_OTH bytes)     -> mconcat $ map putInt8 bytes
-    (RD_SOA d1 d2 serial refresh retry expire min') -> mconcat $
+    (RD_SOA d1 d2 serial refresh retry expire min') -> mconcat
         [ encodeDomain d1
         , encodeDomain d2
         , putInt32 serial
@@ -118,7 +118,7 @@ encodeRDATA rd = case rd of
         , putInt32 expire
         , putInt32 min'
         ]
-    (RD_SRV prio weight port dom) -> mconcat $
+    (RD_SRV prio weight port dom) -> mconcat
         [ putInt16 prio
         , putInt16 weight
         , putInt16 port

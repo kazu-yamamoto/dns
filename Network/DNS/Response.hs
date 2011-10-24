@@ -15,7 +15,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as BL
 
 runDNSFormat :: BL.ByteString -> Either String (DNSFormat, PState)
-runDNSFormat bs = runSGet decodeResponse bs
+runDNSFormat = runSGet decodeResponse
 
 runDNSFormat_ :: BL.ByteString -> Either String DNSFormat
 runDNSFormat_ bs = fst <$> runDNSFormat bs
