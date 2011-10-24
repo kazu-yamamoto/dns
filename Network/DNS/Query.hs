@@ -1,19 +1,26 @@
-module Network.DNS.Query (composeQuery) where
+{-# LANGUAGE RecordWildCards #-}
+module Network.DNS.Query (composeQuery, composeDNSFormat) where
 
 import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
-import qualified Data.ByteString  as BS (unpack)
-import qualified Data.ByteString.Char8 as BS (length, split, null)
+import qualified Data.ByteString.Char8 as BS (length, null, break, drop)
 import Network.DNS.StateBinary
 import Network.DNS.Internal
 import Data.Monoid
+import Control.Monad.State
+import Data.Bits
+import Data.Word
+import Data.IP
 
 (+++) :: Monoid a => a -> a -> a
 (+++) = mappend
 
 ----------------------------------------------------------------
 
+composeDNSFormat :: DNSFormat -> BL.ByteString
+composeDNSFormat fmt = runSPut (encodeDNSFormat fmt)
+
 composeQuery :: Int -> [Question] -> BL.ByteString
-composeQuery idt qs = runSPut (encodeQuery qry)
+composeQuery idt qs = composeDNSFormat qry
   where
     hdr = header defaultQuery
     qry = defaultQuery {
@@ -26,12 +33,18 @@ composeQuery idt qs = runSPut (encodeQuery qry)
 
 ----------------------------------------------------------------
 
-encodeQuery :: DNSFormat -> SPut
-encodeQuery fmt = encodeHeader hdr
-              +++ encodeQuestion qs
+encodeDNSFormat :: DNSFormat -> SPut
+encodeDNSFormat fmt = encodeHeader hdr
+                  +++ mconcat (map encodeQuestion qs)
+                  +++ mconcat (map encodeRR an)
+                  +++ mconcat (map encodeRR au)
+                  +++ mconcat (map encodeRR ad)
   where
     hdr = header fmt
     qs = question fmt
+    an = answer fmt
+    au = authority fmt
+    ad = additional fmt
 
 encodeHeader :: DNSHeader -> SPut
 encodeHeader hdr = encodeIdentifier (identifier hdr)
@@ -48,27 +61,90 @@ encodeHeader hdr = encodeIdentifier (identifier hdr)
     decodeArCount = putInt16
 
 encodeFlags :: DNSFlags -> SPut
-encodeFlags _ = put16 0x0100 -- xxx
-
-encodeQuestion :: [Question] -> SPut
-encodeQuestion qs = encodeDomain dom
-                +++ putInt16 (typeToInt typ)
-                +++ put16 1
+encodeFlags DNSFlags{..} = put16 word
   where
-    q = head qs
-    dom = qname q
-    typ = qtype q
+    word16 :: Enum a => a -> Word16
+    word16 = toEnum . fromEnum
+
+    set :: Word16 -> State Word16 ()
+    set byte = modify (.|. byte)
+
+    st :: State Word16 ()
+    st = sequence_
+              [ set (word16 rcode)
+              , when recAvailable        $ set (bit 7)
+              , when recDesired          $ set (bit 8)
+              , when trunCation          $ set (bit 9)
+              , when authAnswer          $ set (bit 10)
+              , set (word16 opcode `shiftL` 11)
+              , when (qOrR==QR_Response) $ set (bit 15)
+              ]
+
+    word = execState st 0
+
+encodeQuestion :: Question -> SPut
+encodeQuestion Question{..} =
+        encodeDomain qname
+    +++ putInt16 (typeToInt qtype)
+    +++ put16 1
+
+encodeRR :: ResourceRecord -> SPut
+encodeRR ResourceRecord{..} =
+    mconcat
+      [ encodeDomain rrname
+      , putInt16 (typeToInt rrtype)
+      , put16 1
+      , putInt32 rrttl
+      , putInt16 rdlen
+      , encodeRDATA rdata
+      ]
+
+encodeRDATA :: RDATA -> SPut
+encodeRDATA rd = case rd of
+    (RD_A ip)          -> mconcat $ map putInt8 (fromIPv4 ip)
+    (RD_AAAA ip)       -> mconcat $ map putInt16 (fromIPv6 ip)
+    (RD_NS dom)        -> encodeDomain dom
+    (RD_CNAME dom)     -> encodeDomain dom
+    (RD_PTR dom)       -> encodeDomain dom
+    (RD_MX prf dom)    -> mconcat [putInt16 prf, encodeDomain dom]
+    (RD_TXT txt)       -> putByteString txt
+    (RD_OTH bytes)     -> mconcat $ map putInt8 bytes
+    (RD_SOA d1 d2 serial refresh retry expire min') -> mconcat $
+        [ encodeDomain d1
+        , encodeDomain d2
+        , putInt32 serial
+        , putInt32 refresh
+        , putInt32 retry
+        , putInt32 expire
+        , putInt32 min'
+        ]
+    (RD_SRV prio weight port dom) -> mconcat $
+        [ putInt16 prio
+        , putInt16 weight
+        , putInt16 port
+        , encodeDomain dom
+        ]
 
 ----------------------------------------------------------------
 
 encodeDomain :: Domain -> SPut
-encodeDomain dom = foldr ((+++) . encodeSubDomain) (put8 0) $ zip ls ss
+encodeDomain dom | BS.null dom = put8 0
+encodeDomain dom = do
+    mpos <- wsPop dom
+    cur <- gets wsPosition
+    case mpos of
+        Just pos -> encodePointer pos
+        Nothing  -> wsPush dom cur >>
+                    mconcat [ encodePartialDomain hd
+                            , encodeDomain tl
+                            ]
   where
-    ss = filter (not . BS.null) $ BS.split '.' dom
-    ls = map BS.length ss
+    (hd, tl') = BS.break (=='.') dom
+    tl = if BS.null tl' then tl' else BS.drop 1 tl'
 
-encodeSubDomain :: (Int, Domain) -> SPut
-encodeSubDomain (len,sub) = putInt8 len
-                        +++ foldr ((+++) . put8) mempty ss
-  where
-    ss = BS.unpack sub
+encodePointer :: Int -> SPut
+encodePointer pos = let w = (pos .|. 0xc000) in putInt16 w
+
+encodePartialDomain :: Domain -> SPut
+encodePartialDomain sub = putInt8 (BS.length sub)
+                      +++ putByteString sub

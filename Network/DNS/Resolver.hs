@@ -21,7 +21,7 @@ module Network.DNS.Resolver (
   -- ** Intermediate data type for resolver
   , ResolvSeed, makeResolvSeed
   -- ** Type and function for resolver
-  , Resolver, withResolver
+  , Resolver(..), withResolver
   -- ** Looking up functions
   , lookup, lookupRaw
   ) where
@@ -128,7 +128,7 @@ makeAddrInfo addr = do
   argument. 'withResolver' should be passed to 'forkIO'.
 -}
 
-withResolver :: ResolvSeed -> (Resolver -> IO ()) -> IO ()
+withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed func = do
   let ai = addrInfo seed
   sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)

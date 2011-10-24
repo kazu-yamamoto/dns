@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Network.DNS.Response (responseIter, parseResponse) where
+module Network.DNS.Response (responseIter, parseResponse, runDNSFormat, runDNSFormat_) where
 
 import Control.Applicative
 import Control.Monad
@@ -12,13 +12,21 @@ import Network.DNS.Internal
 import Network.DNS.StateBinary
 import Data.Enumerator (Enumerator, Iteratee, run_, ($$))
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as BL
 
-responseIter :: Iteratee ByteString IO (DNSFormat, PState)
-responseIter = runSGet decodeResponse
+runDNSFormat :: BL.ByteString -> Either String (DNSFormat, PState)
+runDNSFormat bs = runSGet decodeResponse bs
 
-parseResponse :: Enumerator ByteString IO (a,b)
-              -> Iteratee ByteString IO (a,b)
-              -> IO a
+runDNSFormat_ :: BL.ByteString -> Either String DNSFormat
+runDNSFormat_ bs = fst <$> runDNSFormat bs
+
+responseIter :: Monad m => Iteratee ByteString m (DNSFormat, PState)
+responseIter = iterSGet decodeResponse
+
+parseResponse :: (Functor m, Monad m)
+              => Enumerator ByteString m (a,b)
+              -> Iteratee ByteString m (a,b)
+              -> m a
 parseResponse enum iter = fst <$> run_ (enum $$ iter)
 
 ----------------------------------------------------------------
