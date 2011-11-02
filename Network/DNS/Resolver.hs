@@ -28,7 +28,6 @@ module Network.DNS.Resolver (
 
 import Control.Applicative
 import Control.Exception
-import qualified Data.ByteString.Lazy as BL
 import Data.Char
 import Data.Int
 import Data.List hiding (find, lookup)
@@ -36,7 +35,6 @@ import Network.BSD
 import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.Internal
-import Network.DNS.Types
 import Network.Socket hiding (send, sendTo, recv, recvFrom)
 import Network.Socket.ByteString.Lazy
 import Prelude hiding (lookup)
