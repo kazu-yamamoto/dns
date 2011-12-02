@@ -4,10 +4,9 @@ module Network.DNS.StateBinary where
 import Blaze.ByteString.Builder
 import Control.Applicative
 import Control.Monad.State
-import Data.Monoid
-import Data.Attoparsec
+import Data.Attoparsec.ByteString
+import qualified Data.Attoparsec.ByteString.Lazy as AL
 import Data.Attoparsec.Enumerator
-import qualified Data.Attoparsec.Lazy as AL
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS (unpack, length)
 import qualified Data.ByteString.Lazy as BL (ByteString)
@@ -17,9 +16,12 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM (insert, lookup, empty)
 import Data.Map (Map)
 import qualified Data.Map as M (insert, lookup, empty)
+import Data.Monoid
 import Data.Word
 import Network.DNS.Types
 import Prelude hiding (lookup, take)
+
+import qualified Data.Attoparsec.Types as T (Parser)
 
 ----------------------------------------------------------------
 
@@ -83,7 +85,7 @@ wsPush dom pos = do
 
 ----------------------------------------------------------------
 
-type SGet = StateT PState Parser
+type SGet = StateT PState (T.Parser ByteString)
 
 data PState = PState {
     psDomain :: IntMap Domain
