@@ -4,8 +4,8 @@ Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
 License-File:           LICENSE
-Synopsis:               DNS libary in Haskell
-Description:            DNS libary for clients and servers.
+Synopsis:               DNS library in Haskell
+Description:            DNS library for clients and servers.
 Category:               Network
 Cabal-Version:          >= 1.6
 Build-Type:             Simple
