@@ -177,6 +177,6 @@ lookupRaw rlv dom typ = do
     q = makeQuestion dom typ
     check seqno res = do
         let hdr = header res
-        if identifier hdr == seqno && anCount hdr /= 0
+        if identifier hdr == seqno
             then Just res
             else Nothing
