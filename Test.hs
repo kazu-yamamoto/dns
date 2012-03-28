@@ -6,7 +6,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.List
 import Network.DNS as DNS
 import Test.Framework.Providers.HUnit
-import Test.Framework.TH
+import Test.Framework.TH.Prime
 import Test.HUnit
 
 ----------------------------------------------------------------
