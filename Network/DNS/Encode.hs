@@ -4,6 +4,7 @@ module Network.DNS.Encode (
   , composeQuery
   ) where
 
+import qualified Blaze.ByteString.Builder as BB (toByteString, fromWrite, writeInt16be)
 import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
 import qualified Data.ByteString.Char8 as BS (length, null, break, drop)
 import Network.DNS.StateBinary
@@ -104,9 +105,15 @@ encodeRR ResourceRecord{..} =
       , putInt16 (typeToInt rrtype)
       , put16 1
       , putInt32 rrttl
-      , putInt16 rdlen
-      , encodeRDATA rdata
+      , rlenRDATA
       ]
+    where
+      rlenRDATA = do
+        addPositionW 2 -- "simulate" putInt16 
+        rDataWrite <- encodeRDATA rdata
+        let rdataLength = fromIntegral . BS.length . BB.toByteString . BB.fromWrite $ rDataWrite
+        let rlenWrite = BB.writeInt16be rdataLength
+        return rlenWrite +++ return rDataWrite
 
 encodeRDATA :: RDATA -> SPut
 encodeRDATA rd = case rd of
