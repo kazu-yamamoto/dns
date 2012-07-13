@@ -167,12 +167,11 @@ decodeDomain :: SGet Domain
 decodeDomain = do
     pos <- getPosition
     c <- getInt8
-    if c == 0
-      then return ""
+    if c == 0 then
+        return ""
       else do
         let n = getValue c
-        if isPointer c
-          then do
+        if isPointer c then do
             d <- getInt8
             let offset = n * 256 + d
             fromMaybe (error $ "decodeDomain: " ++ show offset) <$> pop offset

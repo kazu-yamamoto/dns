@@ -158,9 +158,7 @@ lookup :: Resolver -> Domain -> TYPE -> IO (Maybe [RDATA])
 lookup rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
   where
     {- CNAME hack
-    dom' = if "." `isSuffixOf` dom
-           then dom
-           else dom ++ "."
+    dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
     correct r = rrname r == dom' && rrtype r == typ
     -}
     correct r = rrtype r == typ
@@ -183,9 +181,10 @@ lookupRaw rlv dom typ = do
     q = makeQuestion dom typ
     check seqno res = do
         let hdr = header res
-        if identifier hdr == seqno
-            then Just res
-            else Nothing
+        if identifier hdr == seqno then
+            Just res
+          else
+            Nothing
 
 #if mingw32_HOST_OS == 1
     -- Windows does not support sendAll in Network.ByteString.Lazy.
