@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-|
   DNS Resolver and lookup functions.
 
@@ -41,6 +42,11 @@ import Prelude hiding (lookup)
 import System.Random
 import System.Timeout
 
+#if mingw32_HOST_OS == 1
+import Network.Socket (send)
+import qualified Data.ByteString.Lazy.Char8 as LB
+import Control.Monad (when)
+#endif
 ----------------------------------------------------------------
 
 {-|
@@ -180,3 +186,11 @@ lookupRaw rlv dom typ = do
         if identifier hdr == seqno
             then Just res
             else Nothing
+
+#if mingw32_HOST_OS == 1
+    -- Windows does not support sendAll in Network.ByteString.Lazy.
+    -- This implements sendAll with Haskell Strings.
+    sendAll sock bs = do
+	sent <- send sock (LB.unpack bs)
+	when (sent < fromIntegral (LB.length bs)) $ sendAll sock (LB.drop (fromIntegral sent) bs)
+#endif
