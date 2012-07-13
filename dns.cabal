@@ -1,5 +1,5 @@
 Name:                   dns
-Version:                0.3.3
+Version:                0.3.4
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -11,10 +11,7 @@ Cabal-Version:          >= 1.6
 Build-Type:             Simple
 Extra-Source-Files:     Test.hs, TestProtocol.hs
 library
-  if impl(ghc >= 6.12)
-    GHC-Options:        -Wall -fno-warn-unused-do-bind
-  else
-    GHC-Options:        -Wall
+  GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
                         Network.DNS.Lookup
                         Network.DNS.Resolver
@@ -24,19 +21,34 @@ library
   Other-Modules:        Network.DNS.Internal
                         Network.DNS.StateBinary
   if impl(ghc >= 7)
-    Build-Depends:      base >= 4 && < 5,
-                        binary, iproute >= 1.2.4,
-                        containers, mtl, bytestring, random,
-                        network >= 2.3, blaze-builder,
-                        attoparsec, enumerator, attoparsec-enumerator,
-                        network-enumerator
+    Build-Depends:      base >= 4 && < 5
+                      , attoparsec
+                      , attoparsec-enumerator
+                      , binary
+                      , blaze-builder
+                      , bytestring
+                      , containers
+                      , enumerator
+                      , iproute >= 1.2.4
+                      , mtl
+                      , network >= 2.3
+                      , network-enumerator
+                      , random
   else
-    Build-Depends:      base >= 4 && < 5,
-                        binary, iproute >= 1.2.4,
-                        containers, mtl, bytestring, random,
-                        network, network-bytestring, blaze-builder,
-                        attoparsec, enumerator, attoparsec-enumerator,
-                        network-enumerator
+    Build-Depends:      base >= 4 && < 5
+                      , attoparsec
+                      , attoparsec-enumerator
+                      , binary
+                      , blaze-builder
+                      , bytestring
+                      , containers
+                      , enumerator
+                      , iproute >= 1.2.4
+                      , mtl
+                      , network
+                      , network-bytestring
+                      , network-enumerator
+                      , random
 Source-Repository head
   Type:                 git
   Location:             git://github.com/kazu-yamamoto/dns.git
