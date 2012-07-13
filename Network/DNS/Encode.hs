@@ -107,9 +107,10 @@ encodeRR ResourceRecord{..} =
       , putInt32 rrttl
       , rlenRDATA
       ]
-    where
-      rlenRDATA = do
-        addPositionW 2 -- "simulate" putInt16 
+  where
+    -- Encoding rdata without using rdlen
+    rlenRDATA = do
+        addPositionW 2 -- "simulate" putInt16
         rDataWrite <- encodeRDATA rdata
         let rdataLength = fromIntegral . BS.length . BB.toByteString . BB.fromWrite $ rDataWrite
         let rlenWrite = BB.writeInt16be rdataLength
