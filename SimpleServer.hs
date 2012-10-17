@@ -27,8 +27,8 @@ instance Default Conf where
     def = Conf {
         bufSize = 512
       , timeOut = 3 * 1000 * 1000
-      , realDNS = "192.168.1.1"
-      , hosts   = [("localhost", "127.0.0.1")]
+      , realDNS = "8.8.8.8"
+      , hosts   = [("localhost.", "127.0.0.1")]
     }
 
 timeout' :: String -> Int -> IO a -> IO (Maybe a)
@@ -42,7 +42,7 @@ proxyRequest Conf{..} rc req = do
     let worker Resolver{..} = do
             let packet = mconcat . toChunks $ encode req
             sendAll dnsSock packet
-            receive dnsSock dnsBufsize
+            receive dnsSock
     rs <- makeResolvSeed rc
     withResolver rs $ \r ->
         (>>= check) <$> timeout' "proxy timeout" timeOut (worker r)
