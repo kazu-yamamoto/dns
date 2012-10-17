@@ -11,23 +11,21 @@ import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.Enumerator (Enumerator, run_, ($$))
+import Data.Conduit
+import Data.Conduit.Network
 import Data.IP
 import Data.Maybe
 import Network
 import Network.DNS.Internal
 import Network.DNS.StateBinary
-import Network.Socket.Enumerator
 
 ----------------------------------------------------------------
 
 {-| Receiving DNS data from 'Socket' and parse it.
     The second argument is a buffer size for the socket.
 -}
-receive :: Socket -> Integer -> IO DNSFormat
-receive sock bufsize = receiveDNSFormat responseEnum
-  where
-    responseEnum = enumSocket bufsize sock
+receive :: Socket -> IO DNSFormat
+receive sock = receiveDNSFormat $ sourceSocket sock
 
 ----------------------------------------------------------------
 
@@ -37,12 +35,10 @@ decode :: BL.ByteString -> Either String DNSFormat
 decode bs = fst <$> runSGet decodeResponse bs
 
 ----------------------------------------------------------------
-
-receiveDNSFormat :: Enumerator ByteString IO (DNSFormat, PState)
-                 -> IO DNSFormat
-receiveDNSFormat enum = fst <$> run_ (enum $$ iter)
+receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO DNSFormat
+receiveDNSFormat src = fst <$> runResourceT (src $$ sink)
   where
-    iter = iterSGet decodeResponse
+    sink = sinkSGet decodeResponse
 
 ----------------------------------------------------------------
 

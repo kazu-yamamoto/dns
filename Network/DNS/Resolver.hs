@@ -173,10 +173,9 @@ lookupRaw :: Resolver -> Domain -> TYPE -> IO (Maybe DNSFormat)
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
     sendAll sock (composeQuery seqno [q])
-    (>>= check seqno) <$> timeout tm (receive sock bufsize)
+    (>>= check seqno) <$> timeout tm (receive sock)
   where
     sock = dnsSock rlv
-    bufsize = dnsBufsize rlv
     tm = dnsTimeout rlv
     q = makeQuestion dom typ
     check seqno res = do

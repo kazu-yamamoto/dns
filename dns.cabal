@@ -23,31 +23,31 @@ library
   if impl(ghc >= 7)
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
-                      , attoparsec-enumerator
+                      , attoparsec-conduit
                       , binary
                       , blaze-builder
                       , bytestring
+                      , conduit
                       , containers
-                      , enumerator
                       , iproute >= 1.2.4
                       , mtl
                       , network >= 2.3
-                      , network-enumerator
+                      , network-conduit
                       , random
   else
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
-                      , attoparsec-enumerator
+                      , attoparsec-conduit
                       , binary
                       , blaze-builder
                       , bytestring
+                      , conduit
                       , containers
-                      , enumerator
                       , iproute >= 1.2.4
                       , mtl
                       , network
                       , network-bytestring
-                      , network-enumerator
+                      , network-conduit
                       , random
 Source-Repository head
   Type:                 git

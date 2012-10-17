@@ -6,11 +6,11 @@ import Control.Applicative
 import Control.Monad.State
 import Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Lazy as AL
-import Data.Attoparsec.Enumerator
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS (unpack, length)
 import qualified Data.ByteString.Lazy as BL (ByteString)
-import Data.Enumerator (Iteratee)
+import Data.Conduit
+import Data.Conduit.Attoparsec
 import Data.Int
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM (insert, lookup, empty)
@@ -159,8 +159,8 @@ getNByteString n = lift (take n) <* addPosition n
 initialState :: PState
 initialState = PState IM.empty 0
 
-iterSGet :: Monad m => SGet a -> Iteratee ByteString m (a, PState)
-iterSGet parser = iterParser (runStateT parser initialState)
+sinkSGet :: SGet a -> Sink ByteString (ResourceT IO) (a, PState)
+sinkSGet parser = sinkParser (runStateT parser initialState)
 
 runSGet :: SGet a -> BL.ByteString -> Either String (a, PState)
 runSGet parser bs = AL.eitherResult $ AL.parse (runStateT parser initialState) bs
