@@ -8,17 +8,17 @@ module Network.DNS.Types (
   -- * TYPE
   , TYPE (..), intToType, typeToInt, toType
   -- * DNS Format
-  , DNSFormat (DNSFormat), header, question, answer, authority, additional
+  , DNSFormat (..)
   -- * DNS Header
-  , DNSHeader (DNSHeader), identifier, flags, qdCount, anCount, nsCount, arCount
+  , DNSHeader (..)
   -- * DNS Flags
-  , DNSFlags (DNSFlags), qOrR, opcode, authAnswer, trunCation, recDesired, recAvailable, rcode
+  , DNSFlags (..)
   -- * DNS Body
   , QorR (..)
   , OPCODE (..)
   , RCODE (..)
-  , ResourceRecord (ResourceRecord), rrname, rrtype, rrttl, rdlen, rdata
-  , Question (Question), qname, qtype, makeQuestion
+  , ResourceRecord (..)
+  , Question (..)
   , RDATA (..)
   , responseA, responseAAAA
   ) where
