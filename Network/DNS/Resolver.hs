@@ -61,6 +61,7 @@ data FileOrNumericHost = RCFilePath FilePath | RCHostName HostName
 data ResolvConf = ResolvConf {
     resolvInfo :: FileOrNumericHost
   , resolvTimeout :: Int
+  -- | This field was obsoleted.
   , resolvBufsize :: Integer
 }
 
@@ -68,7 +69,7 @@ data ResolvConf = ResolvConf {
   Default 'ResolvConf'.
   'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
   'resolvTimeout' is 3,000,000 micro seconds.
-  'resolvBufsize' is 512.
+  'resolvBufsize' is 512. (obsoleted)
 -}
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
