@@ -27,7 +27,7 @@ library
                       , binary
                       , blaze-builder
                       , bytestring
-                      , conduit
+                      , conduit >= 0.5
                       , containers
                       , iproute >= 1.2.4
                       , mtl
