@@ -54,14 +54,26 @@ Library
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
   Default-Language:     Haskell2010
-  Hs-Source-Dirs:       test
+  Hs-Source-Dirs:       test, .
   Ghc-Options:          -Wall
   Main-Is:              Spec.hs
-  Other-Modules:        LookupSpec
+  Other-Modules:        EncodeSpec
+                        LookupSpec
   Build-Depends:        base
+                      , attoparsec
+                      , attoparsec-conduit
+                      , binary
+                      , blaze-builder
                       , bytestring
+                      , conduit >= 0.5
+                      , containers
                       , dns
                       , hspec
+                      , iproute >= 1.2.4
+                      , mtl
+                      , network >= 2.3
+                      , network-conduit
+                      , random
 
 Source-Repository head
   Type:                 git
