@@ -7,10 +7,11 @@ License-File:           LICENSE
 Synopsis:               DNS library in Haskell
 Description:            DNS library for clients and servers.
 Category:               Network
-Cabal-Version:          >= 1.6
+Cabal-Version:          >= 1.10
 Build-Type:             Simple
-Extra-Source-Files:     Test.hs, TestProtocol.hs
-library
+
+Library
+  Default-Language:     Haskell2010
   GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
                         Network.DNS.Lookup
@@ -49,6 +50,19 @@ library
                       , network-bytestring
                       , network-conduit
                       , random
+
+Test-Suite spec
+  Type:                 exitcode-stdio-1.0
+  Default-Language:     Haskell2010
+  Hs-Source-Dirs:       test
+  Ghc-Options:          -Wall
+  Main-Is:              Spec.hs
+  Other-Modules:        LookupSpec
+  Build-Depends:        base
+                      , bytestring
+                      , dns
+                      , hspec
+
 Source-Repository head
   Type:                 git
   Location:             git://github.com/kazu-yamamoto/dns.git
