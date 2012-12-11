@@ -19,7 +19,7 @@ spec = do
         it "gets IPv4 addresses via CNAME" $ do
             rs <- makeResolvSeed defaultResolvConf
             withResolver rs $ \resolver ->
-                DNS.lookupA resolver "ghs.google.com" `shouldReturn` Just ["72.14.203.121"]
+                DNS.lookupA resolver "www.yahoo.com" `shouldReturn` Just ["111.67.226.84"]
 
     describe "lookupAAAA" $ do
         it "gets IPv6 addresses" $ do
