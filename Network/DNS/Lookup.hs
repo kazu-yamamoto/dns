@@ -5,6 +5,7 @@
 module Network.DNS.Lookup (
     lookupA, lookupAAAA
   , lookupMX, lookupAviaMX, lookupAAAAviaMX
+  , lookupNS
   , lookupTXT
   , lookupPTR
   , lookupSRV
@@ -72,6 +73,18 @@ lookupXviaMX rlv dom func = do
     check as = case as of
         []  -> Nothing
         ass -> Just (concat ass)
+
+----------------------------------------------------------------
+
+{-|
+  Resolving 'Domain' by 'NS'.
+-}
+lookupNS :: Resolver -> Domain -> IO (Maybe [Domain])
+lookupNS rlv dom = toNS <$> DNS.lookup rlv dom NS
+  where
+    toNS = fmap (map unTag)
+    unTag (RD_NS dm) = dm
+    unTag _ = error "lookupNS"
 
 ----------------------------------------------------------------
 
