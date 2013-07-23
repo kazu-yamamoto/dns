@@ -28,6 +28,16 @@ spec = do
                 DNS.lookupAAAA resolver "mew.org" `shouldReturn` Nothing
                 DNS.lookupAAAA resolver "www.mew.org" `shouldReturn` Just ["2001:240:11e:c00::101"]
 
+    describe "lookupNS" $ do
+        it "gets NS" $ do
+            rs <- makeResolvSeed defaultResolvConf
+            withResolver rs $ \resolver -> do
+                actual <- DNS.lookupNS resolver "mew.org"
+                let expected = Just ["ns1.mew.org.", "ns2.mew.org."]
+                -- The order of NS records is variable, so we sort the
+                -- result.
+                sort <$> actual `shouldBe` expected
+
     describe "lookupTXT" $ do
         it "gets TXT" $ do
             rs <- makeResolvSeed defaultResolvConf
