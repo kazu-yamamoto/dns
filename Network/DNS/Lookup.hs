@@ -142,11 +142,16 @@ lookupTXT rlv dom = do
   Resolving 'Domain' and its preference by 'PTR'.
 -}
 lookupPTR :: Resolver -> Domain -> IO (Either DNSError [Domain])
-lookupPTR rlv dom = toPTR <$> DNS.lookup rlv dom PTR
+lookupPTR rlv dom = do
+  erds <- DNS.lookup rlv dom PTR
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
   where
-    toPTR = fmap (map unTag)
-    unTag (RD_PTR dm) = dm
-    unTag _ = error "lookupPTR"
+    unTag :: RDATA -> Either DNSError Domain
+    unTag (RD_PTR dm) = Right dm
+    unTag _ = Left UnexpectedRDATA
 
 ----------------------------------------------------------------
 
