@@ -7,6 +7,8 @@ module Network.DNS.Types (
     Domain
   -- * TYPE
   , TYPE (..), intToType, typeToInt, toType
+  -- * DNS Error
+  , DNSError (..)
   -- * DNS Format
   , DNSFormat (..)
   -- * DNS Header
