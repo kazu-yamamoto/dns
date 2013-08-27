@@ -11,7 +11,6 @@ module Network.DNS.Lookup (
   , lookupSRV
   ) where
 
-import Control.Applicative
 import Data.ByteString (ByteString)
 import Data.IP
 import Network.DNS.Resolver as DNS
@@ -159,8 +158,13 @@ lookupPTR rlv dom = do
   Resolving 'Domain' and its preference by 'SRV'.
 -}
 lookupSRV :: Resolver -> Domain -> IO (Either DNSError [(Int,Int,Int,Domain)])
-lookupSRV rlv dom = toSRV <$> DNS.lookup rlv dom SRV
+lookupSRV rlv dom = do
+  erds <- DNS.lookup rlv dom SRV
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
   where
-    toSRV = fmap (map unTag)
-    unTag (RD_SRV pri wei prt dm) = (pri,wei,prt,dm)
-    unTag _ = error "lookupSRV"
+    unTag :: RDATA -> Either DNSError (Int,Int,Int,Domain)
+    unTag (RD_SRV pri wei prt dm) = Right (pri,wei,prt,dm)
+    unTag _ = Left UnexpectedRDATA
