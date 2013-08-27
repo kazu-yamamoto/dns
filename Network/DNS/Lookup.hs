@@ -23,7 +23,7 @@ import Network.DNS.Types
 {-|
   Resolving 'IPv4' by 'A'.
 -}
-lookupA :: Resolver -> Domain -> IO (Maybe [IPv4])
+lookupA :: Resolver -> Domain -> IO (Either DNSError [IPv4])
 lookupA rlv dom = toV4 <$> DNS.lookup rlv dom A
   where
     toV4 = fmap (map unTag)
@@ -33,7 +33,7 @@ lookupA rlv dom = toV4 <$> DNS.lookup rlv dom A
 {-|
   Resolving 'IPv6' by 'AAAA'.
 -}
-lookupAAAA :: Resolver -> Domain -> IO (Maybe [IPv6])
+lookupAAAA :: Resolver -> Domain -> IO (Either DNSError [IPv6])
 lookupAAAA rlv dom = toV6 <$> DNS.lookup rlv dom AAAA
   where
     toV6 = fmap (map unTag)
@@ -45,7 +45,7 @@ lookupAAAA rlv dom = toV6 <$> DNS.lookup rlv dom AAAA
 {-|
   Resolving 'Domain' and its preference by 'MX'.
 -}
-lookupMX :: Resolver -> Domain -> IO (Maybe [(Domain,Int)])
+lookupMX :: Resolver -> Domain -> IO (Either DNSError [(Domain,Int)])
 lookupMX rlv dom = toMX <$> DNS.lookup rlv dom MX
   where
     toMX = fmap (map unTag)
@@ -79,7 +79,7 @@ lookupXviaMX rlv dom func = do
 {-|
   Resolving 'Domain' by 'NS'.
 -}
-lookupNS :: Resolver -> Domain -> IO (Maybe [Domain])
+lookupNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupNS rlv dom = toNS <$> DNS.lookup rlv dom NS
   where
     toNS = fmap (map unTag)
@@ -91,7 +91,7 @@ lookupNS rlv dom = toNS <$> DNS.lookup rlv dom NS
 {-|
   Resolving 'String' by 'TXT'.
 -}
-lookupTXT :: Resolver -> Domain -> IO (Maybe [ByteString])
+lookupTXT :: Resolver -> Domain -> IO (Either DNSError [ByteString])
 lookupTXT rlv dom = toTXT <$> DNS.lookup rlv dom TXT
   where
     toTXT = fmap (map unTag)
@@ -103,7 +103,7 @@ lookupTXT rlv dom = toTXT <$> DNS.lookup rlv dom TXT
 {-|
   Resolving 'Domain' and its preference by 'PTR'.
 -}
-lookupPTR :: Resolver -> Domain -> IO (Maybe [Domain])
+lookupPTR :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupPTR rlv dom = toPTR <$> DNS.lookup rlv dom PTR
   where
     toPTR = fmap (map unTag)
@@ -115,7 +115,7 @@ lookupPTR rlv dom = toPTR <$> DNS.lookup rlv dom PTR
 {-|
   Resolving 'Domain' and its preference by 'SRV'.
 -}
-lookupSRV :: Resolver -> Domain -> IO (Maybe [(Int,Int,Int,Domain)])
+lookupSRV :: Resolver -> Domain -> IO (Either DNSError [(Int,Int,Int,Domain)])
 lookupSRV rlv dom = toSRV <$> DNS.lookup rlv dom SRV
   where
     toSRV = fmap (map unTag)
