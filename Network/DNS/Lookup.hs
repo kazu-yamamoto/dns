@@ -14,7 +14,6 @@ module Network.DNS.Lookup (
 import Control.Applicative
 import Data.ByteString (ByteString)
 import Data.IP
-import Data.Maybe
 import Network.DNS.Resolver as DNS
 import Network.DNS.Types
 
@@ -55,24 +54,38 @@ lookupMX rlv dom = toMX <$> DNS.lookup rlv dom MX
 {-|
   Resolving 'IPv4' by 'A' via 'MX'.
 -}
-lookupAviaMX :: Resolver -> Domain -> IO (Maybe [IPv4])
+lookupAviaMX :: Resolver -> Domain -> IO (Either DNSError [IPv4])
 lookupAviaMX rlv dom = lookupXviaMX rlv dom (lookupA rlv)
 
 {-|
   Resolving 'IPv6' by 'AAAA' via 'MX'.
 -}
-lookupAAAAviaMX :: Resolver -> Domain -> IO (Maybe [IPv6])
+lookupAAAAviaMX :: Resolver -> Domain -> IO (Either DNSError [IPv6])
 lookupAAAAviaMX rlv dom = lookupXviaMX rlv dom (lookupAAAA rlv)
 
-lookupXviaMX :: Show a => Resolver -> Domain -> (Domain -> IO (Maybe [a])) -> IO (Maybe [a])
+lookupXviaMX :: Show a
+             => Resolver
+             -> Domain
+             -> (Domain -> IO (Either DNSError [a]))
+             -> IO (Either DNSError [a])
 lookupXviaMX rlv dom func = do
-    mdps <- lookupMX rlv dom
-    maybe (return Nothing) lookup' mdps
-  where
-    lookup' dps = check . catMaybes <$> mapM (func . fst) dps
-    check as = case as of
-        []  -> Nothing
-        ass -> Just (concat ass)
+    edps <- lookupMX rlv dom
+    case edps of
+      -- We have to deconstruct and reconstruct the error so that the
+      -- typechecker does not conclude that a ~ (Domain, Int).
+      Left err -> return (Left err)
+      Right dps -> do
+        -- We'll get back a [Either DNSError a] here.
+        responses <- mapM (func . fst) dps
+        -- We can use 'sequence' to join all of the Eithers
+        -- together. If any of them are (Left _), we'll get a Left
+        -- overall. Otherwise, we'll get Right [a].
+        let overall = sequence responses
+        -- Finally, we use (fmap concat) to concatenate the responses
+        -- if there were no errors.
+        return $ fmap concat overall
+
+
 
 ----------------------------------------------------------------
 
