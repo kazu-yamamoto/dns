@@ -23,11 +23,16 @@ import Network.DNS.Types
   Resolving 'IPv4' by 'A'.
 -}
 lookupA :: Resolver -> Domain -> IO (Either DNSError [IPv4])
-lookupA rlv dom = toV4 <$> DNS.lookup rlv dom A
+lookupA rlv dom = do
+  erds <- DNS.lookup rlv dom A
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
   where
-    toV4 = fmap (map unTag)
-    unTag (RD_A x) = x
-    unTag _ = error "lookupA"
+    unTag :: RDATA -> Either DNSError IPv4
+    unTag (RD_A x) = Right x
+    unTag _ = Left UnexpectedRDATA
 
 {-|
   Resolving 'IPv6' by 'AAAA'.
