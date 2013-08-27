@@ -155,7 +155,7 @@ getRandom = getStdRandom (randomR (0,65535))
 {-|
   Looking up resource records of a domain.
 -}
-lookup :: Resolver -> Domain -> TYPE -> IO (Maybe [RDATA])
+lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
 lookup rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
   where
     {- CNAME hack
@@ -163,18 +163,19 @@ lookup rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
     correct r = rrname r == dom' && rrtype r == typ
     -}
     correct r = rrtype r == typ
-    listToMaybe [] = Nothing
-    listToMaybe xs = Just xs
-    toRDATA = listToMaybe . map rdata . filter correct . answer
+    toRDATA = Right . map rdata . filter correct . answer
 
 {-|
   Looking up a domain and returning an entire DNS Response.
 -}
-lookupRaw :: Resolver -> Domain -> TYPE -> IO (Maybe DNSFormat)
+lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSFormat)
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
     sendAll sock (composeQuery seqno [q])
-    (>>= check seqno) <$> timeout tm (receive sock)
+    response <- timeout tm (receive sock)
+    return $ case response of
+               Nothing -> Left TimeoutExpired
+               Just y  -> check seqno y
   where
     sock = dnsSock rlv
     tm = dnsTimeout rlv
@@ -182,9 +183,9 @@ lookupRaw rlv dom typ = do
     check seqno res = do
         let hdr = header res
         if identifier hdr == seqno then
-            Just res
+            Right res
           else
-            Nothing
+            Left SequenceNumberMismatch
 
 #if mingw32_HOST_OS == 1
     -- Windows does not support sendAll in Network.ByteString.Lazy.
