@@ -60,7 +60,9 @@ data DNSError =
   SequenceNumberMismatch
   -- | The request simply timed out.
   | TimeoutExpired
-
+  -- | The answer has the correct sequence number, but returned an
+  --   unexpected RDATA format.
+  | UnexpectedRDATA
 
 {-|
   Raw data format for DNS Query and Response.
