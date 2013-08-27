@@ -55,11 +55,16 @@ lookupAAAA rlv dom = do
   Resolving 'Domain' and its preference by 'MX'.
 -}
 lookupMX :: Resolver -> Domain -> IO (Either DNSError [(Domain,Int)])
-lookupMX rlv dom = toMX <$> DNS.lookup rlv dom MX
+lookupMX rlv dom = do
+  erds <- DNS.lookup rlv dom MX
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
   where
-    toMX = fmap (map unTag)
-    unTag (RD_MX pr dm) = (dm,pr)
-    unTag _ = error "lookupMX"
+    unTag :: RDATA -> Either DNSError (Domain,Int)
+    unTag (RD_MX pr dm) = Right (dm,pr)
+    unTag _ = Left UnexpectedRDATA
 
 {-|
   Resolving 'IPv4' by 'A' via 'MX'.
