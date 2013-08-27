@@ -38,11 +38,16 @@ lookupA rlv dom = do
   Resolving 'IPv6' by 'AAAA'.
 -}
 lookupAAAA :: Resolver -> Domain -> IO (Either DNSError [IPv6])
-lookupAAAA rlv dom = toV6 <$> DNS.lookup rlv dom AAAA
+lookupAAAA rlv dom = do
+  erds <- DNS.lookup rlv dom AAAA
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
   where
-    toV6 = fmap (map unTag)
-    unTag (RD_AAAA x) = x
-    unTag _ = error "lookupAAAA"
+    unTag :: RDATA -> Either DNSError IPv6
+    unTag (RD_AAAA x) = Right x
+    unTag _ = Left UnexpectedRDATA
 
 ----------------------------------------------------------------
 
