@@ -125,11 +125,16 @@ lookupNS rlv dom = do
   Resolving 'String' by 'TXT'.
 -}
 lookupTXT :: Resolver -> Domain -> IO (Either DNSError [ByteString])
-lookupTXT rlv dom = toTXT <$> DNS.lookup rlv dom TXT
+lookupTXT rlv dom = do
+  erds <- DNS.lookup rlv dom TXT
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
   where
-    toTXT = fmap (map unTag)
-    unTag (RD_TXT x) = x
-    unTag _ = error "lookupTXT"
+    unTag :: RDATA -> Either DNSError ByteString
+    unTag (RD_TXT x) = Right x
+    unTag _ = Left UnexpectedRDATA
 
 ----------------------------------------------------------------
 
