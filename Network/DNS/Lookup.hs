@@ -108,11 +108,16 @@ lookupXviaMX rlv dom func = do
   Resolving 'Domain' by 'NS'.
 -}
 lookupNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
-lookupNS rlv dom = toNS <$> DNS.lookup rlv dom NS
+lookupNS rlv dom = do
+  erds <- DNS.lookup rlv dom NS
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
   where
-    toNS = fmap (map unTag)
-    unTag (RD_NS dm) = dm
-    unTag _ = error "lookupNS"
+    unTag :: RDATA -> Either DNSError Domain
+    unTag (RD_NS dm) = Right dm
+    unTag _ = Left UnexpectedRDATA
 
 ----------------------------------------------------------------
 
