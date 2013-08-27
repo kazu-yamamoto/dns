@@ -63,6 +63,7 @@ data DNSError =
   -- | The answer has the correct sequence number, but returned an
   --   unexpected RDATA format.
   | UnexpectedRDATA
+  deriving (Eq, Show)
 
 {-|
   Raw data format for DNS Query and Response.
