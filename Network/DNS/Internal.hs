@@ -52,6 +52,20 @@ toType = read . map toUpper
 ----------------------------------------------------------------
 
 {-|
+  An enumeration of all possible DNS errors that can occur.
+-}
+data DNSError =
+  -- | The sequence number of the answer doesn't match our query. This
+  --   could indicate foul play.
+  SequenceNumberMismatch
+  -- | The request simply timed out.
+  | TimeoutExpired
+  -- | The answer has the correct sequence number, but returned an
+  --   unexpected RDATA format.
+  | UnexpectedRDATA
+  deriving (Eq, Show)
+
+{-|
   Raw data format for DNS Query and Response.
 -}
 data DNSFormat = DNSFormat {
