@@ -153,17 +153,34 @@ getRandom = getStdRandom (randomR (0,65535))
 ----------------------------------------------------------------
 
 {-|
-  Looking up resource records of a domain.
+  Looking up resource records of a domain. The first parameter is one of
+  the field accessors of the 'DNSFormat' type -- this allows you to
+  choose which section (answer, authority, or additional) you would like
+  to inspect for the result.
 -}
-lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
-lookup rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
+lookupSection :: (DNSFormat -> [ResourceRecord])
+              -> Resolver
+              -> Domain
+              -> TYPE
+              -> IO (Either DNSError [RDATA])
+lookupSection section rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
   where
     {- CNAME hack
     dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
     correct r = rrname r == dom' && rrtype r == typ
     -}
     correct r = rrtype r == typ
-    toRDATA = Right . map rdata . filter correct . answer
+    toRDATA = Right . map rdata . filter correct . section
+
+-- | Look up resource records for a domain, collecting the results
+--   from the ANSWER section of the response.
+lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
+lookup = lookupSection answer
+
+-- | Look up resource records for a domain, collecting the results
+--   from the AUTHORITY section of the response.
+lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
+lookupAuth = lookupSection authority
 
 {-|
   Looking up a domain and returning an entire DNS Response.
