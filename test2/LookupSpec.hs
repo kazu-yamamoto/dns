@@ -56,6 +56,21 @@ spec = do
                 -- result.
                 sort <$> actual `shouldBe` expected
 
+    describe "lookupNSAuth" $ do
+        it "gets NS" $ do
+            -- We expect the GTLD servers to return the NS in the
+            -- AUTHORITY section of the response.
+            let ri = RCHostName "192.5.6.30" -- a.gtld-servers.net
+            let rc = defaultResolvConf { resolvInfo = ri }
+            rs <- makeResolvSeed rc
+            withResolver rs $ \resolver -> do
+                actual <- DNS.lookupNSAuth resolver "example.com"
+                let expected = Right ["a.iana-servers.net.",
+                                      "b.iana-servers.net."]
+                -- The order of NS records is variable, so we sort the
+                -- result.
+                sort <$> actual `shouldBe` expected
+
     describe "lookupTXT" $ do
         it "gets TXT" $ do
             rs <- makeResolvSeed defaultResolvConf
