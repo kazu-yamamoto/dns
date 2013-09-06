@@ -24,7 +24,7 @@ module Network.DNS.Resolver (
   -- ** Type and function for resolver
   , Resolver(..), withResolver
   -- ** Looking up functions
-  , lookup, lookupRaw
+  , lookup, lookupAuth, lookupRaw
   ) where
 
 import Control.Applicative
