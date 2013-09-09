@@ -6,6 +6,7 @@ module Network.DNS.Lookup (
     lookupA, lookupAAAA
   , lookupMX, lookupAviaMX, lookupAAAAviaMX
   , lookupNS
+  , lookupNSAuth
   , lookupTXT
   , lookupPTR
   , lookupSRV
@@ -103,12 +104,16 @@ lookupXviaMX rlv dom func = do
 
 ----------------------------------------------------------------
 
-{-|
-  Resolving 'Domain' by 'NS'.
--}
-lookupNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
-lookupNS rlv dom = do
-  erds <- DNS.lookup rlv dom NS
+-- | This function performs the real work for both 'lookupNS' and
+--   'lookupNSAuth'. The only difference between those two is which
+--   function, 'lookup' or 'lookupAuth', is used to perform the
+--   lookup. We take either of those as our first parameter.
+lookupNSImpl :: (Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA]))
+             -> Resolver
+             -> Domain
+             -> IO (Either DNSError [Domain])
+lookupNSImpl lookup_function rlv dom = do
+  erds <- lookup_function rlv dom NS
   case erds of
     -- See lookupXviaMX for an explanation of this construct.
     Left err  -> return (Left err)
@@ -117,6 +122,21 @@ lookupNS rlv dom = do
     unTag :: RDATA -> Either DNSError Domain
     unTag (RD_NS dm) = Right dm
     unTag _ = Left UnexpectedRDATA
+
+{-|
+  Resolving 'Domain' by 'NS'. Results taken from the ANSWER section of
+  the response.
+-}
+lookupNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
+lookupNS = lookupNSImpl DNS.lookup
+
+{-|
+  Resolving 'Domain' by 'NS'. Results taken from the AUTHORITY section
+  of the response.
+-}
+lookupNSAuth :: Resolver -> Domain -> IO (Either DNSError [Domain])
+lookupNSAuth = lookupNSImpl DNS.lookupAuth
+
 
 ----------------------------------------------------------------
 
