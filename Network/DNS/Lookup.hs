@@ -126,9 +126,32 @@ lookupAAAA rlv dom = do
 
 ----------------------------------------------------------------
 
-{-|
-  Resolving 'Domain' and its preference by 'MX'.
--}
+-- | Look up all \'MX\' records for the given hostname. Two parts
+--   constitute an MX record: a hostname , and an integer priority. We
+--   therefore return each record as a @('Domain', Int)@.
+--
+--   In this first example, we look up the MX for the domain
+--   \"example.com\". It has no MX (to prevent a deluge of spam from
+--   examples posted on the internet). But remember, \"no results\" is
+--   still a successful result.
+--
+--   >>>  let hostname = Data.ByteString.Char8.pack "example.com"
+--   >>>
+--   >>>  rs <- makeResolvSeed defaultResolvConf
+--   >>>  withResolver rs $ \resolver -> lookupMX resolver hostname
+--   Right []
+--
+--   The domain \"mew.org\" does however have a single MX:
+--
+--   >>>  let hostname = Data.ByteString.Char8.pack "mew.org"
+--   >>>
+--   >>>  rs <- makeResolvSeed defaultResolvConf
+--   >>>  withResolver rs $ \resolver -> lookupMX resolver hostname
+--   Right [("mail.mew.org.",10)]
+--
+--   Also note that all hostnames are returned with a trailing dot to
+--   indicate the DNS root.
+--
 lookupMX :: Resolver -> Domain -> IO (Either DNSError [(Domain,Int)])
 lookupMX rlv dom = do
   erds <- DNS.lookup rlv dom MX
