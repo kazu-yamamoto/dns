@@ -10,20 +10,6 @@ import Test.Hspec
 
 spec :: Spec
 spec = do
-    describe "lookupA" $ do
-        it "gets IPv4 addresses" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver ->
-                DNS.lookupA resolver "www.mew.org"
-                    `shouldReturn`
-                    Right ["202.232.15.101"]
-
-        it "gets IPv4 addresses via CNAME" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver ->
-                DNS.lookupA resolver "www.kame.net"
-                    `shouldReturn`
-                    Right ["203.178.141.194"]
 
     describe "lookupAAAA" $ do
         it "gets IPv6 addresses" $ do

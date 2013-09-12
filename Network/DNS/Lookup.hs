@@ -23,9 +23,7 @@
 --
 --   We perform a successful lookup of \"www.example.com\":
 --
---   >>>  import qualified Data.ByteString.Char8 as BS
---   >>>
---   >>>  let hostname = BS.pack "www.example.com"
+--   >>>  let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>>
 --   >>>  rs <- makeResolvSeed defaultResolvConf
 --   >>>  withResolver rs $ \resolver -> lookupA resolver hostname
@@ -35,9 +33,7 @@
 --   by creating and utilizing a 'ResolvConf' which has a timeout of
 --   one millisecond:
 --
---   >>>  import qualified Data.ByteString.Char8 as BS
---   >>>
---   >>>  let hostname = BS.pack "www.example.com"
+--   >>>  let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>>  let badrc = defaultResolvConf { resolvTimeout = 1 }
 --   >>>
 --   >>>  rs <- makeResolvSeed badrc
@@ -70,9 +66,25 @@ import Network.DNS.Types
 
 ----------------------------------------------------------------
 
-{-|
-  Resolving 'IPv4' by 'A'.
--}
+-- | Look up all \'A\' records for the given hostname.
+--
+--   A straightforward example:
+--
+--   >>>  let hostname = Data.ByteString.Char8.pack "www.mew.org"
+--   >>>
+--   >>>  rs <- makeResolvSeed defaultResolvConf
+--   >>>  withResolver rs $ \resolver -> lookupA resolver hostname
+--   Right [202.232.15.101]
+--
+--   This function will also follow a CNAME and resolve its target if
+--   one exists for the queries hostname:
+--
+--   >>>  let hostname = Data.ByteString.Char8.pack "www.kame.net"
+--   >>>
+--   >>>  rs <- makeResolvSeed defaultResolvConf
+--   >>>  withResolver rs $ \resolver -> lookupA resolver hostname
+--   Right [203.178.141.194]
+--
 lookupA :: Resolver -> Domain -> IO (Either DNSError [IPv4])
 lookupA rlv dom = do
   erds <- DNS.lookup rlv dom A
