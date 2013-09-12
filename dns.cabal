@@ -5,7 +5,9 @@ Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
 License-File:           LICENSE
 Synopsis:               DNS library in Haskell
-Description:            DNS library for clients and servers.
+Description:
+  A thread-safe DNS library for both clients and servers written
+  in pure Haskell.
 Category:               Network
 Cabal-Version:          >= 1.10
 Build-Type:             Simple
@@ -79,6 +81,34 @@ Test-Suite spec
                       , conduit >= 0.5
                       , containers
                       , dns
+                      , hspec
+                      , iproute >= 1.2.4
+                      , mtl
+                      , network >= 2.3
+                      , network-conduit
+                      , random
+
+-- The only dependencies we need to /build/ the doctest suite are
+-- base, doctest, and filemanip. If you want to be able to /run/ them,
+-- however, you're going to need the rest of the deps that might be
+-- used in the examples.
+Test-Suite doctests
+  Type:                 exitcode-stdio-1.0
+  Default-Language:     Haskell2010
+  Hs-Source-Dirs:       .
+  Ghc-Options:          -Wall
+  Main-Is:              Doctests.hs
+  Build-Depends:        base
+                      , attoparsec
+                      , attoparsec-conduit
+                      , binary
+                      , blaze-builder
+                      , bytestring
+                      , conduit >= 0.5
+                      , containers
+                      , dns
+                      , doctest >= 0.9
+                      , filemanip == 0.3.*
                       , hspec
                       , iproute >= 1.2.4
                       , mtl

@@ -1,20 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-|
-  DNS Resolver and lookup functions.
-
-  Sample code:
-
-@
-    import qualified Network.DNS as DNS (lookup)
-    import Network.DNS hiding (lookup)
-    main :: IO ()
-    main = do
-        rs <- makeResolvSeed defaultResolvConf
-        withResolver rs $ \\resolver -> do
-            DNS.lookup resolver \"www.example.com\" A >>= print
-@
--}
-
+-- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
   -- * Documentation
   -- ** Configuration for resolver
@@ -49,15 +34,21 @@ import Control.Monad (when)
 #endif
 ----------------------------------------------------------------
 
-{-|
-  Union type for 'FilePath' and 'HostName'. Specify 'FilePath' to
-  \"resolv.conf\" or numeric IP address in 'String' form.
--}
+
+-- | Union type for 'FilePath' and 'HostName'. Specify 'FilePath' to
+--   \"resolv.conf\" or numeric IP address in 'String' form.
+--
+--   /Warning/: Only numeric IP addresses are valid @RCHostName@s.
+--
+--   Example (using Google's public DNS cache):
+--
+--   >>> let cache = RCHostName "8.8.8.8"
+--
 data FileOrNumericHost = RCFilePath FilePath | RCHostName HostName
 
-{-|
-  Type for resolver configuration
--}
+
+-- | Type for resolver configuration. The easiest way to construct a
+--   @ResolvConf@ object is to modify the 'defaultResolvConf'.
 data ResolvConf = ResolvConf {
     resolvInfo :: FileOrNumericHost
   , resolvTimeout :: Int
@@ -65,12 +56,20 @@ data ResolvConf = ResolvConf {
   , resolvBufsize :: Integer
 }
 
-{-|
-  Default 'ResolvConf'.
-  'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
-  'resolvTimeout' is 3,000,000 micro seconds.
-  'resolvBufsize' is 512. (obsoleted)
--}
+
+-- | Return a default 'ResolvConf':
+--
+--     * 'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
+--
+--     * 'resolvTimeout' is 3,000,000 micro seconds.
+--
+--     * 'resolvBufsize' is 512. (obsoleted)
+--
+--  Example (use Google's public DNS cache instead of resolv.conf):
+--
+--   >>> let cache = RCHostName "8.8.8.8"
+--   >>> let rc = defaultResolvConf { resolvInfo = cache }
+--
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo = RCFilePath "/etc/resolv.conf"
@@ -101,9 +100,13 @@ data Resolver = Resolver {
 
 ----------------------------------------------------------------
 
-{-|
-  Making 'ResolvSeed' from an IP address of a DNS cache server.
--}
+
+-- |  Make a 'ResolvSeed' from a 'ResolvConf'.
+--
+--    Examples:
+--
+--    >>> rs <- makeResolvSeed defaultResolvConf
+--
 makeResolvSeed :: ResolvConf -> IO ResolvSeed
 makeResolvSeed conf = ResolvSeed <$> addr
                                  <*> pure (resolvTimeout conf)
@@ -129,11 +132,10 @@ makeAddrInfo addr = do
 
 ----------------------------------------------------------------
 
-{-|
-  Giving a thread-safe 'Resolver' to the function of the second
-  argument. 'withResolver' should be passed to 'forkIO'.
--}
 
+-- | Giving a thread-safe 'Resolver' to the function of the second
+--   argument. 'withResolver' should be passed to 'forkIO'. For
+--   examples, see "Network.DNS.Lookup".
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed func = do
   let ai = addrInfo seed
@@ -174,6 +176,14 @@ lookupSection section rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
 
 -- | Look up resource records for a domain, collecting the results
 --   from the ANSWER section of the response.
+--
+--   We repeat an example from "Network.DNS.Lookup":
+--
+--   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookup resolver hostname A
+--   Right [93.184.216.119]
+--
 lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
 lookup = lookupSection answer
 
@@ -182,9 +192,48 @@ lookup = lookupSection answer
 lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
 lookupAuth = lookupSection authority
 
-{-|
-  Looking up a domain and returning an entire DNS Response.
--}
+
+-- | Look up a name and return the entire DNS Response. Sample output
+--   is included below, however it is /not/ tested -- the sequence
+--   number is unpredictable (it has to be!).
+--
+--   The example code:
+--
+--   @
+--   let hostname = Data.ByteString.Char8.pack \"www.example.com\"
+--   rs <- makeResolvSeed defaultResolvConf
+--   withResolver rs $ \resolver -> lookupRaw resolver hostname A
+--   @
+--
+--   And the (formatted) expected output:
+--
+--   @
+--   Right (DNSFormat
+--           { header = DNSHeader
+--                        { identifier = 1,
+--                          flags = DNSFlags
+--                                    { qOrR = QR_Response,
+--                                      opcode = OP_STD,
+--                                      authAnswer = False,
+--                                      trunCation = False,
+--                                      recDesired = True,
+--                                      recAvailable = True,
+--                                      rcode = NoErr },
+--                          qdCount = 1,
+--                          anCount = 1,
+--                          nsCount = 0,
+--                          arCount = 0},
+--             question = [Question { qname = \"www.example.com.\",
+--                                    qtype = A}],
+--             answer = [ResourceRecord {rrname = \"www.example.com.\",
+--                                       rrtype = A,
+--                                       rrttl = 800,
+--                                       rdlen = 4,
+--                                       rdata = 93.184.216.119}],
+--             authority = [],
+--             additional = []})
+--  @
+--
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSFormat)
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
