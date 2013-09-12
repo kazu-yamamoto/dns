@@ -190,9 +190,10 @@ lookupMX rlv dom = do
 lookupAviaMX :: Resolver -> Domain -> IO (Either DNSError [IPv4])
 lookupAviaMX rlv dom = lookupXviaMX rlv dom (lookupA rlv)
 
-{-|
-  Resolving 'IPv6' by 'AAAA' via 'MX'.
--}
+-- | Look up all \'MX\' records for the given hostname, and then
+--   resolve their hostnames to IPv6 addresses by calling
+--   'lookupAAAA'. The priorities are not retained.
+--
 lookupAAAAviaMX :: Resolver -> Domain -> IO (Either DNSError [IPv6])
 lookupAAAAviaMX rlv dom = lookupXviaMX rlv dom (lookupAAAA rlv)
 
