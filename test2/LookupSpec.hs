@@ -17,14 +17,6 @@ spec = do
                     `shouldReturn`
                     Right []
 
-    describe "lookupTXT" $ do
-        it "gets TXT" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver ->
-                DNS.lookupTXT resolver "mew.org"
-                    `shouldReturn`
-                    Right ["v=spf1 +mx -all"]
-
     describe "lookupPTR" $ do
         it "gets PTR" $ do
             rs <- makeResolvSeed defaultResolvConf

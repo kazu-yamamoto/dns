@@ -290,9 +290,20 @@ lookupNSAuth = lookupNSImpl DNS.lookupAuth
 
 ----------------------------------------------------------------
 
-{-|
-  Resolving 'String' by 'TXT'.
--}
+-- | Look up all \'TXT\' records for the given hostname. The results
+--   are free-form 'ByteString's.
+--
+--   Two common uses for \'TXT\' records are
+--   <http://en.wikipedia.org/wiki/Sender_Policy_Framework> and
+--   <http://en.wikipedia.org/wiki/DomainKeys_Identified_Mail>. As an
+--   example, we find the SPF record for \"mew.org\":
+--
+--   >>> let hostname = Data.ByteString.Char8.pack "mew.org"
+--   >>>
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupTXT resolver hostname
+--   Right ["v=spf1 +mx -all"]
+--
 lookupTXT :: Resolver -> Domain -> IO (Either DNSError [ByteString])
 lookupTXT rlv dom = do
   erds <- DNS.lookup rlv dom TXT
