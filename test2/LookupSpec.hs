@@ -25,15 +25,6 @@ spec = do
                     `shouldReturn`
                     Right ["203.178.141.194"]
 
-        it "returns TimeoutExpired on timeout" $ do
-            -- Use a timeout of one millisecond.
-            let badrc = defaultResolvConf { resolvTimeout = 1 }
-            rs <- makeResolvSeed badrc
-            withResolver rs $ \resolver ->
-                DNS.lookupA resolver "www.example.com"
-                    `shouldReturn`
-                    Left TimeoutExpired
-
     describe "lookupAAAA" $ do
         it "gets IPv6 addresses" $ do
             rs <- makeResolvSeed defaultResolvConf
