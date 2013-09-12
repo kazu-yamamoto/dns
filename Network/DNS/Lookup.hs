@@ -239,10 +239,25 @@ lookupNSImpl lookup_function rlv dom = do
     unTag (RD_NS dm) = Right dm
     unTag _ = Left UnexpectedRDATA
 
-{-|
-  Resolving 'Domain' by 'NS'. Results taken from the ANSWER section of
-  the response.
--}
+-- | Look up all \'NS\' records for the given hostname. The results
+--   are taken from the ANSWER section of the response (as opposed to
+--   AUTHORITY). For details, see e.g.
+--   <http://www.zytrax.com/books/dns/ch15/>.
+--
+--   There will typically be more than one name server for a
+--   domain. It is therefore extra important to sort the results if
+--   you prefer them to be at all deterministic.
+--
+--   Examples:
+--
+--   >>>  import Data.List (sort)
+--   >>>  let hostname = Data.ByteString.Char8.pack "mew.org"
+--   >>>
+--   >>>  rs <- makeResolvSeed defaultResolvConf
+--   >>>  ns <- withResolver rs $ \resolver -> lookupNS resolver hostname
+--   >>>  fmap sort ns
+--   Right ["ns1.mew.org.","ns2.mew.org."]
+--
 lookupNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupNS = lookupNSImpl DNS.lookup
 

@@ -19,16 +19,6 @@ spec = do
                     `shouldReturn`
                     Right []
 
-    describe "lookupNS" $ do
-        it "gets NS" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver -> do
-                actual <- DNS.lookupNS resolver "mew.org"
-                let expected = Right ["ns1.mew.org.", "ns2.mew.org."]
-                -- The order of NS records is variable, so we sort the
-                -- result.
-                sort <$> actual `shouldBe` expected
-
     describe "lookupNSAuth" $ do
         it "gets NS" $ do
             -- We expect the GTLD servers to return the NS in the
