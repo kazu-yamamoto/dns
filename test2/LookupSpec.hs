@@ -16,10 +16,3 @@ spec = do
                     `shouldReturn`
                     Right []
 
-    describe "lookupSRV" $ do
-        it "gets SRV" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver ->
-                DNS.lookupSRV resolver "_sip._tcp.cisco.com"
-                    `shouldReturn`
-                    Right [(1,0,5060,"vcsgw.cisco.com.")]

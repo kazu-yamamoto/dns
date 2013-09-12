@@ -373,9 +373,30 @@ lookupRDNS rlv ip = lookupPTR rlv dom
 
 ----------------------------------------------------------------
 
-{-|
-  Resolving 'Domain' and its preference by 'SRV'.
--}
+-- | Look up all \'SRV\' records for the given hostname. A SRV record
+--   comprises four fields,
+--
+--     * Priority (lower is more-preferred)
+--
+--     * Weight (relative frequency with which to use this record
+--       amongst all results with the same priority)
+--
+--     * Port (the port on which the service is offered)
+--
+--     * Target (the hostname on which the service is offered)
+--
+--   The first three are integral, and the target is another DNS
+--   hostname. We therefore return a four-tuple
+--   @(Int,Int,Int,'Domain')@.
+--
+--   Examples:
+--
+--   >>> let hostname = Data.ByteString.Char8.pack "_sip._tcp.cisco.com"
+--   >>>
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupSRV resolver hostname
+--   Right [(1,0,5060,"vcsgw.cisco.com.")]
+--
 lookupSRV :: Resolver -> Domain -> IO (Either DNSError [(Int,Int,Int,Domain)])
 lookupSRV rlv dom = do
   erds <- DNS.lookup rlv dom SRV
