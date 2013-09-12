@@ -97,9 +97,17 @@ lookupA rlv dom = do
     unTag (RD_A x) = Right x
     unTag _ = Left UnexpectedRDATA
 
-{-|
-  Resolving 'IPv6' by 'AAAA'.
--}
+
+-- | Look up all (IPv6) \'AAAA\' records for the given hostname.
+--
+--   Examples:
+--
+--   >>>  let hostname = Data.ByteString.Char8.pack "www.mew.org"
+--   >>>
+--   >>>  rs <- makeResolvSeed defaultResolvConf
+--   >>>  withResolver rs $ \resolver -> lookupAAAA resolver hostname
+--   Right [2001:240:11e:c00:00:00:00:101]
+--
 lookupAAAA :: Resolver -> Domain -> IO (Either DNSError [IPv6])
 lookupAAAA rlv dom = do
   erds <- DNS.lookup rlv dom AAAA

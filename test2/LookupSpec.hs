@@ -19,10 +19,6 @@ spec = do
                     `shouldReturn`
                     Right []
 
-                DNS.lookupAAAA resolver "www.mew.org"
-                    `shouldReturn`
-                    Right ["2001:240:11e:c00::101"]
-
     describe "lookupNS" $ do
         it "gets NS" $ do
             rs <- makeResolvSeed defaultResolvConf
