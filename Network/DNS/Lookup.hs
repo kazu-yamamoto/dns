@@ -31,21 +31,21 @@
 --
 --   We perform a successful lookup of \"www.example.com\":
 --
---   >>>  let hostname = Data.ByteString.Char8.pack "www.example.com"
+--   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  withResolver rs $ \resolver -> lookupA resolver hostname
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupA resolver hostname
 --   Right [93.184.216.119]
 --
 --   The only error that we can easily cause is a timeout. We do this
 --   by creating and utilizing a 'ResolvConf' which has a timeout of
 --   one millisecond:
 --
---   >>>  let hostname = Data.ByteString.Char8.pack "www.example.com"
---   >>>  let badrc = defaultResolvConf { resolvTimeout = 1 }
+--   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
+--   >>> let badrc = defaultResolvConf { resolvTimeout = 1 }
 --   >>>
---   >>>  rs <- makeResolvSeed badrc
---   >>>  withResolver rs $ \resolver -> lookupA resolver hostname
+--   >>> rs <- makeResolvSeed badrc
+--   >>> withResolver rs $ \resolver -> lookupA resolver hostname
 --   Left TimeoutExpired
 --
 --   As is the convention, successful results will always be wrapped
@@ -78,19 +78,19 @@ import Network.DNS.Types
 --
 --   A straightforward example:
 --
---   >>>  let hostname = Data.ByteString.Char8.pack "www.mew.org"
+--   >>> let hostname = Data.ByteString.Char8.pack "www.mew.org"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  withResolver rs $ \resolver -> lookupA resolver hostname
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupA resolver hostname
 --   Right [202.232.15.101]
 --
 --   This function will also follow a CNAME and resolve its target if
 --   one exists for the queries hostname:
 --
---   >>>  let hostname = Data.ByteString.Char8.pack "www.kame.net"
+--   >>> let hostname = Data.ByteString.Char8.pack "www.kame.net"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  withResolver rs $ \resolver -> lookupA resolver hostname
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupA resolver hostname
 --   Right [203.178.141.194]
 --
 lookupA :: Resolver -> Domain -> IO (Either DNSError [IPv4])
@@ -110,10 +110,10 @@ lookupA rlv dom = do
 --
 --   Examples:
 --
---   >>>  let hostname = Data.ByteString.Char8.pack "www.mew.org"
+--   >>> let hostname = Data.ByteString.Char8.pack "www.mew.org"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  withResolver rs $ \resolver -> lookupAAAA resolver hostname
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupAAAA resolver hostname
 --   Right [2001:240:11e:c00:00:00:00:101]
 --
 lookupAAAA :: Resolver -> Domain -> IO (Either DNSError [IPv6])
@@ -139,18 +139,18 @@ lookupAAAA rlv dom = do
 --   examples posted on the internet). But remember, \"no results\" is
 --   still a successful result.
 --
---   >>>  let hostname = Data.ByteString.Char8.pack "example.com"
+--   >>> let hostname = Data.ByteString.Char8.pack "example.com"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  withResolver rs $ \resolver -> lookupMX resolver hostname
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupMX resolver hostname
 --   Right []
 --
 --   The domain \"mew.org\" does however have a single MX:
 --
---   >>>  let hostname = Data.ByteString.Char8.pack "mew.org"
+--   >>> let hostname = Data.ByteString.Char8.pack "mew.org"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  withResolver rs $ \resolver -> lookupMX resolver hostname
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupMX resolver hostname
 --   Right [("mail.mew.org.",10)]
 --
 --   Also note that all hostnames are returned with a trailing dot to
@@ -174,12 +174,12 @@ lookupMX rlv dom = do
 --
 --   Examples:
 --
---   >>>  import Data.List (sort)
---   >>>  let hostname = Data.ByteString.Char8.pack "mixi.jp"
+--   >>> import Data.List (sort)
+--   >>> let hostname = Data.ByteString.Char8.pack "mixi.jp"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
---   >>>  fmap sort ips
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
+--   >>> fmap sort ips
 --   Right [202.32.29.4,202.32.29.5]
 --
 --   Since there is more than one result, it is necessary to sort the
@@ -250,12 +250,12 @@ lookupNSImpl lookup_function rlv dom = do
 --
 --   Examples:
 --
---   >>>  import Data.List (sort)
---   >>>  let hostname = Data.ByteString.Char8.pack "mew.org"
+--   >>> import Data.List (sort)
+--   >>> let hostname = Data.ByteString.Char8.pack "mew.org"
 --   >>>
---   >>>  rs <- makeResolvSeed defaultResolvConf
---   >>>  ns <- withResolver rs $ \resolver -> lookupNS resolver hostname
---   >>>  fmap sort ns
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> ns <- withResolver rs $ \resolver -> lookupNS resolver hostname
+--   >>> fmap sort ns
 --   Right ["ns1.mew.org.","ns2.mew.org."]
 --
 lookupNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
