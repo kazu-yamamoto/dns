@@ -17,17 +17,6 @@ spec = do
                     `shouldReturn`
                     Right []
 
-    describe "lookupPTR" $ do
-        it "gets PTR" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver -> do
-                let target = "210.130.137.80"
-                    rev = BS.intercalate "." (reverse (BS.split '.' target))
-                            `BS.append` ".in-addr.arpa"
-                DNS.lookupPTR resolver rev
-                    `shouldReturn`
-                    Right ["www-v4.iij.ad.jp."]
-
     describe "lookupSRV" $ do
         it "gets SRV" $ do
             rs <- makeResolvSeed defaultResolvConf

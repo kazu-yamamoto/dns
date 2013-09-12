@@ -318,9 +318,19 @@ lookupTXT rlv dom = do
 
 ----------------------------------------------------------------
 
-{-|
-  Resolving 'Domain' and its preference by 'PTR'.
--}
+-- | Look up all \'PTR\' records for the given hostname. To perform a
+--   reverse lookup on an IP address, you must first reverse its
+--   octets and then append the suffix \".in-addr.arpa.\"
+--
+--   We look up the PTR associated with the IP address
+--   210.130.137.80, i.e., 80.137.130.210.in-addr.arpa:
+--
+--   >>> let hostname = Data.ByteString.Char8.pack "80.137.130.210.in-addr.arpa"
+--   >>>
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupPTR resolver hostname
+--   Right ["www-v4.iij.ad.jp."]
+--
 lookupPTR :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupPTR rlv dom = do
   erds <- DNS.lookup rlv dom PTR
