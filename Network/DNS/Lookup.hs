@@ -7,7 +7,7 @@
 --   We can think of the return type as \"either what I asked for, or
 --   an error\". For example, the 'lookupA' function, if successful,
 --   will return a list of 'IPv4'. The 'lookupMX' function will
---   instead return a list of ('Domain',Int) pairs, where each pair
+--   instead return a list of @('Domain',Int)@ pairs, where each pair
 --   represents a hostname and its associated priority.
 --
 --   The errors that can occur are the same for all lookups. Namely:
@@ -20,6 +20,10 @@
 --
 --   If an error occurs, you should be able to pattern match on the
 --   'DNSError' constructor to determine which of these is the case.
+--
+--   /Note/: A result of \"no records\" is not considered an
+--   error. If you perform, say, an \'AAAA\' lookup for a domain with
+--   no such records, the \"success\" result would be @Right []@.
 --
 --   We perform a successful lookup of \"www.example.com\":
 --
