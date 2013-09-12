@@ -64,10 +64,12 @@ module Network.DNS.Lookup (
   , lookupNSAuth
   , lookupTXT
   , lookupPTR
+  , lookupRDNS
   , lookupSRV
   ) where
 
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS (append, intercalate, pack, split)
 import Data.IP
 import Network.DNS.Resolver as DNS
 import Network.DNS.Types
@@ -331,6 +333,8 @@ lookupTXT rlv dom = do
 --   >>> withResolver rs $ \resolver -> lookupPTR resolver hostname
 --   Right ["www-v4.iij.ad.jp."]
 --
+--   The 'lookupRDNS' function is more suited to this particular task.
+--
 lookupPTR :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupPTR rlv dom = do
   erds <- DNS.lookup rlv dom PTR
@@ -342,6 +346,30 @@ lookupPTR rlv dom = do
     unTag :: RDATA -> Either DNSError Domain
     unTag (RD_PTR dm) = Right dm
     unTag _ = Left UnexpectedRDATA
+
+
+-- | Convenient wrapper around 'lookupPTR' to perform a reverse lookup
+--   on a single IP address.
+--
+--   We repeat the example from 'lookupPTR', except now we pass the IP
+--   address directly:
+--
+--   >>> let hostname = Data.ByteString.Char8.pack "210.130.137.80"
+--   >>>
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupRDNS resolver hostname
+--   Right ["www-v4.iij.ad.jp."]
+--
+lookupRDNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
+lookupRDNS rlv ip = lookupPTR rlv dom
+  where
+    -- ByteString constants.
+    dot = BS.pack "."
+    suffix = BS.pack ".in-addr.arpa"
+
+    octets = BS.split '.' ip
+    reverse_ip = BS.intercalate dot (reverse octets)
+    dom = reverse_ip `BS.append` suffix
 
 ----------------------------------------------------------------
 
