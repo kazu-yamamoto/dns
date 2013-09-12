@@ -261,10 +261,29 @@ lookupNSImpl lookup_function rlv dom = do
 lookupNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupNS = lookupNSImpl DNS.lookup
 
-{-|
-  Resolving 'Domain' by 'NS'. Results taken from the AUTHORITY section
-  of the response.
--}
+-- | Look up all \'NS\' records for the given hostname. The results
+--   are taken from the AUTHORITY section of the response and not the
+--   usual ANSWER (use 'lookupNS' for that). For details, see e.g.
+--   <http://www.zytrax.com/books/dns/ch15/>.
+--
+--   There will typically be more than one name server for a
+--   domain. It is therefore extra important to sort the results if
+--   you prefer them to be at all deterministic.
+--
+--   For an example, we can look up the nameservers for
+--   \"example.com\" from one of the root servers, a.gtld-servers.net,
+--   the IP address of which was found beforehand:
+--
+--   >>> import Data.List (sort)
+--   >>> let hostname = Data.ByteString.Char8.pack "example.com"
+--   >>>
+--   >>> let ri = RCHostName "192.5.6.30" -- a.gtld-servers.net
+--   >>> let rc = defaultResolvConf { resolvInfo = ri }
+--   >>> rs <- makeResolvSeed rc
+--   >>> ns <- withResolver rs $ \resolver -> lookupNSAuth resolver hostname
+--   >>> fmap sort ns
+--   Right ["a.iana-servers.net.","b.iana-servers.net."]
+--
 lookupNSAuth :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupNSAuth = lookupNSImpl DNS.lookupAuth
 
