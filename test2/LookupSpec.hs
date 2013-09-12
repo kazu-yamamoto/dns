@@ -52,13 +52,6 @@ spec = do
                     `shouldReturn`
                     Right ["v=spf1 +mx -all"]
 
-    describe "lookupAviaMX" $ do
-        it "gets IPv4 addresses via MX" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver -> do
-                as <- DNS.lookupAviaMX resolver "mixi.jp"
-                sort <$> as `shouldBe` Right ["202.32.29.4", "202.32.29.5"]
-
     describe "lookupPTR" $ do
         it "gets PTR" $ do
             rs <- makeResolvSeed defaultResolvConf

@@ -10,6 +10,10 @@
 --   instead return a list of @('Domain',Int)@ pairs, where each pair
 --   represents a hostname and its associated priority.
 --
+--   The order of multiple results may not be consistent between
+--   lookups. If you require consistent results, apply
+--   'Data.List.sort' to the returned list.
+--
 --   The errors that can occur are the same for all lookups. Namely:
 --
 --     * Timeout
@@ -164,9 +168,23 @@ lookupMX rlv dom = do
     unTag (RD_MX pr dm) = Right (dm,pr)
     unTag _ = Left UnexpectedRDATA
 
-{-|
-  Resolving 'IPv4' by 'A' via 'MX'.
--}
+-- | Look up all \'MX\' records for the given hostname, and then
+--   resolve their hostnames to IPv4 addresses by calling
+--   'lookupA'. The priorities are not retained.
+--
+--   Examples:
+--
+--   >>>  import Data.List (sort)
+--   >>>  let hostname = Data.ByteString.Char8.pack "mixi.jp"
+--   >>>
+--   >>>  rs <- makeResolvSeed defaultResolvConf
+--   >>>  ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
+--   >>>  fmap sort ips
+--   Right [202.32.29.4,202.32.29.5]
+--
+--   Since there is more than one result, it is necessary to sort the
+--   list in order to check for equality.
+--
 lookupAviaMX :: Resolver -> Domain -> IO (Either DNSError [IPv4])
 lookupAviaMX rlv dom = lookupXviaMX rlv dom (lookupA rlv)
 
