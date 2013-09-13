@@ -8,16 +8,12 @@ import Data.Maybe
 
 ----------------------------------------------------------------
 
-{-|
-  Type for domain.
--}
+-- | Type for domain.
 type Domain = ByteString
 
 ----------------------------------------------------------------
 
-{-|
-  Types for resource records.
--}
+-- | Types for resource records.
 data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA | PTR | SRV
           | UNKNOWN Int deriving (Eq, Show, Read)
 
@@ -51,9 +47,7 @@ toType = read . map toUpper
 
 ----------------------------------------------------------------
 
-{-|
-  An enumeration of all possible DNS errors that can occur.
--}
+-- | An enumeration of all possible DNS errors that can occur.
 data DNSError =
   -- | The sequence number of the answer doesn't match our query. This
   --   could indicate foul play.
@@ -65,9 +59,7 @@ data DNSError =
   | UnexpectedRDATA
   deriving (Eq, Show)
 
-{-|
-  Raw data format for DNS Query and Response.
--}
+-- | Raw data format for DNS Query and Response.
 data DNSFormat = DNSFormat {
     header     :: DNSHeader
   , question   :: [Question]
@@ -76,9 +68,7 @@ data DNSFormat = DNSFormat {
   , additional :: [ResourceRecord]
   } deriving (Eq, Show)
 
-{-|
-  Raw data format for the header of DNS Query and Response.
--}
+-- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
     identifier :: Int
   , flags      :: DNSFlags
@@ -88,9 +78,7 @@ data DNSHeader = DNSHeader {
   , arCount    :: Int
   } deriving (Eq, Show)
 
-{-|
-  Raw data format for the flags of DNS Query and Response.
--}
+-- | Raw data format for the flags of DNS Query and Response.
 data DNSFlags = DNSFlags {
     qOrR         :: QorR
   , opcode       :: OPCODE
@@ -111,25 +99,19 @@ data RCODE = NoErr | FormatErr | ServFail | NameErr | NotImpl | Refused deriving
 
 ----------------------------------------------------------------
 
-{-|
-  Raw data format for DNS questions.
--}
+-- | Raw data format for DNS questions.
 data Question = Question {
     qname  :: Domain
   , qtype  :: TYPE
   } deriving (Eq, Show)
 
-{-|
-  Making "Question".
--}
+-- | Making "Question".
 makeQuestion :: Domain -> TYPE -> Question
 makeQuestion = Question
 
 ----------------------------------------------------------------
 
-{-|
-  Raw data format for resource records.
--}
+-- | Raw data format for resource records.
 data ResourceRecord = ResourceRecord {
     rrname :: Domain
   , rrtype :: TYPE
@@ -138,9 +120,7 @@ data ResourceRecord = ResourceRecord {
   , rdata  :: RDATA
   } deriving (Eq, Show)
 
-{-|
-  Raw data format for each type.
--}
+-- | Raw data format for each type.
 data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
            | RD_SOA Domain Domain Int Int Int Int Int
            | RD_A IPv4 | RD_AAAA IPv6 | RD_TXT ByteString

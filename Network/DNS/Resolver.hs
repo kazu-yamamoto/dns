@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
   -- * Documentation
@@ -79,18 +80,14 @@ defaultResolvConf = ResolvConf {
 
 ----------------------------------------------------------------
 
-{-|
-  Abstract data type of DNS Resolver seed
--}
+-- | Abstract data type of DNS Resolver seed
 data ResolvSeed = ResolvSeed {
     addrInfo :: AddrInfo
   , rsTimeout :: Int
   , rsBufsize :: Integer
 }
 
-{-|
-  Abstract data type of DNS Resolver
--}
+-- | Abstract data type of DNS Resolver
 data Resolver = Resolver {
     genId   :: IO Int
   , dnsSock :: Socket
@@ -154,12 +151,11 @@ getRandom = getStdRandom (randomR (0,65535))
 
 ----------------------------------------------------------------
 
-{-|
-  Looking up resource records of a domain. The first parameter is one of
-  the field accessors of the 'DNSFormat' type -- this allows you to
-  choose which section (answer, authority, or additional) you would like
-  to inspect for the result.
--}
+-- | Looking up resource records of a domain. The first parameter is one of
+--   the field accessors of the 'DNSFormat' type -- this allows you to
+--   choose which section (answer, authority, or additional) you would like
+--   to inspect for the result.
+
 lookupSection :: (DNSFormat -> [ResourceRecord])
               -> Resolver
               -> Domain

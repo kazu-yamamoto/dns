@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+
 module Network.DNS.Encode (
     encode
   , composeQuery
@@ -20,8 +21,8 @@ import Data.IP
 
 ----------------------------------------------------------------
 
-{-| Composing query. First argument is a number to identify response.
--}
+-- | Composing query. First argument is a number to identify response.
+
 composeQuery :: Int -> [Question] -> BL.ByteString
 composeQuery idt qs = encode qry
   where
@@ -36,8 +37,8 @@ composeQuery idt qs = encode qry
 
 ----------------------------------------------------------------
 
-{-| Composing DNS data.
--}
+-- | Composing DNS data.
+
 encode :: DNSFormat -> BL.ByteString
 encode fmt = runSPut (encodeDNSFormat fmt)
 

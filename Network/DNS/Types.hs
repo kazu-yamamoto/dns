@@ -1,6 +1,5 @@
-{-|
-  Data types for DNS Query and Response. For more information, see <http://www.ietf.org/rfc/rfc1035>.
--}
+-- | Data types for DNS Query and Response.
+--   For more information, see <http://www.ietf.org/rfc/rfc1035>.
 
 module Network.DNS.Types (
   -- * Domain
