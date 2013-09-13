@@ -21,16 +21,15 @@ import Network.DNS.StateBinary
 
 ----------------------------------------------------------------
 
-{-| Receiving DNS data from 'Socket' and parse it.
-    The second argument is a buffer size for the socket.
--}
+-- | Receiving DNS data from 'Socket' and parse it.
+
 receive :: Socket -> IO DNSFormat
 receive sock = receiveDNSFormat $ sourceSocket sock
 
 ----------------------------------------------------------------
 
-{-| Parsing DNS data.
--}
+-- | Parsing DNS data.
+
 decode :: BL.ByteString -> Either String DNSFormat
 decode bs = fst <$> runSGet decodeResponse bs
 
