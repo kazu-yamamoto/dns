@@ -33,6 +33,7 @@ import Network.Socket (send)
 import qualified Data.ByteString.Lazy.Char8 as LB
 import Control.Monad (when)
 #endif
+
 ----------------------------------------------------------------
 
 
@@ -53,6 +54,7 @@ data FileOrNumericHost = RCFilePath FilePath | RCHostName HostName
 data ResolvConf = ResolvConf {
     resolvInfo :: FileOrNumericHost
   , resolvTimeout :: Int
+  , resolvRetry :: Int
   -- | This field was obsoleted.
   , resolvBufsize :: Integer
 }
@@ -63,6 +65,8 @@ data ResolvConf = ResolvConf {
 --     * 'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
 --
 --     * 'resolvTimeout' is 3,000,000 micro seconds.
+--
+--     * 'resolvRetry' is 5.
 --
 --     * 'resolvBufsize' is 512. (obsoleted)
 --
@@ -75,6 +79,7 @@ defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo = RCFilePath "/etc/resolv.conf"
   , resolvTimeout = 3 * 1000 * 1000
+  , resolvRetry = 5
   , resolvBufsize = 512
 }
 
@@ -84,6 +89,7 @@ defaultResolvConf = ResolvConf {
 data ResolvSeed = ResolvSeed {
     addrInfo :: AddrInfo
   , rsTimeout :: Int
+  , rsRetry :: Int
   , rsBufsize :: Integer
 }
 
@@ -92,6 +98,7 @@ data Resolver = Resolver {
     genId   :: IO Int
   , dnsSock :: Socket
   , dnsTimeout :: Int
+  , dnsRetry :: Int
   , dnsBufsize :: Integer
 }
 
@@ -107,6 +114,7 @@ data Resolver = Resolver {
 makeResolvSeed :: ResolvConf -> IO ResolvSeed
 makeResolvSeed conf = ResolvSeed <$> addr
                                  <*> pure (resolvTimeout conf)
+                                 <*> pure (resolvRetry conf)
                                  <*> pure (resolvBufsize conf)
   where
     addr = case resolvInfo conf of
@@ -142,6 +150,7 @@ withResolver seed func = do
           genId = getRandom
         , dnsSock = sock
         , dnsTimeout = rsTimeout seed
+        , dnsRetry = rsRetry seed
         , dnsBufsize = rsBufsize seed
         }
   func resolv `finally` sClose sock
@@ -233,21 +242,27 @@ lookupAuth = lookupSection authority
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSFormat)
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
-    sendAll sock (composeQuery seqno [q])
-    response <- timeout tm (receive sock)
-    return $ case response of
-               Nothing -> Left TimeoutExpired
-               Just y  -> check seqno y
+    let query = composeQuery seqno [q]
+        checkSeqno = check seqno
+    loop query checkSeqno 0
   where
+    loop query checkSeqno cnt
+      | cnt == retry = return $ Left TimeoutExpired
+      | otherwise    = do
+          sendAll sock query
+          response <- timeout tm (receive sock)
+          case response of
+              Nothing  -> loop query checkSeqno (cnt + 1)
+              Just res -> do
+                  let valid = checkSeqno res
+                      ret | valid     = Right res
+                          | otherwise = Left SequenceNumberMismatch
+                  return ret
     sock = dnsSock rlv
     tm = dnsTimeout rlv
+    retry = dnsRetry rlv
     q = makeQuestion dom typ
-    check seqno res = do
-        let hdr = header res
-        if identifier hdr == seqno then
-            Right res
-          else
-            Left SequenceNumberMismatch
+    check seqno res = identifier (header res) == seqno
 
 #if mingw32_HOST_OS == 1
     -- Windows does not support sendAll in Network.ByteString.Lazy.
