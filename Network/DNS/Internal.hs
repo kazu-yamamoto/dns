@@ -1,10 +1,14 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Network.DNS.Internal where
 
+import Control.Exception (Exception)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.IP
 import Data.Maybe
+import Data.Typeable (Typeable)
 
 ----------------------------------------------------------------
 
@@ -57,7 +61,9 @@ data DNSError =
   -- | The answer has the correct sequence number, but returned an
   --   unexpected RDATA format.
   | UnexpectedRDATA
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable)
+
+instance Exception DNSError
 
 -- | Raw data format for DNS Query and Response.
 data DNSFormat = DNSFormat {
