@@ -8,7 +8,7 @@ module Network.DNS.Resolver (
   -- ** Intermediate data type for resolver
   , ResolvSeed, makeResolvSeed
   -- ** Type and function for resolver
-  , Resolver(..), withResolver
+  , Resolver(..), withResolver, withResolvers
   -- ** Looking up functions
   , lookup, lookupAuth, lookupRaw
   ) where
@@ -142,18 +142,37 @@ makeAddrInfo addr = do
 --   argument. 'withResolver' should be passed to 'forkIO'. For
 --   examples, see "Network.DNS.Lookup".
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
-withResolver seed func = do
-  let ai = addrInfo seed
-  sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
-  connect sock (addrAddress ai)
-  let resolv = Resolver {
-          genId = getRandom
-        , dnsSock = sock
-        , dnsTimeout = rsTimeout seed
-        , dnsRetry = rsRetry seed
-        , dnsBufsize = rsBufsize seed
-        }
-  func resolv `finally` sClose sock
+withResolver seed func = bracket (openSocket seed) sClose $ \sock -> do
+    connectSocket sock seed
+    func $ makeResolver seed sock
+
+withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
+withResolvers seeds func = bracket openSockets closeSockets $ \socks -> do
+    mapM_ (uncurry connectSocket) $ zip socks seeds
+    let resolvs = map (uncurry makeResolver) $ zip seeds socks
+    func resolvs
+  where
+    openSockets = mapM openSocket seeds
+    closeSockets = mapM sClose
+
+openSocket :: ResolvSeed -> IO Socket
+openSocket seed = socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
+  where
+    ai = addrInfo seed
+
+connectSocket :: Socket -> ResolvSeed -> IO ()
+connectSocket sock seed = connect sock (addrAddress ai)
+  where
+    ai = addrInfo seed
+
+makeResolver :: ResolvSeed -> Socket -> Resolver
+makeResolver seed sock = Resolver {
+    genId = getRandom
+  , dnsSock = sock
+  , dnsTimeout = rsTimeout seed
+  , dnsRetry = rsRetry seed
+  , dnsBufsize = rsBufsize seed
+  }
 
 getRandom :: IO Int
 getRandom = getStdRandom (randomR (0,65535))
@@ -244,20 +263,24 @@ lookupRaw rlv dom typ = do
     seqno <- genId rlv
     let query = composeQuery seqno [q]
         checkSeqno = check seqno
-    loop query checkSeqno 0
+    loop query checkSeqno 0 False
   where
-    loop query checkSeqno cnt
-      | cnt == retry = return $ Left TimeoutExpired
+    loop query checkSeqno cnt mismatch
+      | cnt == retry = do
+          let ret | mismatch  = SequenceNumberMismatch
+                  | otherwise = TimeoutExpired
+          return $ Left ret
       | otherwise    = do
           sendAll sock query
           response <- timeout tm (receive sock)
           case response of
-              Nothing  -> loop query checkSeqno (cnt + 1)
+              Nothing  -> loop query checkSeqno (cnt + 1) False
               Just res -> do
                   let valid = checkSeqno res
-                      ret | valid     = Right res
-                          | otherwise = Left SequenceNumberMismatch
-                  return ret
+                  if valid then
+                      return $ Right res
+                    else
+                      loop query checkSeqno (cnt + 1) False
     sock = dnsSock rlv
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
