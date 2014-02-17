@@ -46,16 +46,18 @@ import Control.Monad (when)
 --
 --   >>> let cache = RCHostName "8.8.8.8"
 --
-data FileOrNumericHost = RCFilePath FilePath | RCHostName HostName
-
+data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
+                       | RCHostName HostName -- ^ A numeric IP address
 
 -- | Type for resolver configuration. The easiest way to construct a
 --   @ResolvConf@ object is to modify the 'defaultResolvConf'.
 data ResolvConf = ResolvConf {
     resolvInfo :: FileOrNumericHost
+   -- | Timeout in micro seconds.
   , resolvTimeout :: Int
+   -- | The number of retries including the first try.
   , resolvRetry :: Int
-  -- | This field was obsoleted.
+   -- | This field was obsoleted.
   , resolvBufsize :: Integer
 }
 
@@ -85,7 +87,8 @@ defaultResolvConf = ResolvConf {
 
 ----------------------------------------------------------------
 
--- | Abstract data type of DNS Resolver seed
+-- | Abstract data type of DNS Resolver seed.
+--   When implementing a DNS cache, this should be re-used.
 data ResolvSeed = ResolvSeed {
     addrInfo :: AddrInfo
   , rsTimeout :: Int
@@ -94,6 +97,7 @@ data ResolvSeed = ResolvSeed {
 }
 
 -- | Abstract data type of DNS Resolver
+--   When implementing a DNS cache, this MUST NOT be re-used.
 data Resolver = Resolver {
     genId   :: IO Int
   , dnsSock :: Socket
@@ -139,13 +143,14 @@ makeAddrInfo addr = do
 
 
 -- | Giving a thread-safe 'Resolver' to the function of the second
---   argument. 'withResolver' should be passed to 'forkIO'. For
---   examples, see "Network.DNS.Lookup".
+--   argument. A socket for UDP is opened inside and is surely closed.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed func = bracket (openSocket seed) sClose $ \sock -> do
     connectSocket sock seed
     func $ makeResolver seed sock
 
+-- | Giving thread-safe 'Resolver's to the function of the second
+--   argument. Sockets for UDP are opened inside and are surely closed.
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
 withResolvers seeds func = bracket openSockets closeSockets $ \socks -> do
     mapM_ (uncurry connectSocket) $ zip socks seeds
