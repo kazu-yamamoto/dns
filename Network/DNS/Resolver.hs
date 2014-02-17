@@ -68,7 +68,7 @@ data ResolvConf = ResolvConf {
 --
 --     * 'resolvTimeout' is 3,000,000 micro seconds.
 --
---     * 'resolvRetry' is 5.
+--     * 'resolvRetry' is 3.
 --
 --     * 'resolvBufsize' is 512. (obsoleted)
 --
@@ -81,7 +81,7 @@ defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo = RCFilePath "/etc/resolv.conf"
   , resolvTimeout = 3 * 1000 * 1000
-  , resolvRetry = 5
+  , resolvRetry = 3
   , resolvBufsize = 512
 }
 
