@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, OverloadedStrings #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -15,6 +15,7 @@ module Network.DNS.Resolver (
 
 import Control.Applicative
 import Control.Exception
+import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Int
 import Data.List hiding (find, lookup)
@@ -194,14 +195,25 @@ lookupSection :: (DNSFormat -> [ResourceRecord])
               -> Domain
               -> TYPE
               -> IO (Either DNSError [RDATA])
-lookupSection section rlv dom typ = (>>= toRDATA) <$> lookupRaw rlv dom typ
+lookupSection section rlv dom typ = do
+    eans <- lookupRaw rlv dom typ
+    case eans of
+        Left  err -> return $ Left err
+        Right ans -> return $ case errcode ans of
+            NoErr     -> Right $ toRDATA ans
+            FormatErr -> Left FormatError
+            ServFail  -> Left ServerFailure
+            NameErr   -> Left NameError
+            NotImpl   -> Left NotImplemented
+            Refused   -> Left OperationRefused
   where
     {- CNAME hack
     dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
     correct r = rrname r == dom' && rrtype r == typ
     -}
     correct r = rrtype r == typ
-    toRDATA = Right . map rdata . filter correct . section
+    toRDATA = map rdata . filter correct . section
+    errcode = rcode . flags . header
 
 -- | Look up resource records for a domain, collecting the results
 --   from the ANSWER section of the response.
@@ -264,6 +276,8 @@ lookupAuth = lookupSection authority
 --  @
 --
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSFormat)
+lookupRaw _   dom _
+  | isIllegal dom     = return $ Left IllegalDomain
 lookupRaw rlv dom typ = do
     seqno <- genId rlv
     let query = composeQuery seqno [q]
@@ -299,3 +313,14 @@ lookupRaw rlv dom typ = do
 	sent <- send sock (LB.unpack bs)
 	when (sent < fromIntegral (LB.length bs)) $ sendAll sock (LB.drop (fromIntegral sent) bs)
 #endif
+
+isIllegal :: Domain -> Bool
+isIllegal ""                    = True
+isIllegal dom
+  | '.' `BS.notElem` dom        = True
+  | ':' `BS.elem` dom           = True
+  | '/' `BS.elem` dom           = True
+  | BS.length dom > 253         = True
+  | any (\x -> BS.length x > 63)
+        (BS.split '.' dom)      = True
+isIllegal _                     = False
