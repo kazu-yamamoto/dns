@@ -10,7 +10,11 @@ module Network.DNS.Resolver (
   -- ** Type and function for resolver
   , Resolver(..), withResolver, withResolvers
   -- ** Looking up functions
-  , lookup, lookupAuth, lookupRaw
+  , lookup
+  , lookupAuth
+  -- ** Raw looking up function
+  , lookupRaw
+  , fromDNSFormat
   ) where
 
 import Control.Applicative
@@ -199,13 +203,7 @@ lookupSection section rlv dom typ = do
     eans <- lookupRaw rlv dom typ
     case eans of
         Left  err -> return $ Left err
-        Right ans -> return $ case errcode ans of
-            NoErr     -> Right $ toRDATA ans
-            FormatErr -> Left FormatError
-            ServFail  -> Left ServerFailure
-            NameErr   -> Left NameError
-            NotImpl   -> Left NotImplemented
-            Refused   -> Left OperationRefused
+        Right ans -> return $ fromDNSFormat ans toRDATA
   where
     {- CNAME hack
     dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
@@ -213,6 +211,17 @@ lookupSection section rlv dom typ = do
     -}
     correct r = rrtype r == typ
     toRDATA = map rdata . filter correct . section
+
+-- | Extract necessary information from 'DNSFormat'
+fromDNSFormat :: DNSFormat -> (DNSFormat -> a) -> Either DNSError a
+fromDNSFormat ans conv = case errcode ans of
+    NoErr     -> Right $ conv ans
+    FormatErr -> Left FormatError
+    ServFail  -> Left ServerFailure
+    NameErr   -> Left NameError
+    NotImpl   -> Left NotImplemented
+    Refused   -> Left OperationRefused
+  where
     errcode = rcode . flags . header
 
 -- | Look up resource records for a domain, collecting the results
