@@ -1,5 +1,5 @@
 Name:                   dns
-Version:                1.2.0
+Version:                1.2.1
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -35,7 +35,7 @@ Library
                       , iproute >= 1.2.4
                       , mtl
                       , network >= 2.3
-                      , network-conduit
+                      , network-conduit < 1.1.0
                       , random
   else
     Build-Depends:      base >= 4 && < 5
@@ -50,7 +50,7 @@ Library
                       , mtl
                       , network
                       , network-bytestring
-                      , network-conduit
+                      , network-conduit < 1.1.0
                       , random
 
 Test-Suite network
@@ -85,7 +85,7 @@ Test-Suite spec
                       , iproute >= 1.2.4
                       , mtl
                       , network >= 2.3
-                      , network-conduit
+                      , network-conduit < 1.1.0
                       , random
 
 Test-Suite doctest
