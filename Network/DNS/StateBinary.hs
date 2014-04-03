@@ -4,6 +4,7 @@ module Network.DNS.StateBinary where
 import Blaze.ByteString.Builder
 import Control.Applicative
 import Control.Monad.State
+import Control.Monad.Trans.Resource (ResourceT)
 import Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Lazy as AL
 import Data.ByteString (ByteString)

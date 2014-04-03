@@ -30,13 +30,14 @@ Library
                       , binary
                       , blaze-builder
                       , bytestring
-                      , conduit >= 0.5
+                      , conduit >= 1.1
+                      , conduit-extra
                       , containers
                       , iproute >= 1.2.4
                       , mtl
                       , network >= 2.3
-                      , network-conduit
                       , random
+                      , resourcet
   else
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
@@ -44,14 +45,15 @@ Library
                       , binary
                       , blaze-builder
                       , bytestring
-                      , conduit
+                      , conduit >= 1.1
+                      , conduit-extra
                       , containers
                       , iproute >= 1.2.4
                       , mtl
                       , network
                       , network-bytestring
-                      , network-conduit
                       , random
+                      , resourcet
 
 Test-Suite network
   Type:                 exitcode-stdio-1.0
@@ -78,15 +80,16 @@ Test-Suite spec
                       , binary
                       , blaze-builder
                       , bytestring
-                      , conduit >= 0.5
+                      , conduit >= 1.1
+                      , conduit-extra
                       , containers
                       , dns
                       , hspec
                       , iproute >= 1.2.4
                       , mtl
                       , network >= 2.3
-                      , network-conduit
                       , random
+                      , resourcet
 
 Test-Suite doctest
   Type:                 exitcode-stdio-1.0

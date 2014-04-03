@@ -7,6 +7,7 @@ module Network.DNS.Decode (
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Data.Bits
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
