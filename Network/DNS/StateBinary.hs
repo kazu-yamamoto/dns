@@ -1,28 +1,27 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module Network.DNS.StateBinary where
 
-import Blaze.ByteString.Builder
-import Control.Applicative
-import Control.Monad.State
+import Blaze.ByteString.Builder (Write)
+import qualified Blaze.ByteString.Builder as BB
+import Control.Applicative ((<$>), (<*))
+import Control.Monad.State (State, StateT)
+import qualified Control.Monad.State as ST
 import Control.Monad.Trans.Resource (ResourceT)
-import Data.Attoparsec.ByteString
+import qualified Data.Attoparsec as A
 import qualified Data.Attoparsec.ByteString.Lazy as AL
+import qualified Data.Attoparsec.Types as T
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS (unpack, length)
-import qualified Data.ByteString.Lazy as BL (ByteString)
-import Data.Conduit
-import Data.Conduit.Attoparsec
-import Data.Int
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
+import Data.Conduit (Sink)
+import Data.Conduit.Attoparsec (sinkParser)
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IM (insert, lookup, empty)
+import qualified Data.IntMap as IM
 import Data.Map (Map)
-import qualified Data.Map as M (insert, lookup, empty)
-import Data.Monoid
-import Data.Word
+import qualified Data.Map as M
+import Data.Monoid (Monoid, mconcat, mappend, mempty)
+import Data.Word (Word8, Word16, Word32)
 import Network.DNS.Types
-import Prelude hiding (lookup, take)
-
-import qualified Data.Attoparsec.Types as T (Parser)
 
 ----------------------------------------------------------------
 
@@ -41,30 +40,30 @@ instance Monoid SPut where
     mappend a b = mconcat <$> sequence [a, b]
 
 put8 :: Word8 -> SPut
-put8 = fixedSized 1 writeWord8
+put8 = fixedSized 1 BB.writeWord8
 
 put16 :: Word16 -> SPut
-put16 = fixedSized 2 writeWord16be
+put16 = fixedSized 2 BB.writeWord16be
 
 put32 :: Word32 -> SPut
-put32 = fixedSized 4 writeWord32be
+put32 = fixedSized 4 BB.writeWord32be
 
 putInt8 :: Int -> SPut
-putInt8 = fixedSized 1 (writeInt8 . fromIntegral)
+putInt8 = fixedSized 1 (BB.writeInt8 . fromIntegral)
 
 putInt16 :: Int -> SPut
-putInt16 = fixedSized 2 (writeInt16be . fromIntegral)
+putInt16 = fixedSized 2 (BB.writeInt16be . fromIntegral)
 
 putInt32 :: Int -> SPut
-putInt32 = fixedSized 4 (writeInt32be . fromIntegral)
+putInt32 = fixedSized 4 (BB.writeInt32be . fromIntegral)
 
 putByteString :: ByteString -> SPut
-putByteString = writeSized BS.length writeByteString
+putByteString = writeSized BS.length BB.writeByteString
 
 addPositionW :: Int -> State WState ()
 addPositionW n = do
-    (WState m cur) <- get
-    put $ WState m (cur+n)
+    (WState m cur) <- ST.get
+    ST.put $ WState m (cur+n)
 
 fixedSized :: Int -> (a -> Write) -> a -> SPut
 fixedSized n f a = do addPositionW n
@@ -76,13 +75,13 @@ writeSized n f a = do addPositionW (n a)
 
 wsPop :: Domain -> State WState (Maybe Int)
 wsPop dom = do
-    doms <- gets wsDomain
+    doms <- ST.gets wsDomain
     return $ M.lookup dom doms
 
 wsPush :: Domain -> Int -> State WState ()
 wsPush dom pos = do
-    (WState m cur) <- get
-    put $ WState (M.insert dom pos m) cur
+    (WState m cur) <- ST.get
+    ST.put $ WState (M.insert dom pos m) cur
 
 ----------------------------------------------------------------
 
@@ -96,39 +95,39 @@ data PState = PState {
 ----------------------------------------------------------------
 
 getPosition :: SGet Int
-getPosition = psPosition <$> get
+getPosition = psPosition <$> ST.get
 
 addPosition :: Int -> SGet ()
 addPosition n = do
-    PState dom pos <- get
-    put $ PState dom (pos + n)
+    PState dom pos <- ST.get
+    ST.put $ PState dom (pos + n)
 
 push :: Int -> Domain -> SGet ()
 push n d = do
-    PState dom pos <- get
-    put $ PState (IM.insert n d dom) pos
+    PState dom pos <- ST.get
+    ST.put $ PState (IM.insert n d dom) pos
 
 pop :: Int -> SGet (Maybe Domain)
-pop n = IM.lookup n . psDomain <$> get
+pop n = IM.lookup n . psDomain <$> ST.get
 
 ----------------------------------------------------------------
 
 get8 :: SGet Word8
-get8  = lift anyWord8 <* addPosition 1
+get8  = ST.lift A.anyWord8 <* addPosition 1
 
 get16 :: SGet Word16
-get16 = lift getWord16be <* addPosition 2
+get16 = ST.lift getWord16be <* addPosition 2
   where
-    word8' = fromIntegral <$> anyWord8
+    word8' = fromIntegral <$> A.anyWord8
     getWord16be = do
         a <- word8'
         b <- word8'
         return $ a * 256 + b
 
 get32 :: SGet Word32
-get32 = lift getWord32be <* addPosition 4
+get32 = ST.lift getWord32be <* addPosition 4
   where
-    word8' = fromIntegral <$> anyWord8
+    word8' = fromIntegral <$> A.anyWord8
     getWord32be = do
         a <- word8'
         b <- word8'
@@ -153,7 +152,7 @@ getNBytes len = toInts <$> getNByteString len
     toInts = map fromIntegral . BS.unpack
 
 getNByteString :: Int -> SGet ByteString
-getNByteString n = lift (take n) <* addPosition n
+getNByteString n = ST.lift (A.take n) <* addPosition n
 
 ----------------------------------------------------------------
 
@@ -161,10 +160,10 @@ initialState :: PState
 initialState = PState IM.empty 0
 
 sinkSGet :: SGet a -> Sink ByteString (ResourceT IO) (a, PState)
-sinkSGet parser = sinkParser (runStateT parser initialState)
+sinkSGet parser = sinkParser (ST.runStateT parser initialState)
 
 runSGet :: SGet a -> BL.ByteString -> Either String (a, PState)
-runSGet parser bs = AL.eitherResult $ AL.parse (runStateT parser initialState) bs
+runSGet parser bs = AL.eitherResult $ AL.parse (ST.runStateT parser initialState) bs
 
 runSPut :: SPut -> BL.ByteString
-runSPut = toLazyByteString . fromWrite . flip evalState initialWState
+runSPut = BB.toLazyByteString . BB.fromWrite . flip ST.evalState initialWState

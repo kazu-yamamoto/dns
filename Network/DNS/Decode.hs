@@ -5,18 +5,18 @@ module Network.DNS.Decode (
   , receive
   ) where
 
-import Control.Applicative
-import Control.Monad
+import Control.Applicative ((<$), (<$>), (<*), (<*>))
+import Control.Monad (replicateM)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
-import Data.Bits
+import Data.Bits ((.&.), shiftR, testBit)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.Conduit
-import Data.Conduit.Network
-import Data.IP
-import Data.Maybe
-import Network
+import Data.Conduit (($$), Source)
+import Data.Conduit.Network (sourceSocket)
+import Data.IP (toIPv4, toIPv6)
+import Data.Maybe (fromMaybe)
+import Network (Socket)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
 

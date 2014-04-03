@@ -69,8 +69,8 @@ module Network.DNS.Lookup (
   ) where
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS (append, intercalate, pack, split)
-import Data.IP
+import qualified Data.ByteString.Char8 as BS
+import Data.IP (IPv4, IPv6)
 import Network.DNS.Resolver as DNS
 import Network.DNS.Types
 

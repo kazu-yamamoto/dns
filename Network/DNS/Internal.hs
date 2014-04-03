@@ -5,9 +5,9 @@ module Network.DNS.Internal where
 import Control.Exception (Exception)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.Char
-import Data.IP
-import Data.Maybe
+import Data.Char (toUpper)
+import Data.IP (IPv4, IPv6)
+import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
 
 ----------------------------------------------------------------

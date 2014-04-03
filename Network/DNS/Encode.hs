@@ -5,16 +5,17 @@ module Network.DNS.Encode (
   , composeQuery
   ) where
 
-import qualified Blaze.ByteString.Builder as BB (toByteString, fromWrite, writeInt16be)
-import qualified Data.ByteString.Lazy.Char8 as BL (ByteString)
-import qualified Data.ByteString.Char8 as BS (length, null, break, drop)
-import Network.DNS.StateBinary
+import qualified Blaze.ByteString.Builder as BB
+import Control.Monad (when)
+import Control.Monad.State (State, modify, execState, gets)
+import Data.Binary (Word16)
+import Data.Bits ((.|.), bit, shiftL)
+import qualified Data.ByteString.Char8 as BS
+import Data.ByteString.Lazy.Char8 (ByteString)
+import Data.IP (fromIPv4, fromIPv6)
+import Data.Monoid (Monoid, mappend, mconcat)
 import Network.DNS.Internal
-import Data.Monoid
-import Control.Monad.State
-import Data.Bits
-import Data.Word
-import Data.IP
+import Network.DNS.StateBinary
 
 (+++) :: Monoid a => a -> a -> a
 (+++) = mappend
@@ -23,7 +24,7 @@ import Data.IP
 
 -- | Composing query. First argument is a number to identify response.
 
-composeQuery :: Int -> [Question] -> BL.ByteString
+composeQuery :: Int -> [Question] -> ByteString
 composeQuery idt qs = encode qry
   where
     hdr = header defaultQuery
@@ -39,7 +40,7 @@ composeQuery idt qs = encode qry
 
 -- | Composing DNS data.
 
-encode :: DNSFormat -> BL.ByteString
+encode :: DNSFormat -> ByteString
 encode fmt = runSPut (encodeDNSFormat fmt)
 
 ----------------------------------------------------------------

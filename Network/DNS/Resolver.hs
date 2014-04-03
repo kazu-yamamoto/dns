@@ -17,21 +17,21 @@ module Network.DNS.Resolver (
   , fromDNSFormat
   ) where
 
-import Control.Applicative
-import Control.Exception
+import Control.Applicative ((<$>), (<*>), pure)
+import Control.Exception (bracket)
 import qualified Data.ByteString.Char8 as BS
-import Data.Char
-import Data.Int
-import Data.List hiding (find, lookup)
-import Network.BSD
+import Data.Char (isSpace)
+import Data.List (isPrefixOf)
+import Network.BSD (getProtocolNumber)
 import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.Internal
-import Network.Socket hiding (send, sendTo, recv, recvFrom)
-import Network.Socket.ByteString.Lazy
+import Network.Socket (HostName, Socket, SocketType(Datagram), sClose, socket, connect)
+import Network.Socket (AddrInfoFlag(..), AddrInfo(..), defaultHints, getAddrInfo)
+import Network.Socket.ByteString.Lazy (sendAll)
 import Prelude hiding (lookup)
-import System.Random
-import System.Timeout
+import System.Random (getStdRandom, randomR)
+import System.Timeout (timeout)
 
 #if mingw32_HOST_OS == 1
 import Network.Socket (send)
