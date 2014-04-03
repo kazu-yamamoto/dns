@@ -159,7 +159,7 @@ withResolver seed func = bracket (openSocket seed) sClose $ \sock -> do
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
 withResolvers seeds func = bracket openSockets closeSockets $ \socks -> do
     mapM_ (uncurry connectSocket) $ zip socks seeds
-    let resolvs = map (uncurry makeResolver) $ zip seeds socks
+    let resolvs = zipWith makeResolver seeds socks
     func resolvs
   where
     openSockets = mapM openSocket seeds
