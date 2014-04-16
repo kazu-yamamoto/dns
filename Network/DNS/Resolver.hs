@@ -28,7 +28,9 @@ import Network.DNS.Encode
 import Network.DNS.Internal
 import Network.Socket (HostName, Socket, SocketType(Datagram), sClose, socket, connect)
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), defaultHints, getAddrInfo)
+#ifndef mingw32_HOST_OS
 import Network.Socket.ByteString.Lazy (sendAll)
+#endif
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, randomR)
 import System.Timeout (timeout)
