@@ -130,7 +130,7 @@ decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
 decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
   where
     combine [] = []
-    combine [_] = error "combine"
+    combine [_] = fail "combine"
     combine (a:b:cs) =  a * 256 + b : combine cs
 decodeRData SOA _ = RD_SOA <$> decodeDomain
                            <*> decodeDomain
@@ -170,7 +170,10 @@ decodeDomain = do
         if isPointer c then do
             d <- getInt8
             let offset = n * 256 + d
-            fromMaybe (error $ "decodeDomain: " ++ show offset) <$> pop offset
+            mo <- pop offset
+            case mo of
+                Nothing -> fail $ "decodeDomain: " ++ show offset
+                Just o -> return o
           else do
             hs <- getNByteString n
             ds <- decodeDomain
