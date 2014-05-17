@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable #-}
 
 module Network.DNS.Internal where
 
@@ -9,6 +9,8 @@ import Data.Char (toUpper)
 import Data.IP (IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
+import Data.Foldable (Foldable)
+import Data.Traversable
 
 ----------------------------------------------------------------
 
@@ -138,13 +140,15 @@ makeQuestion = Question
 ----------------------------------------------------------------
 
 -- | Raw data format for resource records.
-data ResourceRecord = ResourceRecord {
+data RR a = ResourceRecord {
     rrname :: Domain
   , rrtype :: TYPE
   , rrttl  :: Int
   , rdlen  :: Int
-  , rdata  :: RDATA
-  } deriving (Eq, Show)
+  , rdata  :: a
+  } deriving (Eq, Show, Functor, Foldable)
+
+type ResourceRecord = RR RDATA
 
 -- | Raw data format for each type.
 data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
@@ -164,6 +168,14 @@ instance Show RDATA where
   show (RD_PTR dom) = BS.unpack dom
   show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
   show (RD_OTH is) = show is
+
+instance Traversable RR where
+  sequenceA rr = fmap (\x -> fmap (const x) rr) $ rdata rr
+
+-- | Like 'fmap' except that RR 'TYPE' context is available
+--   within the map.
+rrMapWithType :: (TYPE -> a -> b) -> RR a -> RR b
+rrMapWithType parse rr = parse (rrtype rr) `fmap` rr
 
 ----------------------------------------------------------------
 

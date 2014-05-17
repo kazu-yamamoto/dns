@@ -4,7 +4,12 @@
 module Network.DNS.Types (
   -- * Domain
     Domain
-  -- * TYPE
+  -- * Resource Records
+  , ResourceRecord
+  , RR (..)
+  , RDATA (..)
+  , rrMapWithType
+  -- ** Resource Record Type
   , TYPE (..), intToType, typeToInt, toType
   -- * DNS Error
   , DNSError (..)
@@ -18,9 +23,7 @@ module Network.DNS.Types (
   , QorR (..)
   , OPCODE (..)
   , RCODE (..)
-  , ResourceRecord (..)
   , Question (..)
-  , RDATA (..)
   , responseA, responseAAAA
   ) where
 
