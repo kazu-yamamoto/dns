@@ -1,14 +1,17 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable #-}
 
 module Network.DNS.Internal where
 
 import Control.Exception (Exception)
+import Control.Applicative
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (toUpper)
 import Data.IP (IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
+import Data.Foldable (Foldable)
+import Data.Traversable
 
 ----------------------------------------------------------------
 
@@ -86,13 +89,48 @@ data DNSError =
 instance Exception DNSError
 
 -- | Raw data format for DNS Query and Response.
-data DNSFormat = DNSFormat {
+data DNSMessage a = DNSFormat {
     header     :: DNSHeader
   , question   :: [Question]
-  , answer     :: [ResourceRecord]
-  , authority  :: [ResourceRecord]
-  , additional :: [ResourceRecord]
-  } deriving (Eq, Show)
+  , answer     :: [RR a]
+  , authority  :: [RR a]
+  , additional :: [RR a]
+  } deriving (Eq, Show, Functor, Foldable)
+
+type DNSFormat = DNSMessage RDATA
+
+instance Traversable DNSMessage where
+  sequenceA dns = liftA3 build answer' authority' additional'
+    where
+      answer'     = traverse sequenceA $ answer dns
+      authority'  = traverse sequenceA $ authority dns
+      additional' = traverse sequenceA $ additional dns
+      build ans auth add = cast { answer     = ans
+                                , authority  = auth
+                                , additional = add }
+        where
+          cast = fmap (error "unhandled case in sequenceA (DNSMessage)")
+                      dns
+
+-- | Like 'fmap' except that RR 'TYPE' context is available
+--   within the map.
+dnsMapWithType :: (TYPE -> a -> b) -> DNSMessage a -> DNSMessage b
+dnsMapWithType parse dns =
+    cast { answer     = mapParse $ answer dns
+         , authority  = mapParse $ authority dns
+         , additional = mapParse $ additional dns
+         }
+  where
+    cast = fmap (error "unhandled case in dnsMapWithType") dns
+    mapParse = map (rrMapWithType parse)
+
+-- | Behaves exactly like a regular 'traverse' except that the traversing
+--   function also has access to the RR 'TYPE' associated with a value. 
+dnsTraverseWithType ::
+    Applicative f =>
+    (TYPE -> a -> f b) -> DNSMessage a -> f (DNSMessage b)
+dnsTraverseWithType parse = sequenceA . dnsMapWithType parse
+
 
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
@@ -138,22 +176,32 @@ makeQuestion = Question
 ----------------------------------------------------------------
 
 -- | Raw data format for resource records.
-data ResourceRecord = ResourceRecord {
+data RR a = ResourceRecord {
     rrname :: Domain
   , rrtype :: TYPE
   , rrttl  :: Int
   , rdlen  :: Int
-  , rdata  :: RDATA
-  } deriving (Eq, Show)
+  , rdata  :: a
+  } deriving (Eq, Show, Functor, Foldable)
+
+type ResourceRecord = RR RDATA
 
 -- | Raw data format for each type.
-data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
+data RD a = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
            | RD_SOA Domain Domain Int Int Int Int Int
            | RD_A IPv4 | RD_AAAA IPv6 | RD_TXT ByteString
            | RD_SRV Int Int Int Domain
-           | RD_OTH [Int] deriving (Eq)
+           | RD_OTH a deriving (Eq, Functor, Foldable)
 
-instance Show RDATA where
+type RDATA = RD [Int]
+
+instance Traversable RD where
+  sequenceA (RD_OTH a) = fmap RD_OTH a
+  sequenceA rd         = pure cast
+    where
+        cast = fmap (error "unhandled case in squenceA (RD)") rd
+
+instance Show a => Show (RD a) where
   show (RD_NS dom) = BS.unpack dom
   show (RD_MX prf dom) = BS.unpack dom ++ " " ++ show prf
   show (RD_CNAME dom) = BS.unpack dom
@@ -164,6 +212,14 @@ instance Show RDATA where
   show (RD_PTR dom) = BS.unpack dom
   show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
   show (RD_OTH is) = show is
+
+instance Traversable RR where
+  sequenceA rr = fmap (\x -> fmap (const x) rr) $ rdata rr
+
+-- | Like 'fmap' except that RR 'TYPE' context is available
+--   within the map.
+rrMapWithType :: (TYPE -> a -> b) -> RR a -> RR b
+rrMapWithType parse rr = parse (rrtype rr) `fmap` rr
 
 ----------------------------------------------------------------
 
