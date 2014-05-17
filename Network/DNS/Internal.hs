@@ -3,6 +3,7 @@
 module Network.DNS.Internal where
 
 import Control.Exception (Exception)
+import Control.Applicative (Applicative, liftA3)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (toUpper)
@@ -88,13 +89,48 @@ data DNSError =
 instance Exception DNSError
 
 -- | Raw data format for DNS Query and Response.
-data DNSFormat = DNSFormat {
+data DNSMessage a = DNSFormat {
     header     :: DNSHeader
   , question   :: [Question]
-  , answer     :: [ResourceRecord]
-  , authority  :: [ResourceRecord]
-  , additional :: [ResourceRecord]
-  } deriving (Eq, Show)
+  , answer     :: [RR a]
+  , authority  :: [RR a]
+  , additional :: [RR a]
+  } deriving (Eq, Show, Functor, Foldable)
+
+type DNSFormat = DNSMessage RDATA
+
+instance Traversable DNSMessage where
+  sequenceA dns = liftA3 build answer' authority' additional'
+    where
+      answer'     = traverse sequenceA $ answer dns
+      authority'  = traverse sequenceA $ authority dns
+      additional' = traverse sequenceA $ additional dns
+      build ans auth add = cast { answer     = ans
+                                , authority  = auth
+                                , additional = add }
+        where
+          cast = fmap (error "unhandled case in sequenceA (DNSMessage)")
+                      dns
+
+-- | Like 'fmap' except that RR 'TYPE' context is available
+--   within the map.
+dnsMapWithType :: (TYPE -> a -> b) -> DNSMessage a -> DNSMessage b
+dnsMapWithType parse dns =
+    cast { answer     = mapParse $ answer dns
+         , authority  = mapParse $ authority dns
+         , additional = mapParse $ additional dns
+         }
+  where
+    cast = fmap (error "unhandled case in dnsMapWithType") dns
+    mapParse = map (rrMapWithType parse)
+
+-- | Behaves exactly like a regular 'traverse' except that the traversing
+--   function also has access to the RR 'TYPE' associated with a value. 
+dnsTraverseWithType ::
+    Applicative f =>
+    (TYPE -> a -> f b) -> DNSMessage a -> f (DNSMessage b)
+dnsTraverseWithType parse = sequenceA . dnsMapWithType parse
+
 
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {

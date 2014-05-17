@@ -14,7 +14,10 @@ module Network.DNS.Types (
   -- * DNS Error
   , DNSError (..)
   -- * DNS Format
-  , DNSFormat (..)
+  , DNSFormat
+  , DNSMessage (..)
+  , dnsMapWithType
+  , dnsTraverseWithType
   -- * DNS Header
   , DNSHeader (..)
   -- * DNS Flags
