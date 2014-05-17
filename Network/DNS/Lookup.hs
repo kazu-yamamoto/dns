@@ -177,12 +177,12 @@ lookupMX rlv dom = do
 --   Examples:
 --
 --   >>> import Data.List (sort)
---   >>> let hostname = Data.ByteString.Char8.pack "mixi.jp"
+--   >>> let hostname = Data.ByteString.Char8.pack "iij.ad.jp"
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
 --   >>> fmap sort ips
---   Right [202.32.29.4,202.32.29.5]
+--   Right [202.232.30.70,202.232.30.144]
 --
 --   Since there is more than one result, it is necessary to sort the
 --   list in order to check for equality.
@@ -328,11 +328,11 @@ lookupTXT rlv dom = do
 --   We look up the PTR associated with the IP address
 --   210.130.137.80, i.e., 80.137.130.210.in-addr.arpa:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "80.137.130.210.in-addr.arpa"
+--   >>> let hostname = Data.ByteString.Char8.pack "164.2.232.202.in-addr.arpa"
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupPTR resolver hostname
---   Right ["www-v4.iij.ad.jp."]
+--   Right ["www.iij.ad.jp."]
 --
 --   The 'lookupRDNS' function is more suited to this particular task.
 --
@@ -355,11 +355,11 @@ lookupPTR rlv dom = do
 --   We repeat the example from 'lookupPTR', except now we pass the IP
 --   address directly:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "210.130.137.80"
+--   >>> let hostname = Data.ByteString.Char8.pack "202.232.2.164"
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupRDNS resolver hostname
---   Right ["www-v4.iij.ad.jp."]
+--   Right ["www.iij.ad.jp."]
 --
 lookupRDNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
 lookupRDNS rlv ip = lookupPTR rlv dom
