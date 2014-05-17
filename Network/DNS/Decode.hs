@@ -15,7 +15,6 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Conduit (($$), Source)
 import Data.Conduit.Network (sourceSocket)
 import Data.IP (toIPv4, toIPv6)
-import Data.Maybe (fromMaybe)
 import Network (Socket)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
