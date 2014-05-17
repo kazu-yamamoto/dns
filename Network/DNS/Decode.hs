@@ -3,6 +3,7 @@
 module Network.DNS.Decode (
     decode
   , receive
+  , receive'
   ) where
 
 import Control.Applicative ((<$), (<$>), (<*), (<*>))
@@ -39,6 +40,11 @@ receive sock = do
     case traverse unpackBytes dns of
         Left e  -> ControlException.throwIO (RDATAParseError e)
         Right d -> return d
+
+-- | Receiving DNS data from 'Socket' and partially parse it.
+--   Unknown RDATA sections will be left as 'ByteString'
+receive' :: Socket -> IO (DNSMessage (RD ByteString))
+receive' sock = receiveDNSFormat $ sourceSocket sock
 
 
 ----------------------------------------------------------------

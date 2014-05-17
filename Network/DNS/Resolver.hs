@@ -14,6 +14,7 @@ module Network.DNS.Resolver (
   , lookupAuth
   -- ** Raw looking up function
   , lookupRaw
+  , lookupRaw'
   , fromDNSFormat
   ) where
 
@@ -286,9 +287,22 @@ lookupAuth = lookupSection authority
 --  @
 --
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSFormat)
-lookupRaw _   dom _
+lookupRaw = lookupRawInternal receive
+
+-- | Like 'lookupRaw' except that no unknown RDATA records are not split up
+--   into 'Int's.
+lookupRaw' :: Resolver -> Domain -> TYPE -> IO (Either DNSError (DNSMessage (RD BS.ByteString)))
+lookupRaw' = lookupRawInternal receive'
+
+lookupRawInternal ::
+    (Socket -> IO (DNSMessage a))
+    -> Resolver
+    -> Domain
+    -> TYPE
+    -> IO (Either DNSError (DNSMessage a))
+lookupRawInternal _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-lookupRaw rlv dom typ = do
+lookupRawInternal rcv rlv dom typ = do
     seqno <- genId rlv
     let query = composeQuery seqno [q]
         checkSeqno = check seqno
@@ -301,7 +315,7 @@ lookupRaw rlv dom typ = do
           return $ Left ret
       | otherwise    = do
           sendAll sock query
-          response <- timeout tm (receive sock)
+          response <- timeout tm (rcv sock)
           case response of
               Nothing  -> loop query checkSeqno (cnt + 1) False
               Just res -> do
