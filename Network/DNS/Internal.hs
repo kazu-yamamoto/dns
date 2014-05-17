@@ -3,7 +3,7 @@
 module Network.DNS.Internal where
 
 import Control.Exception (Exception)
-import Control.Applicative (Applicative, liftA3)
+import Control.Applicative
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (toUpper)
@@ -187,13 +187,21 @@ data RR a = ResourceRecord {
 type ResourceRecord = RR RDATA
 
 -- | Raw data format for each type.
-data RDATA = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
+data RD a = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
            | RD_SOA Domain Domain Int Int Int Int Int
            | RD_A IPv4 | RD_AAAA IPv6 | RD_TXT ByteString
            | RD_SRV Int Int Int Domain
-           | RD_OTH [Int] deriving (Eq)
+           | RD_OTH a deriving (Eq, Functor, Foldable)
 
-instance Show RDATA where
+type RDATA = RD [Int]
+
+instance Traversable RD where
+  sequenceA (RD_OTH a) = fmap RD_OTH a
+  sequenceA rd         = pure cast
+    where
+        cast = fmap (error "unhandled case in squenceA (RD)") rd
+
+instance Show a => Show (RD a) where
   show (RD_NS dom) = BS.unpack dom
   show (RD_MX prf dom) = BS.unpack dom ++ " " ++ show prf
   show (RD_CNAME dom) = BS.unpack dom

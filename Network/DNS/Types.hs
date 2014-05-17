@@ -7,7 +7,8 @@ module Network.DNS.Types (
   -- * Resource Records
   , ResourceRecord
   , RR (..)
-  , RDATA (..)
+  , RDATA
+  , RD (..)
   , rrMapWithType
   -- ** Resource Record Type
   , TYPE (..), intToType, typeToInt, toType
