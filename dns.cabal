@@ -1,5 +1,5 @@
 Name:                   dns
-Version:                1.2.2
+Version:                1.2.3
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -26,12 +26,11 @@ Library
   if impl(ghc >= 7)
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
-                      , attoparsec-conduit
                       , binary
                       , blaze-builder
                       , bytestring
                       , conduit >= 1.1
-                      , conduit-extra
+                      , conduit-extra >= 1.1
                       , containers
                       , iproute >= 1.2.4
                       , mtl
@@ -41,12 +40,11 @@ Library
   else
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
-                      , attoparsec-conduit
                       , binary
                       , blaze-builder
                       , bytestring
                       , conduit >= 1.1
-                      , conduit-extra
+                      , conduit-extra >= 1.1
                       , containers
                       , iproute >= 1.2.4
                       , mtl
@@ -76,12 +74,11 @@ Test-Suite spec
   Other-Modules:        EncodeSpec
   Build-Depends:        base
                       , attoparsec
-                      , attoparsec-conduit
                       , binary
                       , blaze-builder
                       , bytestring
                       , conduit >= 1.1
-                      , conduit-extra
+                      , conduit-extra >= 1.1
                       , containers
                       , dns
                       , hspec

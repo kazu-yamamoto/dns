@@ -1,13 +1,15 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, ViewPatterns, DeriveDataTypeable #-}
 
 module Network.DNS.Decode (
     decode
   , receive
+  , receive'
   ) where
 
 import Control.Applicative ((<$), (<$>), (<*), (<*>))
 import Control.Monad (replicateM)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
+import qualified Control.Exception as ControlException
 import Data.Bits ((.&.), shiftR, testBit)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -15,17 +17,35 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Conduit (($$), Source)
 import Data.Conduit.Network (sourceSocket)
 import Data.IP (toIPv4, toIPv6)
-import Data.Maybe (fromMaybe)
+import Data.Traversable (traverse)
+import Data.Typeable (Typeable)
 import Network (Socket)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
 
 ----------------------------------------------------------------
 
+
+data RDATAParseError = RDATAParseError String
+ deriving (Show, Typeable)
+
+instance ControlException.Exception RDATAParseError
+
+
 -- | Receiving DNS data from 'Socket' and parse it.
 
 receive :: Socket -> IO DNSFormat
-receive sock = receiveDNSFormat $ sourceSocket sock
+receive sock = do
+    dns <- receiveDNSFormat $ sourceSocket sock
+    case traverse unpackBytes dns of
+        Left e  -> ControlException.throwIO (RDATAParseError e)
+        Right d -> return d
+
+-- | Receiving DNS data from 'Socket' and partially parse it.
+--   Unknown RDATA sections will be left as 'ByteString'
+receive' :: Socket -> IO (DNSMessage (RD ByteString))
+receive' sock = receiveDNSFormat $ sourceSocket sock
+
 
 ----------------------------------------------------------------
 
@@ -33,16 +53,29 @@ receive sock = receiveDNSFormat $ sourceSocket sock
 
 decode :: BL.ByteString -> Either String DNSFormat
 decode bs = fst <$> runSGet decodeResponse bs
+            >>= traverse unpackBytes
+
+unpackBytes :: RD ByteString -> Either String (RD [Int])
+unpackBytes (RD_OTH dta) = fmap (RD_OTH . fst) $ unpack $ dta'
+ where
+    len = fromIntegral $ BS.length dta
+    dta' = BL.fromChunks [dta]
+    unpack = runSGet (getNBytes len)
+unpackBytes rd = Right $ cast rd
+ where
+    cast = fmap (error "unhandled case in decode")
+
+
 
 ----------------------------------------------------------------
-receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO DNSFormat
+receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO (DNSMessage (RD ByteString))
 receiveDNSFormat src = fst <$> runResourceT (src $$ sink)
   where
     sink = sinkSGet decodeResponse
 
 ----------------------------------------------------------------
 
-decodeResponse :: SGet DNSFormat
+decodeResponse :: SGet (DNSMessage (RD ByteString))
 decodeResponse = do
     hd <- decodeHeader
     DNSFormat hd <$> decodeQueries (qdCount hd)
@@ -98,10 +131,10 @@ decodeQuery :: SGet Question
 decodeQuery = Question <$> decodeDomain
                        <*> (decodeType <* ignoreClass)
 
-decodeRRs :: Int -> SGet [ResourceRecord]
+decodeRRs :: Int -> SGet [RR (RD ByteString)]
 decodeRRs n = replicateM n decodeRR
 
-decodeRR :: SGet ResourceRecord
+decodeRR :: SGet (RR (RD ByteString))
 decodeRR = do
     Question dom typ <- decodeQuery
     ttl <- decodeTTL
@@ -117,7 +150,7 @@ decodeRR = do
     decodeTTL = fromIntegral <$> get32
     decodeRLen = getInt16
 
-decodeRData :: TYPE -> Int -> SGet RDATA
+decodeRData :: TYPE -> Int -> SGet (RD ByteString)
 decodeRData NS _ = RD_NS <$> decodeDomain
 decodeRData MX _ = RD_MX <$> decodePreference <*> decodeDomain
   where
@@ -155,7 +188,7 @@ decodeRData SRV _ = RD_SRV <$> decodePriority
     decodeWeight   = getInt16
     decodePort     = getInt16
 
-decodeRData _  len = RD_OTH <$> getNBytes len
+decodeRData _  len = RD_OTH <$> getNByteString len
 
 ----------------------------------------------------------------
 
