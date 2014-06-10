@@ -18,6 +18,7 @@ Library
   Exposed-Modules:      Network.DNS
                         Network.DNS.Lookup
                         Network.DNS.Resolver
+                        Network.DNS.Utils
                         Network.DNS.Types
                         Network.DNS.Encode
                         Network.DNS.Decode
