@@ -28,7 +28,7 @@ import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.Internal
 import Network.Socket (HostName, Socket, SocketType(Datagram), sClose, socket, connect)
-import Network.Socket (AddrInfoFlag(..), AddrInfo(..), defaultHints, getAddrInfo)
+import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), PortNumber(..), defaultHints, getAddrInfo)
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, randomR)
 import System.Timeout (timeout)
@@ -54,7 +54,7 @@ import Network.Socket.ByteString.Lazy (sendAll)
 --   >>> let cache = RCHostName "8.8.8.8"
 --
 data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
-                       | RCHostName HostName -- ^ A numeric IP address
+                       | RCHostName HostName (Maybe PortNumber) -- ^ A numeric IP address and port number
 
 -- | Type for resolver configuration. The easiest way to construct a
 --   @ResolvConf@ object is to modify the 'defaultResolvConf'.
@@ -81,7 +81,7 @@ data ResolvConf = ResolvConf {
 --
 --  Example (use Google's public DNS cache instead of resolv.conf):
 --
---   >>> let cache = RCHostName "8.8.8.8"
+--   >>> let cache = RCHostName "8.8.8.8" Nothing
 --   >>> let rc = defaultResolvConf { resolvInfo = cache }
 --
 defaultResolvConf :: ResolvConf
@@ -129,14 +129,14 @@ makeResolvSeed conf = ResolvSeed <$> addr
                                  <*> pure (resolvBufsize conf)
   where
     addr = case resolvInfo conf of
-        RCHostName numhost -> makeAddrInfo numhost
-        RCFilePath file -> toAddr <$> readFile file >>= makeAddrInfo
+        RCHostName numhost mport -> makeAddrInfo numhost mport
+        RCFilePath file -> toAddr <$> readFile file >>= \i -> makeAddrInfo i Nothing
     toAddr cs = let l:_ = filter ("nameserver" `isPrefixOf`) $ lines cs
                 in extract l
     extract = reverse . dropWhile isSpace . reverse . dropWhile isSpace . drop 11
 
-makeAddrInfo :: HostName -> IO AddrInfo
-makeAddrInfo addr = do
+makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
+makeAddrInfo addr mport = do
     proto <- getProtocolNumber "udp"
     let hints = defaultHints {
             addrFlags = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
@@ -144,7 +144,11 @@ makeAddrInfo addr = do
           , addrProtocol = proto
           }
     a:_ <- getAddrInfo (Just hints) (Just addr) (Just "domain")
-    return a
+    let connectPort = case addrAddress a of
+                        SockAddrInet pn ha -> SockAddrInet (maybe pn id mport) ha
+                        SockAddrInet6 pn fi ha sid -> SockAddrInet6 (maybe pn id mport) fi ha sid
+                        unix -> unix 
+    return $ a { addrAddress = connectPort }
 
 ----------------------------------------------------------------
 
