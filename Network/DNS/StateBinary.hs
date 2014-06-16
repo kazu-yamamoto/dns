@@ -7,7 +7,7 @@ import Control.Applicative ((<$>), (<*))
 import Control.Monad.State (State, StateT)
 import qualified Control.Monad.State as ST
 import Control.Monad.Trans.Resource (ResourceT)
-import qualified Data.Attoparsec as A
+import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.ByteString.Lazy as AL
 import qualified Data.Attoparsec.Types as T
 import Data.ByteString (ByteString)
