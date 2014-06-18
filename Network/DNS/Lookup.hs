@@ -280,7 +280,7 @@ lookupNS = lookupNSImpl DNS.lookup
 --   >>> import Data.List (sort)
 --   >>> let hostname = Data.ByteString.Char8.pack "example.com"
 --   >>>
---   >>> let ri = RCHostName "192.5.6.30" Nothing -- a.gtld-servers.net
+--   >>> let ri = RCHostName "192.5.6.30" -- a.gtld-servers.net
 --   >>> let rc = defaultResolvConf { resolvInfo = ri }
 --   >>> rs <- makeResolvSeed rc
 --   >>> ns <- withResolver rs $ \resolver -> lookupNSAuth resolver hostname
