@@ -112,11 +112,11 @@ lookupA rlv dom = do
 --
 --   Examples:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "www.mew.org"
+--   >>> let hostname = Data.ByteString.Char8.pack "www.wide.ad.jp"
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupAAAA resolver hostname
---   Right [2001:240:11e:c00:00:00:00:101]
+--   Right [2001:200:dff:fff1:216:3eff:fe4b:651c]
 --
 lookupAAAA :: Resolver -> Domain -> IO (Either DNSError [IPv6])
 lookupAAAA rlv dom = do
@@ -177,12 +177,12 @@ lookupMX rlv dom = do
 --   Examples:
 --
 --   >>> import Data.List (sort)
---   >>> let hostname = Data.ByteString.Char8.pack "iij.ad.jp"
+--   >>> let hostname = Data.ByteString.Char8.pack "wide.ad.jp"
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
 --   >>> fmap sort ips
---   Right [202.232.30.70,202.232.30.144]
+--   Right [133.138.10.34,203.178.136.49]
 --
 --   Since there is more than one result, it is necessary to sort the
 --   list in order to check for equality.
