@@ -54,7 +54,8 @@ import Network.Socket.ByteString.Lazy (sendAll)
 --   >>> let cache = RCHostName "8.8.8.8"
 --
 data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
-                       | RCHostName HostName (Maybe PortNumber) -- ^ A numeric IP address and port number
+                       | RCHostName HostName -- ^ A numeric IP address
+                       | RCHostPort HostName PortNumber -- ^ A numeric IP address and port number
 
 -- | Type for resolver configuration. The easiest way to construct a
 --   @ResolvConf@ object is to modify the 'defaultResolvConf'.
@@ -81,7 +82,7 @@ data ResolvConf = ResolvConf {
 --
 --  Example (use Google's public DNS cache instead of resolv.conf):
 --
---   >>> let cache = RCHostName "8.8.8.8" Nothing
+--   >>> let cache = RCHostName "8.8.8.8"
 --   >>> let rc = defaultResolvConf { resolvInfo = cache }
 --
 defaultResolvConf :: ResolvConf
@@ -129,7 +130,8 @@ makeResolvSeed conf = ResolvSeed <$> addr
                                  <*> pure (resolvBufsize conf)
   where
     addr = case resolvInfo conf of
-        RCHostName numhost mport -> makeAddrInfo numhost mport
+        RCHostName numhost -> makeAddrInfo numhost Nothing
+        RCHostPort numhost mport -> makeAddrInfo numhost $ Just mport
         RCFilePath file -> toAddr <$> readFile file >>= \i -> makeAddrInfo i Nothing
     toAddr cs = let l:_ = filter ("nameserver" `isPrefixOf`) $ lines cs
                 in extract l
