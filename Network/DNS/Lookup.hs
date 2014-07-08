@@ -84,7 +84,7 @@ import Network.DNS.Types
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
---   Right [202.232.15.101]
+--   Right [210.130.207.72]
 --
 --   This function will also follow a CNAME and resolve its target if
 --   one exists for the queries hostname:
