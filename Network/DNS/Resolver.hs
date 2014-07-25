@@ -149,7 +149,7 @@ makeAddrInfo addr mport = do
     let connectPort = case addrAddress a of
                         SockAddrInet pn ha -> SockAddrInet (maybe pn id mport) ha
                         SockAddrInet6 pn fi ha sid -> SockAddrInet6 (maybe pn id mport) fi ha sid
-                        unix -> unix 
+                        unix -> unix
     return $ a { addrAddress = connectPort }
 
 ----------------------------------------------------------------

@@ -126,7 +126,7 @@ dnsMapWithType parse dns =
     mapParse = map (rrMapWithType parse)
 
 -- | Behaves exactly like a regular 'traverse' except that the traversing
---   function also has access to the RR 'TYPE' associated with a value. 
+--   function also has access to the RR 'TYPE' associated with a value.
 dnsTraverseWithType ::
     Applicative f =>
     (TYPE -> a -> f b) -> DNSMessage a -> f (DNSMessage b)
