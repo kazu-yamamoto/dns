@@ -110,8 +110,7 @@ instance Traversable DNSMessage where
                                 , authority  = auth
                                 , additional = add }
         where
-          cast = fmap (error "unhandled case in sequenceA (DNSMessage)")
-                      dns
+          cast = error "unhandled case in sequenceA (DNSMessage)" <$> dns
 
 -- | Like 'fmap' except that RR 'TYPE' context is available
 --   within the map.
@@ -122,7 +121,7 @@ dnsMapWithType parse dns =
          , additional = mapParse $ additional dns
          }
   where
-    cast = fmap (error "unhandled case in dnsMapWithType") dns
+    cast = error "unhandled case in dnsMapWithType" <$> dns
     mapParse = map (rrMapWithType parse)
 
 -- | Behaves exactly like a regular 'traverse' except that the traversing
@@ -197,10 +196,10 @@ data RD a = RD_NS Domain | RD_CNAME Domain | RD_MX Int Domain | RD_PTR Domain
 type RDATA = RD [Int]
 
 instance Traversable RD where
-  sequenceA (RD_OTH a) = fmap RD_OTH a
+  sequenceA (RD_OTH a) = RD_OTH <$> a
   sequenceA rd         = pure cast
     where
-        cast = fmap (error "unhandled case in squenceA (RD)") rd
+        cast = error "unhandled case in squenceA (RD)" <$> rd
 
 instance Show a => Show (RD a) where
   show (RD_NS dom) = BS.unpack dom
@@ -215,12 +214,12 @@ instance Show a => Show (RD a) where
   show (RD_OTH is) = show is
 
 instance Traversable RR where
-  sequenceA rr = fmap (\x -> fmap (const x) rr) $ rdata rr
+  sequenceA rr = (\x -> fmap (const x) rr) <$> rdata rr
 
 -- | Like 'fmap' except that RR 'TYPE' context is available
 --   within the map.
 rrMapWithType :: (TYPE -> a -> b) -> RR a -> RR b
-rrMapWithType parse rr = parse (rrtype rr) `fmap` rr
+rrMapWithType parse rr = parse (rrtype rr) <$> rr
 
 ----------------------------------------------------------------
 

@@ -20,13 +20,14 @@ module Network.DNS.Resolver (
 
 import Control.Applicative ((<$>), (<*>), pure)
 import Control.Exception (bracket)
-import qualified Data.ByteString.Char8 as BS
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
+import Data.Maybe (fromMaybe)
 import Network.BSD (getProtocolNumber)
 import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.Internal
+import qualified Data.ByteString.Char8 as BS
 import Network.Socket (HostName, Socket, SocketType(Datagram), sClose, socket, connect)
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), PortNumber(..), defaultHints, getAddrInfo)
 import Prelude hiding (lookup)
@@ -147,8 +148,8 @@ makeAddrInfo addr mport = do
           }
     a:_ <- getAddrInfo (Just hints) (Just addr) (Just "domain")
     let connectPort = case addrAddress a of
-                        SockAddrInet pn ha -> SockAddrInet (maybe pn id mport) ha
-                        SockAddrInet6 pn fi ha sid -> SockAddrInet6 (maybe pn id mport) fi ha sid
+                        SockAddrInet pn ha -> SockAddrInet (fromMaybe pn mport) ha
+                        SockAddrInet6 pn fi ha sid -> SockAddrInet6 (fromMaybe pn mport) fi ha sid
                         unix -> unix
     return $ a { addrAddress = connectPort }
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, ViewPatterns, DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
 
 module Network.DNS.Decode (
     decode
@@ -56,16 +56,12 @@ decode bs = fst <$> runSGet decodeResponse bs
             >>= traverse unpackBytes
 
 unpackBytes :: RD ByteString -> Either String (RD [Int])
-unpackBytes (RD_OTH dta) = fmap (RD_OTH . fst) $ unpack $ dta'
+unpackBytes (RD_OTH dta) = RD_OTH . fst <$> unpack dta'
  where
     len = fromIntegral $ BS.length dta
     dta' = BL.fromChunks [dta]
     unpack = runSGet (getNBytes len)
-unpackBytes rd = Right $ cast rd
- where
-    cast = fmap (error "unhandled case in decode")
-
-
+unpackBytes rd = Right $ error "unhandled case in decode" <$> rd
 
 ----------------------------------------------------------------
 receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO (DNSMessage (RD ByteString))
