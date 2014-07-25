@@ -21,7 +21,7 @@ type Domain = ByteString
 ----------------------------------------------------------------
 
 -- | Types for resource records.
-data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA | PTR | SRV
+data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA | PTR | SRV | DNAME
           | UNKNOWN Int deriving (Eq, Show, Read)
 
 rrDB :: [(TYPE, Int)]
@@ -35,6 +35,7 @@ rrDB = [
   , (TXT,   16)
   , (AAAA,  28)
   , (SRV,   33)
+  , (DNAME, 39) -- RFC 2672
   ]
 
 rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
