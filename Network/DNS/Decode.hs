@@ -202,7 +202,11 @@ decodeDomain = do
             mo <- pop offset
             case mo of
                 Nothing -> fail $ "decodeDomain: " ++ show offset
-                Just o -> return o
+                Just o -> do
+                    -- A pointer may refer to another pointer.
+                    -- So, register this position for the domain.
+                    push pos o
+                    return o
           else do
             hs <- getNByteString n
             ds <- decodeDomain
