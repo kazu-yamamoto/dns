@@ -73,6 +73,7 @@ Test-Suite spec
   Ghc-Options:          -Wall
   Main-Is:              Spec.hs
   Other-Modules:        EncodeSpec
+                        DecodeSpec
   Build-Depends:        base
                       , attoparsec
                       , binary
@@ -88,6 +89,7 @@ Test-Suite spec
                       , network >= 2.3
                       , random
                       , resourcet
+                      , word8
 
 Test-Suite doctest
   Type:                 exitcode-stdio-1.0
