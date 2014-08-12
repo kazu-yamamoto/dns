@@ -124,6 +124,7 @@ encodeRDATA rd = case rd of
     (RD_AAAA ip)       -> mconcat $ map putInt16 (fromIPv6 ip)
     (RD_NS dom)        -> encodeDomain dom
     (RD_CNAME dom)     -> encodeDomain dom
+    (RD_DNAME dom)     -> encodeDomain dom
     (RD_PTR dom)       -> encodeDomain dom
     (RD_MX prf dom)    -> mconcat [putInt16 prf, encodeDomain dom]
     (RD_TXT txt)       -> putByteString txt

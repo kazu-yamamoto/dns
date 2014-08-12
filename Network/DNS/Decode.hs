@@ -152,6 +152,7 @@ decodeRData MX _ = RD_MX <$> decodePreference <*> decodeDomain
   where
     decodePreference = getInt16
 decodeRData CNAME _ = RD_CNAME <$> decodeDomain
+decodeRData DNAME _ = RD_DNAME <$> decodeDomain
 decodeRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
     ignoreLength = BS.tail
