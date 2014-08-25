@@ -14,12 +14,14 @@ spec = do
             check1 testQueryA
             check1 testQueryAAAA
             check1 testResponseA
+            check1 testResponseTXT
 
     describe "decode" $ do
         it "decodes DNSFormat correctly" $ do
             check2 testQueryA
             check2 testQueryAAAA
             check2 testResponseA
+            check2 testResponseTXT
 
 check1 :: DNSFormat -> Expectation
 check1 inp = out `shouldBe` Right inp
@@ -133,6 +135,83 @@ testResponseA = DNSFormat {
                  , rrttl = 568
                  , rdlen = 4
                  , rdata = RD_A $ toIPv4 [119, 147, 15, 100]
+                 }
+            ]
+  , authority = [ ResourceRecord {
+                       rrname = "qzone.qq.com."
+                     , rrtype = NS
+                     , rrttl = 45919
+                     , rdlen = 10
+                     , rdata = RD_NS "ns-tel2.qq.com."
+                     }
+                , ResourceRecord {
+                       rrname = "qzone.qq.com."
+                     , rrtype = NS
+                     , rrttl = 45919
+                     , rdlen = 10
+                     , rdata = RD_NS "ns-tel1.qq.com."
+                     }
+                ]
+  , additional = [ ResourceRecord {
+                        rrname = "ns-tel1.qq.com."
+                      , rrtype = A
+                      , rrttl = 46520
+                      , rdlen = 4
+                      , rdata = RD_A $ toIPv4 [121, 14, 73, 115]
+                      }
+                 , ResourceRecord {
+                        rrname = "ns-tel2.qq.com."
+                      , rrtype = A
+                      , rrttl = 2890
+                      , rdlen = 4
+                      , rdata = RD_A $ toIPv4 [222, 73, 76, 226]
+                      }
+                 , ResourceRecord {
+                        rrname = "ns-tel2.qq.com."
+                      , rrtype = A
+                      , rrttl = 2890
+                      , rdlen = 4
+                      , rdata = RD_A $ toIPv4 [183, 60, 3, 202]
+                      }
+                 , ResourceRecord {
+                        rrname = "ns-tel2.qq.com."
+                      , rrtype = A
+                      , rrttl = 2890
+                      , rdlen = 4
+                      , rdata = RD_A $ toIPv4 [218, 30, 72, 180]
+                      }
+                 ]
+  }
+
+testResponseTXT :: DNSFormat
+testResponseTXT = DNSFormat {
+    header = DNSHeader {
+         identifier = 48724
+       , flags = DNSFlags {
+           qOrR = QR_Response
+         , opcode = OP_STD
+         , authAnswer = False
+         , trunCation = False
+         , recDesired = True
+         , recAvailable = True
+         , rcode = NoErr
+         }
+       , qdCount = 1
+       , anCount = 1
+       , nsCount = 2
+       , arCount = 4
+       }
+  , question = [Question {
+                     qname = "492056364.qzone.qq.com."
+                   , qtype = TXT
+                   }
+                ]
+  , answer = [ResourceRecord {
+                   rrname = "492056364.qzone.qq.com."
+                 , rrtype = TXT
+                 , rrttl = 0
+                 , rdlen = 16
+                 , rdata = RD_TXT "simple txt line"
                  }
             ]
   , authority = [ ResourceRecord {
