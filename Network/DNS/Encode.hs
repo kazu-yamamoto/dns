@@ -127,7 +127,7 @@ encodeRDATA rd = case rd of
     (RD_DNAME dom)     -> encodeDomain dom
     (RD_PTR dom)       -> encodeDomain dom
     (RD_MX prf dom)    -> mconcat [putInt16 prf, encodeDomain dom]
-    (RD_TXT txt)       -> putByteString txt
+    (RD_TXT txt)       -> putByteStringWithLength txt
     (RD_OTH bytes)     -> mconcat $ map putInt8 bytes
     (RD_SOA d1 d2 serial refresh retry expire min') -> mconcat
         [ encodeDomain d1
@@ -144,6 +144,12 @@ encodeRDATA rd = case rd of
         , putInt16 port
         , encodeDomain dom
         ]
+
+-- In the case of the TXT record, we need to put the string length
+putByteStringWithLength :: BS.ByteString -> SPut
+putByteStringWithLength bs =
+       putInt8 (fromIntegral $ BS.length bs) -- put the length of the given string
+   +++ putByteString bs
 
 ----------------------------------------------------------------
 
