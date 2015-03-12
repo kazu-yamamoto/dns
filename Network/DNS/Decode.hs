@@ -157,11 +157,7 @@ decodeRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
     ignoreLength = BS.tail
 decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
-decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
-  where
-    combine [] = []
-    combine [_] = fail "combine"
-    combine (a:b:cs) =  a * 256 + b : combine cs
+decodeRData AAAA len  = (RD_AAAA . toIPv6) <$> getNBytes len
 decodeRData SOA _ = RD_SOA <$> decodeDomain
                            <*> decodeDomain
                            <*> decodeSerial
