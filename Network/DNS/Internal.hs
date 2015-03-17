@@ -7,8 +7,8 @@ import Control.Applicative
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (toUpper)
-import Data.IP (IPv4, IPv6)
-import Data.Maybe (fromMaybe)
+import Data.IP (IPv4, IPv6, IP(..))
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Typeable (Typeable)
 import Data.Foldable (Foldable)
 import Data.Traversable
@@ -21,7 +21,7 @@ type Domain = ByteString
 ----------------------------------------------------------------
 
 -- | Types for resource records.
-data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA | PTR | SRV | DNAME
+data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA | PTR | SRV | DNAME | OPTREC
           | UNKNOWN Int deriving (Eq, Show, Read)
 
 rrDB :: [(TYPE, Int)]
@@ -36,6 +36,7 @@ rrDB = [
   , (AAAA,  28)
   , (SRV,   33)
   , (DNAME, 39) -- RFC 2672
+  , (OPTREC, 41) -- RFC 6891
   ]
 
 rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
@@ -186,12 +187,32 @@ data RR a = ResourceRecord {
 
 type ResourceRecord = RR RDATA
 
+data OptType = OTClientSubnet
+             | OTOther Int
+    deriving (Show, Eq)
+
+optTable :: [(OptType, Int)]
+optTable = [(OTClientSubnet, 8)
+           ]
+
+intToOptType :: Int -> OptType
+intToOptType i = fromMaybe (OTOther i) (rookup i optTable)
+
+optTypeToInt :: OptType -> Int
+optTypeToInt (OTOther i) = i
+optTypeToInt t = fromJust $ lookup t optTable
+
+data OptValue = ClientSubnet Int Int IP -- Source Mask / Scope Mask / IP
+              | Other Int ByteString
+    deriving (Eq,Show)
+
 -- | Raw data format for each type.
 data RD a = RD_NS Domain | RD_CNAME Domain | RD_DNAME Domain
            | RD_MX Int Domain | RD_PTR Domain
            | RD_SOA Domain Domain Int Int Int Int Int
            | RD_A IPv4 | RD_AAAA IPv6 | RD_TXT ByteString
            | RD_SRV Int Int Int Domain
+           | RD_OPT [OptValue]
            | RD_OTH a deriving (Eq, Functor, Foldable)
 
 type RDATA = RD [Int]
@@ -200,7 +221,7 @@ instance Traversable RD where
   sequenceA (RD_OTH a) = RD_OTH <$> a
   sequenceA rd         = pure cast
     where
-        cast = error "unhandled case in squenceA (RD)" <$> rd
+        cast = error "unhandled case in sequenceA (RD)" <$> rd
 
 instance Show a => Show (RD a) where
   show (RD_NS dom) = BS.unpack dom
@@ -213,6 +234,7 @@ instance Show a => Show (RD a) where
   show (RD_SOA mn _ _ _ _ _ mi) = BS.unpack mn ++ " " ++ show mi
   show (RD_PTR dom) = BS.unpack dom
   show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
+  show (RD_OPT vs) = show vs
   show (RD_OTH is) = show is
 
 instance Traversable RR where
