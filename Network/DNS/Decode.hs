@@ -6,20 +6,21 @@ module Network.DNS.Decode (
   , receive'
   ) where
 
-import Control.Applicative ((<$), (<$>), (<*), (<*>))
+import Control.Applicative ((<$), (<$>), (<*), (<*>), pure)
 import Control.Monad (replicateM)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import qualified Control.Exception as ControlException
 import Data.Bits ((.&.), shiftR, testBit)
-import Data.ByteString (ByteString)
+import Data.ByteString (ByteString,unpack)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit (($$), Source)
 import Data.Conduit.Network (sourceSocket)
-import Data.IP (toIPv4, toIPv6)
+import Data.IP (toIPv4, toIPv6, IP(..))
 import Data.Traversable (traverse)
 import Data.Typeable (Typeable)
 import Network (Socket)
+import Network.Socket (Family(..))
 import Network.DNS.Internal
 import Network.DNS.StateBinary
 
@@ -180,6 +181,42 @@ decodeRData SRV _ = RD_SRV <$> decodePriority
     decodePriority = getInt16
     decodeWeight   = getInt16
     decodePort     = getInt16
+decodeRData OPTREC len = RD_OPT <$> decodeOptions len
+  where
+    decodeOptions tl
+        | tl == 0 = pure []
+        | tl < 4 = fail "trailing bytes found"
+        | otherwise = do
+            (l,opt) <- decodeOption
+            (opt:) <$> decodeOptions (tl - l)
+    decodeOption = do
+        t <- decodeOptType
+        l <- decodeLength
+        d <- decodeData t l
+        return (l+4,d)
+    decodeOptType = intToOptType <$> getInt16
+    decodeLength = getInt16
+    decodeFamily = getInt16 >>= \n -> case n of
+                                        1 -> pure AF_INET
+                                        2 -> pure AF_INET6
+                                        _ -> fail "unsupported family type"
+    decodeData OTClientSubnet l = do
+        fam <- decodeFamily
+        srcMask <- getInt8
+        scopeMask <- getInt8
+        rawip <- unpack <$> getNByteString (l - 4)  -- 4 = 2 + 1 + 1
+        let fullLen = case fam of   -- The full length of the address. See Data.IP documentation for details.
+                        AF_INET -> 4
+                        AF_INET6 -> 16
+                        _ -> error "fullLen@decodeData"
+        let fullAddr = fmap fromIntegral $ rawip ++ (take (fullLen - (l - 4)) $ repeat 0) -- Pad the address with zeroes
+        let c = case fam of
+                    AF_INET -> IPv4 . toIPv4
+                    AF_INET6 -> IPv6 . toIPv6
+                    _ -> error "c@decodeData"
+        return $ ClientSubnet srcMask scopeMask $ c fullAddr
+    decodeData (OTOther i) l = Other i <$> getNByteString l
+
 
 decodeRData _  len = RD_OTH <$> getNByteString len
 

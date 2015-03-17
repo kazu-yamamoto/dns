@@ -12,7 +12,8 @@ import Data.Binary (Word16)
 import Data.Bits ((.|.), bit, shiftL)
 import qualified Data.ByteString.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
-import Data.IP (fromIPv4, fromIPv6)
+import Data.IP (fromIPv4, fromIPv6, IP(..))
+import Data.List (dropWhileEnd)
 import Data.Monoid (Monoid, mappend, mconcat)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
@@ -128,6 +129,7 @@ encodeRDATA rd = case rd of
     (RD_PTR dom)       -> encodeDomain dom
     (RD_MX prf dom)    -> mconcat [putInt16 prf, encodeDomain dom]
     (RD_TXT txt)       -> putByteStringWithLength txt
+    (RD_OPT optvs)     -> mconcat $ fmap encodeOptValue optvs
     (RD_OTH bytes)     -> mconcat $ map putInt8 bytes
     (RD_SOA d1 d2 serial refresh retry expire min') -> mconcat
         [ encodeDomain d1
@@ -143,6 +145,24 @@ encodeRDATA rd = case rd of
         , putInt16 weight
         , putInt16 port
         , encodeDomain dom
+        ]
+
+encodeOptValue :: OptValue -> SPut
+encodeOptValue (ClientSubnet srcmask scopemask ip) = mconcat $
+        [ putInt16 $ case ip of
+                        IPv4 _ -> 1
+                        IPv6 _ -> 2
+        , putInt8 srcmask
+        , putInt8 scopemask
+        ] ++ (fmap putInt8 . dropWhileEnd (==0) $ decAddr ip)
+    where
+        decAddr = case ip of
+                    IPv4 _ -> fromIPv4 . ipv4
+                    IPv6 _ -> fromIPv6 . ipv6
+encodeOptValue (Other t bs) = mconcat 
+        [ putInt16 t
+        , putInt16 $ BS.length bs
+        , putByteString bs
         ]
 
 -- In the case of the TXT record, we need to put the string length
