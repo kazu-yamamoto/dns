@@ -16,7 +16,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit (($$), Source)
 import Data.Conduit.Network (sourceSocket)
-import Data.IP (toIPv4, toIPv6, IP(..))
+import Data.IP (toIPv4, toIPv6b, IP(..))
 import Data.Traversable (traverse)
 import Data.Typeable (Typeable)
 import Network (Socket)
@@ -158,7 +158,7 @@ decodeRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
     ignoreLength = BS.tail
 decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
-decodeRData AAAA len  = (RD_AAAA . toIPv6) <$> getNBytes len
+decodeRData AAAA len  = (RD_AAAA . toIPv6b) <$> getNBytes len
 decodeRData SOA _ = RD_SOA <$> decodeDomain
                            <*> decodeDomain
                            <*> decodeSerial
@@ -212,7 +212,7 @@ decodeRData OPTREC len = RD_OPT <$> decodeOptions len
         let fullAddr = fmap fromIntegral $ rawip ++ (take (fullLen - (l - 4)) $ repeat 0) -- Pad the address with zeroes
         let c = case fam of
                     AF_INET -> IPv4 . toIPv4
-                    AF_INET6 -> IPv6 . toIPv6
+                    AF_INET6 -> IPv6 . toIPv6b
                     _ -> error "c@decodeData"
         return $ ClientSubnet srcMask scopeMask $ c fullAddr
     decodeData (OTOther i) l = Other i <$> getNByteString l

@@ -12,6 +12,8 @@ module Network.DNS.Types (
   , rrMapWithType
   -- ** Resource Record Type
   , TYPE (..), intToType, typeToInt, toType
+  -- ** EDNS0 Opt Type
+  , OptValue (..)
   -- * DNS Error
   , DNSError (..)
   -- * DNS Format
