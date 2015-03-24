@@ -16,7 +16,7 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit (($$), Source)
 import Data.Conduit.Network (sourceSocket)
-import Data.IP (toIPv4, toIPv6)
+import Data.IP (toIPv4, toIPv6b)
 import Data.Traversable (traverse)
 import Data.Typeable (Typeable)
 import Network (Socket)
@@ -157,11 +157,7 @@ decodeRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
     ignoreLength = BS.tail
 decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
-decodeRData AAAA len  = (RD_AAAA . toIPv6 . combine) <$> getNBytes len
-  where
-    combine [] = []
-    combine [_] = fail "combine"
-    combine (a:b:cs) =  a * 256 + b : combine cs
+decodeRData AAAA len  = (RD_AAAA . toIPv6b) <$> getNBytes len
 decodeRData SOA _ = RD_SOA <$> decodeDomain
                            <*> decodeDomain
                            <*> decodeSerial

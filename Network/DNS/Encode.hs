@@ -12,7 +12,7 @@ import Data.Binary (Word16)
 import Data.Bits ((.|.), bit, shiftL)
 import qualified Data.ByteString.Char8 as BS
 import Data.ByteString.Lazy.Char8 (ByteString)
-import Data.IP (fromIPv4, fromIPv6)
+import Data.IP (fromIPv4, fromIPv6b)
 import Data.Monoid (Monoid, mappend, mconcat)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
@@ -121,7 +121,7 @@ encodeRR ResourceRecord{..} =
 encodeRDATA :: RDATA -> SPut
 encodeRDATA rd = case rd of
     (RD_A ip)          -> mconcat $ map putInt8 (fromIPv4 ip)
-    (RD_AAAA ip)       -> mconcat $ map putInt16 (fromIPv6 ip)
+    (RD_AAAA ip)       -> mconcat $ map putInt8 (fromIPv6b ip)
     (RD_NS dom)        -> encodeDomain dom
     (RD_CNAME dom)     -> encodeDomain dom
     (RD_DNAME dom)     -> encodeDomain dom
