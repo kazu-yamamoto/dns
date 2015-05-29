@@ -216,7 +216,7 @@ decodeOData ClientSubnet len = do
                     _ -> fail "Unsupported address family"
         pure $ OD_ClientSubnet srcMask scpMask ip
 decodeOData (OUNKNOWN i) len = OD_Unknown i <$> getNByteString len
-decodeOData _ _ = error "Unhandled case in decodeOData"
+
 ----------------------------------------------------------------
 
 decodeDomain :: SGet Domain

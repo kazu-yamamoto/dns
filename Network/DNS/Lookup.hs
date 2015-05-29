@@ -35,7 +35,7 @@
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
---   Right [93.184.216.119]
+--   Right [93.184.216.34]
 --
 --   The only error that we can easily cause is a timeout. We do this
 --   by creating and utilizing a 'ResolvConf' which has a timeout of
