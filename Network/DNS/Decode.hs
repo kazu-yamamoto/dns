@@ -199,23 +199,23 @@ decodeRData OPT ol = RD_OPT <$> decode' ol
         | l == 0 = pure []
         | otherwise = do
             optCode <- decodeOptType
-            optLen <- fromIntegral <$> getInt16
-            dat <- decodeOData optCode =<< getNByteString optLen
+            optLen <- getInt16
+            dat <- decodeOData optCode optLen
             (dat:) <$> decode' (l - optLen - 4)
 decodeRData _  len = RD_OTH <$> getNByteString len
 
-decodeOData :: OPTTYPE -> ByteString -> SGet OData
-decodeOData ClientSubnet bs = do
+decodeOData :: OPTTYPE -> Int -> SGet OData
+decodeOData ClientSubnet len = do
         fam <- getInt16
         srcMask <- getInt8
         scpMask <- getInt8
-        rawip <- fmap fromIntegral . B.unpack <$> getNByteString (B.length bs - 4) -- 4 = 2 + 1 + 1
+        rawip <- fmap fromIntegral . B.unpack <$> getNByteString (len - 4) -- 4 = 2 + 1 + 1
         ip <- case fam of
                     1 -> pure . IPv4 . toIPv4 $ take 4 (rawip ++ repeat 0)
                     2 -> pure . IPv6 . toIPv6b $ take 16 (rawip ++ repeat 0)
                     _ -> fail "Unsupported address family"
         pure $ OD_ClientSubnet srcMask scpMask ip
-decodeOData (OUNKNOWN i) bs = pure $ OD_Unknown i bs
+decodeOData (OUNKNOWN i) len = OD_Unknown i <$> getNByteString len
 decodeOData _ _ = error "Unhandled case in decodeOData"
 ----------------------------------------------------------------
 
