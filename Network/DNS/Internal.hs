@@ -42,7 +42,7 @@ rrDB = [
   , (AAAA,  28)
   , (SRV,   33)
   , (DNAME, 39) -- RFC 2672
-  , (OPT,   41)
+  , (OPT,   41) -- RFC 6891
   ]
 
 data OPTTYPE = ClientSubnet
