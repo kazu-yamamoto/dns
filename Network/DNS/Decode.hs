@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, MultiWayIf #-}
 
 module Network.DNS.Decode (
     decode
@@ -223,22 +223,21 @@ decodeDomain :: SGet Domain
 decodeDomain = do
     pos <- getPosition
     c <- getInt8
-    if c == 0 then
-        return ""
-      else do
-        let n = getValue c
-        if isPointer c then do
+    let n = getValue c
+    if  | c == 0 -> return ""
+        | isPointer c -> do
             d <- getInt8
             let offset = n * 256 + d
             mo <- pop offset
             case mo of
                 Nothing -> fail $ "decodeDomain: " ++ show offset
-                Just o -> do
-                    -- A pointer may refer to another pointer.
-                    -- So, register this position for the domain.
-                    push pos o
-                    return o
-          else do
+                -- A pointer may refer to another pointer.
+                -- So, register this position for the domain.
+                Just o -> push pos o >> return o
+        -- As for now, extended labels have no use.
+        -- This may change some time in the future.
+        | isExtLabel c -> return ""
+        | otherwise -> do
             hs <- getNByteString n
             ds <- decodeDomain
             let dom = hs `BS.append` "." `BS.append` ds
@@ -247,6 +246,7 @@ decodeDomain = do
   where
     getValue c = c .&. 0x3f
     isPointer c = testBit c 7 && testBit c 6
+    isExtLabel c = (not $ testBit c 7) && testBit c 6
 
 ignoreClass :: SGet ()
 ignoreClass = () <$ get16
