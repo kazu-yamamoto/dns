@@ -6,7 +6,7 @@ module Network.DNS.Types (
     Domain
   -- * Resource Records
   , ResourceRecord (..)
-  , RData (..)
+  , RData (..), OData (..)
   -- ** Resource Record Type
   , TYPE (..), intToType, typeToInt
   , OPTTYPE (..), intToOptType, optTypeToInt
