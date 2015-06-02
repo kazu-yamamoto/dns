@@ -129,7 +129,7 @@ decodeRR = do
   where
     decodeRR' _ OPT = do
         udps <- decodeUDPSize
-        ercode <- decodeERCode
+        _ <- decodeERCode
         ver <- decodeOPTVer
         dok <- decodeDNSOK
         len <- decodeRLen
