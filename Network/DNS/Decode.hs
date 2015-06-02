@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
 
 module Network.DNS.Decode (
     decode
@@ -224,8 +224,10 @@ decodeDomain = do
     pos <- getPosition
     c <- getInt8
     let n = getValue c
-    if  | c == 0 -> return ""
-        | isPointer c -> do
+    -- Syntax hack to avoid using MultiWayIf
+    case () of
+        _ | c == 0 -> return ""
+        _ | isPointer c -> do
             d <- getInt8
             let offset = n * 256 + d
             mo <- pop offset
@@ -236,8 +238,8 @@ decodeDomain = do
                 Just o -> push pos o >> return o
         -- As for now, extended labels have no use.
         -- This may change some time in the future.
-        | isExtLabel c -> return ""
-        | otherwise -> do
+        _ | isExtLabel c -> return ""
+        _ | otherwise -> do
             hs <- getNByteString n
             ds <- decodeDomain
             let dom = hs `BS.append` "." `BS.append` ds
