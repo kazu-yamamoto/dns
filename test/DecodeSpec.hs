@@ -1,8 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, CPP #-}
 
 module DecodeSpec where
 
 import Data.ByteString.Internal (ByteString(..), unsafeCreate)
+#if !MIN_VERSION_bytestring(0,10,0)
+import qualified Data.ByteString as BS
+#endif
 import qualified Data.ByteString.Lazy as BL
 import Data.Word8
 import Foreign.ForeignPtr (withForeignPtr)
@@ -49,7 +52,11 @@ spec = do
 ----------------------------------------------------------------
 
 fromHexString :: BL.ByteString -> BL.ByteString
+#if MIN_VERSION_bytestring(0,10,0)
 fromHexString = BL.fromStrict . fromHexString' . BL.toStrict
+#else
+fromHexString = BL.pack . BS.unpack . fromHexString' . BS.pack . BL.unpack
+#endif
 
 fromHexString' :: ByteString -> ByteString
 fromHexString' (PS fptr off len) = unsafeCreate size $ \dst ->
