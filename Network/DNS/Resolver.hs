@@ -15,6 +15,7 @@ module Network.DNS.Resolver (
   -- ** Raw looking up function
   , lookupRaw
   , fromDNSMessage
+  , fromDNSFormat
   ) where
 
 import Control.Exception (bracket)
@@ -235,6 +236,10 @@ fromDNSMessage ans conv = case errcode ans of
     BadOpt    -> Left BadOptRecord
   where
     errcode = rcode . flags . header
+
+-- | For backward compatibility.
+fromDNSFormat :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
+fromDNSFormat = fromDNSMessage
 
 -- | Look up resource records for a domain, collecting the results
 --   from the ANSWER section of the response.

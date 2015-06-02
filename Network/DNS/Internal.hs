@@ -119,6 +119,9 @@ data DNSMessage = DNSMessage {
   , additional :: [ResourceRecord]
   } deriving (Eq, Show)
 
+-- | For backward compatibility.
+type DNSFormat = DNSMessage
+
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
     identifier :: Int
