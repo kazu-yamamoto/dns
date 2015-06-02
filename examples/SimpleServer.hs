@@ -5,7 +5,7 @@ import Control.Concurrent
 import Control.Monad
 import qualified Data.ByteString as S
 import Data.ByteString.Lazy hiding (putStrLn, filter, length)
-import Data.Default
+import Data.Default.Class
 import Data.IP
 import Data.Maybe
 import Data.Monoid
@@ -37,7 +37,7 @@ timeout' msg tm io = do
     maybe (putStrLn msg) (const $ return ()) result
     return result
 
-proxyRequest :: Conf -> ResolvConf -> DNSFormat -> IO (Maybe DNSFormat)
+proxyRequest :: Conf -> ResolvConf -> DNSMessage -> IO (Maybe DNSMessage)
 proxyRequest Conf{..} rc req = do
     let worker Resolver{..} = do
             let packet = mconcat . toChunks $ encode req
@@ -48,13 +48,13 @@ proxyRequest Conf{..} rc req = do
         (>>= check) <$> timeout' "proxy timeout" timeOut (worker r)
   where
     ident = identifier . header $ req
-    check :: DNSFormat -> Maybe DNSFormat
+    check :: DNSMessage -> Maybe DNSMessage
     check rsp = let hdr = header rsp
                 in  if identifier hdr == ident
                         then Just rsp
                         else Nothing
 
-handleRequest :: Conf -> ResolvConf -> DNSFormat -> IO (Maybe DNSFormat)
+handleRequest :: Conf -> ResolvConf -> DNSMessage -> IO (Maybe DNSMessage)
 handleRequest conf@Conf{hosts=hosts} rc req =
     maybe
       (proxyRequest conf rc req)
@@ -66,7 +66,7 @@ handleRequest conf@Conf{hosts=hosts} rc req =
     lookupHosts = do
         q <- listToMaybe . filterA . question $ req
         ip <- lookup (qname q) hosts
-        return $ responseA ident q ip
+        return $ responseA ident q [ip]
 
 handlePacket :: Conf -> Socket -> SockAddr -> S.ByteString -> IO ()
 handlePacket conf@Conf{..} sock addr bs = case decode (fromChunks [bs]) of

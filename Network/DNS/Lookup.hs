@@ -35,7 +35,7 @@
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
---   Right [93.184.216.119]
+--   Right [93.184.216.34]
 --
 --   The only error that we can easily cause is a timeout. We do this
 --   by creating and utilizing a 'ResolvConf' which has a timeout of
@@ -103,7 +103,7 @@ lookupA rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RDATA -> Either DNSError IPv4
+    unTag :: RData -> Either DNSError IPv4
     unTag (RD_A x) = Right x
     unTag _ = Left UnexpectedRDATA
 
@@ -126,7 +126,7 @@ lookupAAAA rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RDATA -> Either DNSError IPv6
+    unTag :: RData -> Either DNSError IPv6
     unTag (RD_AAAA x) = Right x
     unTag _ = Left UnexpectedRDATA
 
@@ -166,7 +166,7 @@ lookupMX rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RDATA -> Either DNSError (Domain,Int)
+    unTag :: RData -> Either DNSError (Domain,Int)
     unTag (RD_MX pr dm) = Right (dm,pr)
     unTag _ = Left UnexpectedRDATA
 
@@ -227,7 +227,7 @@ lookupXviaMX rlv dom func = do
 --   'lookupNSAuth'. The only difference between those two is which
 --   function, 'lookup' or 'lookupAuth', is used to perform the
 --   lookup. We take either of those as our first parameter.
-lookupNSImpl :: (Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA]))
+lookupNSImpl :: (Resolver -> Domain -> TYPE -> IO (Either DNSError [RData]))
              -> Resolver
              -> Domain
              -> IO (Either DNSError [Domain])
@@ -238,7 +238,7 @@ lookupNSImpl lookup_function rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RDATA -> Either DNSError Domain
+    unTag :: RData -> Either DNSError Domain
     unTag (RD_NS dm) = Right dm
     unTag _ = Left UnexpectedRDATA
 
@@ -315,7 +315,7 @@ lookupTXT rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RDATA -> Either DNSError ByteString
+    unTag :: RData -> Either DNSError ByteString
     unTag (RD_TXT x) = Right x
     unTag _ = Left UnexpectedRDATA
 
@@ -344,7 +344,7 @@ lookupPTR rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RDATA -> Either DNSError Domain
+    unTag :: RData -> Either DNSError Domain
     unTag (RD_PTR dm) = Right dm
     unTag _ = Left UnexpectedRDATA
 
@@ -406,6 +406,6 @@ lookupSRV rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RDATA -> Either DNSError (Int,Int,Int,Domain)
+    unTag :: RData -> Either DNSError (Int,Int,Int,Domain)
     unTag (RD_SRV pri wei prt dm) = Right (pri,wei,prt,dm)
     unTag _ = Left UnexpectedRDATA

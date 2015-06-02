@@ -14,8 +14,7 @@ module Network.DNS.Resolver (
   , lookupAuth
   -- ** Raw looking up function
   , lookupRaw
-  , lookupRaw'
-  , fromDNSFormat
+  , fromDNSMessage
   ) where
 
 import Control.Applicative ((<$>), (<*>), pure)
@@ -199,37 +198,38 @@ getRandom = getStdRandom (randomR (0,65535))
 ----------------------------------------------------------------
 
 -- | Looking up resource records of a domain. The first parameter is one of
---   the field accessors of the 'DNSFormat' type -- this allows you to
+--   the field accessors of the 'DNSMessage' type -- this allows you to
 --   choose which section (answer, authority, or additional) you would like
 --   to inspect for the result.
 
-lookupSection :: (DNSFormat -> [ResourceRecord])
+lookupSection :: (DNSMessage -> [ResourceRecord])
               -> Resolver
               -> Domain
               -> TYPE
-              -> IO (Either DNSError [RDATA])
+              -> IO (Either DNSError [RData])
 lookupSection section rlv dom typ = do
     eans <- lookupRaw rlv dom typ
     case eans of
         Left  err -> return $ Left err
-        Right ans -> return $ fromDNSFormat ans toRDATA
+        Right ans -> return $ fromDNSMessage ans toRData
   where
     {- CNAME hack
     dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
     correct r = rrname r == dom' && rrtype r == typ
     -}
     correct r = rrtype r == typ
-    toRDATA = map rdata . filter correct . section
+    toRData = map rdata . filter correct . section
 
--- | Extract necessary information from 'DNSFormat'
-fromDNSFormat :: DNSFormat -> (DNSFormat -> a) -> Either DNSError a
-fromDNSFormat ans conv = case errcode ans of
+-- | Extract necessary information from 'DNSMessage'
+fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
+fromDNSMessage ans conv = case errcode ans of
     NoErr     -> Right $ conv ans
     FormatErr -> Left FormatError
     ServFail  -> Left ServerFailure
     NameErr   -> Left NameError
     NotImpl   -> Left NotImplemented
     Refused   -> Left OperationRefused
+    BadOpt    -> Left BadOptRecord
   where
     errcode = rcode . flags . header
 
@@ -241,14 +241,14 @@ fromDNSFormat ans conv = case errcode ans of
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookup resolver hostname A
---   Right [93.184.216.119]
+--   Right [93.184.216.34]
 --
-lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
+lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookup = lookupSection answer
 
 -- | Look up resource records for a domain, collecting the results
 --   from the AUTHORITY section of the response.
-lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RDATA])
+lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookupAuth = lookupSection authority
 
 
@@ -267,7 +267,7 @@ lookupAuth = lookupSection authority
 --   And the (formatted) expected output:
 --
 --   @
---   Right (DNSFormat
+--   Right (DNSMessage
 --           { header = DNSHeader
 --                        { identifier = 1,
 --                          flags = DNSFlags
@@ -278,10 +278,7 @@ lookupAuth = lookupSection authority
 --                                      recDesired = True,
 --                                      recAvailable = True,
 --                                      rcode = NoErr },
---                          qdCount = 1,
---                          anCount = 1,
---                          nsCount = 0,
---                          arCount = 0},
+--                        },
 --             question = [Question { qname = \"www.example.com.\",
 --                                    qtype = A}],
 --             answer = [ResourceRecord {rrname = \"www.example.com.\",
@@ -293,20 +290,15 @@ lookupAuth = lookupSection authority
 --             additional = []})
 --  @
 --
-lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSFormat)
+lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
 lookupRaw = lookupRawInternal receive
 
--- | Like 'lookupRaw' except that no unknown RDATA records are not split up
---   into 'Int's.
-lookupRaw' :: Resolver -> Domain -> TYPE -> IO (Either DNSError (DNSMessage (RD BS.ByteString)))
-lookupRaw' = lookupRawInternal receive'
-
 lookupRawInternal ::
-    (Socket -> IO (DNSMessage a))
+    (Socket -> IO DNSMessage)
     -> Resolver
     -> Domain
     -> TYPE
-    -> IO (Either DNSError (DNSMessage a))
+    -> IO (Either DNSError DNSMessage)
 lookupRawInternal _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
 lookupRawInternal rcv rlv dom typ = do

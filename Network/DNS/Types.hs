@@ -5,20 +5,15 @@ module Network.DNS.Types (
   -- * Domain
     Domain
   -- * Resource Records
-  , ResourceRecord
-  , RR (..)
-  , RDATA
-  , RD (..)
-  , rrMapWithType
+  , ResourceRecord (..)
+  , RData (..), OData (..)
   -- ** Resource Record Type
-  , TYPE (..), intToType, typeToInt, toType
+  , TYPE (..), intToType, typeToInt
+  , OPTTYPE (..), intToOptType, optTypeToInt
   -- * DNS Error
   , DNSError (..)
-  -- * DNS Format
-  , DNSFormat
+  -- * DNS Message
   , DNSMessage (..)
-  , dnsMapWithType
-  , dnsTraverseWithType
   -- * DNS Header
   , DNSHeader (..)
   -- * DNS Flags

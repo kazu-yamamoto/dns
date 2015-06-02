@@ -1,17 +1,13 @@
-{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Network.DNS.Internal where
 
 import Control.Exception (Exception)
-import Control.Applicative
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.Char (toUpper)
-import Data.IP (IPv4, IPv6)
+import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
-import Data.Foldable (Foldable)
-import Data.Traversable
 
 ----------------------------------------------------------------
 
@@ -21,7 +17,17 @@ type Domain = ByteString
 ----------------------------------------------------------------
 
 -- | Types for resource records.
-data TYPE = A | AAAA | NS | TXT | MX | CNAME | SOA | PTR | SRV | DNAME
+data TYPE = A
+          | AAAA
+          | NS
+          | TXT
+          | MX
+          | CNAME
+          | SOA
+          | PTR
+          | SRV
+          | DNAME
+          | OPT
           | UNKNOWN Int deriving (Eq, Show, Read)
 
 rrDB :: [(TYPE, Int)]
@@ -36,7 +42,17 @@ rrDB = [
   , (AAAA,  28)
   , (SRV,   33)
   , (DNAME, 39) -- RFC 2672
+  , (OPT,   41) -- RFC 6891
   ]
+
+data OPTTYPE = ClientSubnet
+             | OUNKNOWN Int
+    deriving (Eq)
+
+orDB :: [(OPTTYPE, Int)]
+orDB = [
+        (ClientSubnet, 8)
+       ]
 
 rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
 rookup _    []          =  Nothing
@@ -48,10 +64,13 @@ intToType :: Int -> TYPE
 intToType n = fromMaybe (UNKNOWN n) $ rookup n rrDB
 typeToInt :: TYPE -> Int
 typeToInt (UNKNOWN x)  = x
-typeToInt t = fromMaybe 0 $ lookup t rrDB
+typeToInt t = fromMaybe (error "typeToInt") $ lookup t rrDB
 
-toType :: String -> TYPE
-toType = read . map toUpper
+intToOptType :: Int -> OPTTYPE
+intToOptType n = fromMaybe (OUNKNOWN n) $ rookup n orDB
+optTypeToInt :: OPTTYPE -> Int
+optTypeToInt (OUNKNOWN x)  = x
+optTypeToInt t = fromMaybe (error "optTypeToInt") $ lookup t orDB
 
 ----------------------------------------------------------------
 
@@ -85,61 +104,25 @@ data DNSError =
     --   or a name server may not wish to perform
     --   a particular operation (e.g., zone transfer) for particular data.
   | OperationRefused
+    -- | The server detected a malformed OPT RR.
+  | BadOptRecord
   deriving (Eq, Show, Typeable)
 
 instance Exception DNSError
 
 -- | Raw data format for DNS Query and Response.
-data DNSMessage a = DNSFormat {
+data DNSMessage = DNSMessage {
     header     :: DNSHeader
   , question   :: [Question]
-  , answer     :: [RR a]
-  , authority  :: [RR a]
-  , additional :: [RR a]
-  } deriving (Eq, Show, Functor, Foldable)
-
-type DNSFormat = DNSMessage RDATA
-
-instance Traversable DNSMessage where
-  sequenceA dns = liftA3 build answer' authority' additional'
-    where
-      answer'     = traverse sequenceA $ answer dns
-      authority'  = traverse sequenceA $ authority dns
-      additional' = traverse sequenceA $ additional dns
-      build ans auth add = cast { answer     = ans
-                                , authority  = auth
-                                , additional = add }
-        where
-          cast = error "unhandled case in sequenceA (DNSMessage)" <$> dns
-
--- | Like 'fmap' except that RR 'TYPE' context is available
---   within the map.
-dnsMapWithType :: (TYPE -> a -> b) -> DNSMessage a -> DNSMessage b
-dnsMapWithType parse dns =
-    cast { answer     = mapParse $ answer dns
-         , authority  = mapParse $ authority dns
-         , additional = mapParse $ additional dns
-         }
-  where
-    cast = error "unhandled case in dnsMapWithType" <$> dns
-    mapParse = map (rrMapWithType parse)
-
--- | Behaves exactly like a regular 'traverse' except that the traversing
---   function also has access to the RR 'TYPE' associated with a value.
-dnsTraverseWithType ::
-    Applicative f =>
-    (TYPE -> a -> f b) -> DNSMessage a -> f (DNSMessage b)
-dnsTraverseWithType parse = sequenceA . dnsMapWithType parse
-
+  , answer     :: [ResourceRecord]
+  , authority  :: [ResourceRecord]
+  , additional :: [ResourceRecord]
+  } deriving (Eq, Show)
 
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
     identifier :: Int
   , flags      :: DNSFlags
-  , qdCount    :: Int
-  , anCount    :: Int
-  , nsCount    :: Int
-  , arCount    :: Int
   } deriving (Eq, Show)
 
 -- | Raw data format for the flags of DNS Query and Response.
@@ -159,7 +142,7 @@ data QorR = QR_Query | QR_Response deriving (Eq, Show)
 
 data OPCODE = OP_STD | OP_INV | OP_SSR deriving (Eq, Show, Enum)
 
-data RCODE = NoErr | FormatErr | ServFail | NameErr | NotImpl | Refused deriving (Eq, Show, Enum)
+data RCODE = NoErr | FormatErr | ServFail | NameErr | NotImpl | Refused | BadOpt deriving (Eq, Show, Enum)
 
 ----------------------------------------------------------------
 
@@ -176,33 +159,36 @@ makeQuestion = Question
 ----------------------------------------------------------------
 
 -- | Raw data format for resource records.
-data RR a = ResourceRecord {
-    rrname :: Domain
-  , rrtype :: TYPE
-  , rrttl  :: Int
-  , rdlen  :: Int
-  , rdata  :: a
-  } deriving (Eq, Show, Functor, Foldable)
-
-type ResourceRecord = RR RDATA
+data ResourceRecord = ResourceRecord {
+                            rrname :: Domain
+                          , rrtype :: TYPE
+                          , rrttl  :: Int
+                          , rdata  :: RData
+                          }
+                    | OptRecord {
+                            orudpsize   :: Int
+                          , ordnssecok  :: Bool
+                          , orversion   :: Int
+                          , rdata       :: RData
+                          }
+                    deriving (Eq,Show)
 
 -- | Raw data format for each type.
-data RD a = RD_NS Domain | RD_CNAME Domain | RD_DNAME Domain
-           | RD_MX Int Domain | RD_PTR Domain
+data RData = RD_NS Domain
+           | RD_CNAME Domain
+           | RD_DNAME Domain
+           | RD_MX Int Domain
+           | RD_PTR Domain
            | RD_SOA Domain Domain Int Int Int Int Int
-           | RD_A IPv4 | RD_AAAA IPv6 | RD_TXT ByteString
+           | RD_A IPv4
+           | RD_AAAA IPv6
+           | RD_TXT ByteString
            | RD_SRV Int Int Int Domain
-           | RD_OTH a deriving (Eq, Functor, Foldable)
+           | RD_OPT [OData]
+           | RD_OTH ByteString
+    deriving (Eq)
 
-type RDATA = RD [Int]
-
-instance Traversable RD where
-  sequenceA (RD_OTH a) = RD_OTH <$> a
-  sequenceA rd         = pure cast
-    where
-        cast = error "unhandled case in squenceA (RD)" <$> rd
-
-instance Show a => Show (RD a) where
+instance Show RData where
   show (RD_NS dom) = BS.unpack dom
   show (RD_MX prf dom) = BS.unpack dom ++ " " ++ show prf
   show (RD_CNAME dom) = BS.unpack dom
@@ -213,20 +199,18 @@ instance Show a => Show (RD a) where
   show (RD_SOA mn _ _ _ _ _ mi) = BS.unpack mn ++ " " ++ show mi
   show (RD_PTR dom) = BS.unpack dom
   show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
+  show (RD_OPT od) = show od
   show (RD_OTH is) = show is
 
-instance Traversable RR where
-  sequenceA rr = (\x -> fmap (const x) rr) <$> rdata rr
 
--- | Like 'fmap' except that RR 'TYPE' context is available
---   within the map.
-rrMapWithType :: (TYPE -> a -> b) -> RR a -> RR b
-rrMapWithType parse rr = parse (rrtype rr) <$> rr
+data OData = OD_ClientSubnet Int Int IP
+           | OD_Unknown Int ByteString
+    deriving (Eq,Show)
 
 ----------------------------------------------------------------
 
-defaultQuery :: DNSFormat
-defaultQuery = DNSFormat {
+defaultQuery :: DNSMessage
+defaultQuery = DNSMessage {
     header = DNSHeader {
        identifier = 0
      , flags = DNSFlags {
@@ -238,10 +222,6 @@ defaultQuery = DNSFormat {
          , recAvailable = False
          , rcode        = NoErr
          }
-     , qdCount = 0
-     , anCount = 0
-     , nsCount = 0
-     , arCount = 0
      }
   , question   = []
   , answer     = []
@@ -249,7 +229,7 @@ defaultQuery = DNSFormat {
   , additional = []
   }
 
-defaultResponse :: DNSFormat
+defaultResponse :: DNSMessage
 defaultResponse =
   let hd = header defaultQuery
       flg = flags hd
@@ -263,24 +243,24 @@ defaultResponse =
         }
       }
 
-responseA :: Int -> Question -> IPv4 -> DNSFormat
-responseA ident q ip =
+responseA :: Int -> Question -> [IPv4] -> DNSMessage
+responseA ident q ips =
   let hd = header defaultResponse
       dom = qname q
-      an = ResourceRecord dom A 300 4 (RD_A ip)
+      an = fmap (ResourceRecord dom A 300 . RD_A) ips
   in  defaultResponse {
-          header = hd { identifier=ident, qdCount = 1, anCount = 1 }
+          header = hd { identifier=ident }
         , question = [q]
-        , answer = [an]
+        , answer = an
       }
 
-responseAAAA :: Int -> Question -> IPv6 -> DNSFormat
-responseAAAA ident q ip =
+responseAAAA :: Int -> Question -> [IPv6] -> DNSMessage
+responseAAAA ident q ips =
   let hd = header defaultResponse
       dom = qname q
-      an = ResourceRecord dom AAAA 300 16 (RD_AAAA ip)
+      an = fmap (ResourceRecord dom AAAA 300 . RD_AAAA) ips
   in  defaultResponse {
-          header = hd { identifier=ident, qdCount = 1, anCount = 1 }
+          header = hd { identifier=ident }
         , question = [q]
-        , answer = [an]
+        , answer = an
       }
