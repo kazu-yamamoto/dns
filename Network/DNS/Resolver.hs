@@ -17,7 +17,6 @@ module Network.DNS.Resolver (
   , fromDNSMessage
   ) where
 
-import Control.Applicative ((<$>), (<*>), pure)
 import Control.Exception (bracket)
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
@@ -32,6 +31,10 @@ import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), PortNumber(
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, randomR)
 import System.Timeout (timeout)
+
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative ((<$>), (<*>), pure)
+#endif
 
 #if mingw32_HOST_OS == 1
 import Network.Socket (send)

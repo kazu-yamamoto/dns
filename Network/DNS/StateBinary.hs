@@ -1,9 +1,8 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, CPP #-}
 module Network.DNS.StateBinary where
 
 import Blaze.ByteString.Builder (Write)
 import qualified Blaze.ByteString.Builder as BB
-import Control.Applicative ((<$>), (<*))
 import Control.Monad.State (State, StateT)
 import qualified Control.Monad.State as ST
 import Control.Monad.Trans.Resource (ResourceT)
@@ -19,9 +18,13 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Monoid (Monoid, mconcat, mappend, mempty)
 import Data.Word (Word8, Word16, Word32)
 import Network.DNS.Types
+
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative ((<$>), (<*))
+import Data.Monoid (Monoid, mconcat, mappend, mempty)
+#endif
 
 ----------------------------------------------------------------
 

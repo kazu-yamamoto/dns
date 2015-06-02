@@ -1,11 +1,10 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, CPP #-}
 
 module Network.DNS.Decode (
     decode
   , receive
   ) where
 
-import Control.Applicative
 import Control.Monad (replicateM)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import qualified Control.Exception as ControlException
@@ -21,6 +20,10 @@ import Data.Typeable (Typeable)
 import Network (Socket)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
+
+#if __GLASGOW_HASKELL__ < 709
+import Control.Applicative
+#endif
 
 ----------------------------------------------------------------
 
