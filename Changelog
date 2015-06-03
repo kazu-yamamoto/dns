@@ -1,0 +1,8 @@
+2.0.0
+	- DNSMessage is now monomorphic
+	- RDATA is now monomorphic
+	- Removed traversal instance for DNSMessage
+	- EDNS0 encoding/decoding is now supported
+	- Removed dnsMapWithType and dnsTraverseWithType functions
+	- responseA and responseAAAA now take lists of IP addresses as their arguments
+	- DNSHeader type no longer has qdCount, anCount, nsCount, and arCount fields
