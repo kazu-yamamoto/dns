@@ -161,6 +161,10 @@ makeAddrInfo addr mport = do
 
 -- | Giving a thread-safe 'Resolver' to the function of the second
 --   argument. A socket for UDP is opened inside and is surely closed.
+--   Multiple 'withResolver's can be used concurrently.
+--   Multiple lookups must be done sequentially with a given
+--   'Resolver'. If multiple 'Resolver's are necessary for
+--   concurrent purpose, use 'withResolvers'.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed func = bracket (openSocket seed) sClose $ \sock -> do
     connectSocket sock seed
@@ -168,6 +172,8 @@ withResolver seed func = bracket (openSocket seed) sClose $ \sock -> do
 
 -- | Giving thread-safe 'Resolver's to the function of the second
 --   argument. Sockets for UDP are opened inside and are surely closed.
+--   For each 'Resolver', multiple lookups must be done sequentially.
+--   'Resolver's can be used concurrently.
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
 withResolvers seeds func = bracket openSockets closeSockets $ \socks -> do
     mapM_ (uncurry connectSocket) $ zip socks seeds
