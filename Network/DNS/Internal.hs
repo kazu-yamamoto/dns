@@ -137,6 +137,7 @@ data DNSFlags = DNSFlags {
   , recDesired   :: Bool
   , recAvailable :: Bool
   , rcode        :: RCODE
+  , authenData   :: Bool
   } deriving (Eq, Show)
 
 ----------------------------------------------------------------
@@ -236,6 +237,7 @@ defaultQuery = DNSMessage {
          , recDesired   = True
          , recAvailable = False
          , rcode        = NoErr
+         , authenData   = False
          }
      }
   , question   = []
@@ -254,6 +256,7 @@ defaultResponse =
               qOrR = QR_Response
             , authAnswer = True
             , recAvailable = True
+            , authenData = False
             }
         }
       }

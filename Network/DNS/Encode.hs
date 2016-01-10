@@ -83,6 +83,7 @@ encodeFlags DNSFlags{..} = put16 word
     st :: State Word16 ()
     st = sequence_
               [ set (word16 rcode)
+              , when authenData          $ set (bit 5)
               , when recAvailable        $ set (bit 7)
               , when recDesired          $ set (bit 8)
               , when trunCation          $ set (bit 9)

@@ -291,7 +291,9 @@ lookupAuth = lookupSection authority
 --                                      trunCation = False,
 --                                      recDesired = True,
 --                                      recAvailable = True,
---                                      rcode = NoErr },
+--                                      rcode = NoErr,
+--                                      authenData = False
+--                                    },
 --                        },
 --             question = [Question { qname = \"www.example.com.\",
 --                                    qtype = A}],
