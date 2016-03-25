@@ -168,5 +168,12 @@ sinkSGet parser = sinkParser (ST.runStateT parser initialState)
 runSGet :: SGet a -> BL.ByteString -> Either String (a, PState)
 runSGet parser bs = AL.eitherResult $ AL.parse (ST.runStateT parser initialState) bs
 
+runSGetWithLeftovers :: SGet a -> BL.ByteString -> Either String ((a, PState), BL.ByteString)
+runSGetWithLeftovers parser bs = toResult $ AL.parse (ST.runStateT parser initialState) bs
+  where
+    toResult :: AL.Result r -> Either String (r, BL.ByteString)
+    toResult (AL.Done i r) = Right (r, i)
+    toResult (AL.Fail _ _ err) = Left err
+
 runSPut :: SPut -> BL.ByteString
 runSPut = BB.toLazyByteString . BB.fromWrite . flip ST.evalState initialWState
