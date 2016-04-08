@@ -2,9 +2,11 @@
 
 module Network.DNS.Decode (
     decode
+  , decodeMany
   , receive
   ) where
 
+import Control.Applicative (many)
 import Control.Monad (replicateM)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import qualified Control.Exception as ControlException
@@ -45,6 +47,20 @@ receive = receiveDNSFormat . sourceSocket
 
 decode :: BL.ByteString -> Either String DNSMessage
 decode bs = fst <$> runSGet decodeResponse bs
+
+-- | Parse many length-encoded DNS records, for example, from TCP traffic.
+
+decodeMany :: BL.ByteString -> Either String ([DNSMessage], BL.ByteString)
+decodeMany bs = do
+    ((bss, _), leftovers) <- runSGetWithLeftovers lengthEncoded bs
+    msgs <- mapM decode bss
+    return (msgs, leftovers)
+  where
+    -- Read a list of length-encoded lazy bytestrings
+    lengthEncoded :: SGet [BL.ByteString]
+    lengthEncoded = many $ do
+      len <- getInt16
+      fmap BL.fromStrict (getNByteString len)
 
 ----------------------------------------------------------------
 receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO DNSMessage
