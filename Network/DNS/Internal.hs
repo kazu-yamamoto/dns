@@ -143,9 +143,21 @@ data DNSFlags = DNSFlags {
 
 data QorR = QR_Query | QR_Response deriving (Eq, Show)
 
-data OPCODE = OP_STD | OP_INV | OP_SSR deriving (Eq, Show, Enum)
+data OPCODE
+  = OP_STD
+  | OP_INV
+  | OP_SSR
+  deriving (Eq, Show, Enum, Bounded)
 
-data RCODE = NoErr | FormatErr | ServFail | NameErr | NotImpl | Refused | BadOpt deriving (Eq, Show, Enum)
+data RCODE
+  = NoErr
+  | FormatErr
+  | ServFail
+  | NameErr
+  | NotImpl
+  | Refused
+  | BadOpt
+  deriving (Eq, Show, Enum, Bounded)
 
 ----------------------------------------------------------------
 
