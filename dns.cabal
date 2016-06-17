@@ -39,6 +39,7 @@ Library
                       , network >= 2.3
                       , random
                       , resourcet
+                      , safe == 0.3.*
   else
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
@@ -54,6 +55,7 @@ Library
                       , network-bytestring
                       , random
                       , resourcet
+                      , safe == 0.3.*
 
 Test-Suite network
   Type:                 exitcode-stdio-1.0
@@ -90,6 +92,7 @@ Test-Suite spec
                       , network >= 2.3
                       , random
                       , resourcet
+                      , safe == 0.3.*
                       , word8
 
 Test-Suite doctest

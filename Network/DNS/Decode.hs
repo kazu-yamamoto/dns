@@ -19,9 +19,11 @@ import Data.Conduit (($$), Source)
 import Data.Conduit.Network (sourceSocket)
 import Data.IP (IP(..), toIPv4, toIPv6b)
 import Data.Typeable (Typeable)
+import Data.Word (Word16)
 import Network (Socket)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
+import qualified Safe
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative
@@ -81,22 +83,28 @@ decodeResponse = do
 ----------------------------------------------------------------
 
 decodeFlags :: SGet DNSFlags
-decodeFlags = toFlags <$> get16
+decodeFlags = do
+    word <- get16
+    maybe (fail "Unsupported flags") pure (toFlags word)
   where
-    toFlags flgs = DNSFlags (getQorR flgs)
-                            (getOpcode flgs)
-                            (getAuthAnswer flgs)
-                            (getTrunCation flgs)
-                            (getRecDesired flgs)
-                            (getRecAvailable flgs)
-                            (getRcode flgs)
+    toFlags :: Word16 -> Maybe DNSFlags
+    toFlags flgs = do
+      opcode_ <- getOpcode flgs
+      rcode_ <- getRcode flgs
+      return $ DNSFlags (getQorR flgs)
+                        opcode_
+                        (getAuthAnswer flgs)
+                        (getTrunCation flgs)
+                        (getRecDesired flgs)
+                        (getRecAvailable flgs)
+                        rcode_
     getQorR w = if testBit w 15 then QR_Response else QR_Query
-    getOpcode w = toEnum $ fromIntegral $ shiftR w 11 .&. 0x0f
+    getOpcode w = Safe.toEnumMay (fromIntegral (shiftR w 11 .&. 0x0f))
     getAuthAnswer w = testBit w 10
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8
     getRecAvailable w = testBit w 7
-    getRcode w = toEnum $ fromIntegral $ w .&. 0x0f
+    getRcode w = Safe.toEnumMay (fromIntegral (w .&. 0x0f))
 
 ----------------------------------------------------------------
 
