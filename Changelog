@@ -1,3 +1,7 @@
+2.0.4
+	- Renaming a variable to fix preprocessor conflicts [#37](https://github.com/kazu-yamamoto/dns/pull/37)
+2.0.3
+	- Handle invalid opcodes gracefully. [#36](https://github.com/kazu-yamamoto/dns/pull/36)
 2.0.2
 	- Providing a new API: decodeMany.
 2.0.1
