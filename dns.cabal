@@ -31,6 +31,7 @@ Library
                       , binary
                       , blaze-builder
                       , bytestring
+                      , bytestring-builder
                       , conduit >= 1.1
                       , conduit-extra >= 1.1
                       , containers
@@ -46,6 +47,7 @@ Library
                       , binary
                       , blaze-builder
                       , bytestring
+                      , bytestring-builder
                       , conduit >= 1.1
                       , conduit-extra >= 1.1
                       , containers
@@ -67,6 +69,7 @@ Test-Suite network
   Build-Depends:        dns
                       , base
                       , bytestring
+                      , bytestring-builder
                       , hspec
 
 Test-Suite spec
@@ -82,6 +85,7 @@ Test-Suite spec
                       , binary
                       , blaze-builder
                       , bytestring
+                      , bytestring-builder
                       , conduit >= 1.1
                       , conduit-extra >= 1.1
                       , containers
