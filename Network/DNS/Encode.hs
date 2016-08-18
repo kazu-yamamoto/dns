@@ -3,6 +3,7 @@
 module Network.DNS.Encode (
     encode
   , composeQuery
+  , composeQueryAD
   ) where
 
 import qualified Blaze.ByteString.Builder as BB
@@ -36,6 +37,21 @@ composeQuery idt qs = encode qry
          }
       , question = qs
       }
+
+composeQueryAD :: Int -> [Question] -> ByteString
+composeQueryAD idt qs = encode qry
+  where
+      hdr = header defaultQuery
+      flg = flags hdr
+      qry = defaultQuery {
+          header = hdr {
+              identifier = idt,
+              flags = flg {
+                  authenData = True
+              }
+           }
+        , question = qs
+        }
 
 ----------------------------------------------------------------
 
