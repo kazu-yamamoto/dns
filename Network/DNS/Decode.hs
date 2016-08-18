@@ -231,6 +231,16 @@ decodeRData OPT ol = RD_OPT <$> decode' ol
             optLen <- getInt16
             dat <- decodeOData optCode optLen
             (dat:) <$> decode' (l - optLen - 4)
+--
+decodeRData TLSA len = RD_TLSA <$> decodeUsage
+                               <*> decodeSelector
+                               <*> decodeMType
+                               <*> decodeADF
+  where
+    decodeUsage    = getInt8
+    decodeSelector = getInt8
+    decodeMType    = getInt8
+    decodeADF      = getNByteString (len - 3)
 decodeRData _  len = RD_OTH <$> getNByteString len
 
 decodeOData :: OPTTYPE -> Int -> SGet OData

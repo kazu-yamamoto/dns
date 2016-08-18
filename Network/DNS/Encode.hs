@@ -167,6 +167,12 @@ encodeRDATA rd = case rd of
         , putInt16 port
         , encodeDomain dom
         ]
+    (RD_TLSA u s m d) -> mconcat
+        [ putInt8 u
+        , putInt8 s
+        , putInt8 m
+        , putByteString d
+        ]
 
 encodeOData :: OData -> SPut
 encodeOData (OD_ClientSubnet srcNet scpNet ip) = let dropZeroes = dropWhileEnd (==0)
