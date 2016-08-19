@@ -197,8 +197,7 @@ lookupAviaMX rlv dom = lookupXviaMX rlv dom (lookupA rlv)
 lookupAAAAviaMX :: Resolver -> Domain -> IO (Either DNSError [IPv6])
 lookupAAAAviaMX rlv dom = lookupXviaMX rlv dom (lookupAAAA rlv)
 
-lookupXviaMX :: Show a
-             => Resolver
+lookupXviaMX :: Resolver
              -> Domain
              -> (Domain -> IO (Either DNSError [a]))
              -> IO (Either DNSError [a])

@@ -28,7 +28,7 @@ import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.Internal
 import qualified Data.ByteString.Char8 as BS
-import Network.Socket (HostName, Socket, SocketType(Datagram), sClose, socket, connect)
+import Network.Socket (HostName, Socket, SocketType(Datagram), close, socket, connect)
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), PortNumber(..), defaultHints, getAddrInfo)
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, randomR)
@@ -167,7 +167,7 @@ makeAddrInfo addr mport = do
 --   'Resolver'. If multiple 'Resolver's are necessary for
 --   concurrent purpose, use 'withResolvers'.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
-withResolver seed func = bracket (openSocket seed) sClose $ \sock -> do
+withResolver seed func = bracket (openSocket seed) close $ \sock -> do
     connectSocket sock seed
     func $ makeResolver seed sock
 
@@ -182,7 +182,7 @@ withResolvers seeds func = bracket openSockets closeSockets $ \socks -> do
     func resolvs
   where
     openSockets = mapM openSocket seeds
-    closeSockets = mapM sClose
+    closeSockets = mapM close
 
 openSocket :: ResolvSeed -> IO Socket
 openSocket seed = socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)

@@ -72,7 +72,7 @@ fixedSized :: Int -> (a -> Write) -> a -> SPut
 fixedSized n f a = do addPositionW n
                       return (f a)
 
-writeSized :: Show a => (a -> Int) -> (a -> Write) -> a -> SPut
+writeSized :: (a -> Int) -> (a -> Write) -> a -> SPut
 writeSized n f a = do addPositionW (n a)
                       return (f a)
 
