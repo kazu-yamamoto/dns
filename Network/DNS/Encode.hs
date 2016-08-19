@@ -6,12 +6,13 @@ module Network.DNS.Encode (
   , composeQueryAD
   ) where
 
-import qualified Blaze.ByteString.Builder as BB
 import Control.Monad (when)
 import Control.Monad.State (State, modify, execState, gets)
 import Data.Binary (Word16)
 import Data.Bits ((.|.), bit, shiftL, setBit)
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy as BL
 import Data.ByteString.Lazy.Char8 (ByteString)
 import Data.IP (IP(..),fromIPv4, fromIPv6b)
 import Data.List (dropWhileEnd)
@@ -118,10 +119,11 @@ encodeQuestion Question{..} = encodeDomain qname
 putRData :: RData -> SPut
 putRData rd = do
     addPositionW 2 -- "simulate" putInt16
-    rDataWrite <- encodeRDATA rd
-    let rdataLength = fromIntegral . BS.length . BB.toByteString . BB.fromWrite $ rDataWrite
-    let rlenWrite = BB.writeInt16be rdataLength
-    return rlenWrite <> return rDataWrite
+    rDataBuilder <- encodeRDATA rd
+    -- fixmed: SPut must hold length
+    let rdataLength = fromIntegral . BL.length . BB.toLazyByteString $ rDataBuilder
+    let rlenBuilder = BB.int16BE rdataLength
+    return rlenBuilder <> return rDataBuilder
 
 encodeRR :: ResourceRecord -> SPut
 encodeRR ResourceRecord{..} = mconcat [ encodeDomain rrname

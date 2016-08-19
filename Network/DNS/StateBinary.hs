@@ -1,8 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, CPP #-}
 module Network.DNS.StateBinary where
 
-import Blaze.ByteString.Builder (Write)
-import qualified Blaze.ByteString.Builder as BB
 import Control.Monad.State (State, StateT)
 import qualified Control.Monad.State as ST
 import Control.Monad.Trans.Resource (ResourceT)
@@ -11,6 +9,8 @@ import qualified Data.Attoparsec.ByteString.Lazy as AL
 import qualified Data.Attoparsec.Types as T
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import Data.ByteString.Builder (Builder)
+import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit (Sink)
 import Data.Conduit.Attoparsec (sinkParser)
@@ -28,7 +28,7 @@ import Data.Monoid (Monoid, mconcat, mappend, mempty)
 
 ----------------------------------------------------------------
 
-type SPut = State WState Write
+type SPut = State WState Builder
 
 data WState = WState {
     wsDomain :: Map Domain Int
@@ -43,36 +43,36 @@ instance Monoid SPut where
     mappend a b = mconcat <$> sequence [a, b]
 
 put8 :: Word8 -> SPut
-put8 = fixedSized 1 BB.writeWord8
+put8 = fixedSized 1 BB.word8
 
 put16 :: Word16 -> SPut
-put16 = fixedSized 2 BB.writeWord16be
+put16 = fixedSized 2 BB.word16BE
 
 put32 :: Word32 -> SPut
-put32 = fixedSized 4 BB.writeWord32be
+put32 = fixedSized 4 BB.word32BE
 
 putInt8 :: Int -> SPut
-putInt8 = fixedSized 1 (BB.writeInt8 . fromIntegral)
+putInt8 = fixedSized 1 (BB.int8 . fromIntegral)
 
 putInt16 :: Int -> SPut
-putInt16 = fixedSized 2 (BB.writeInt16be . fromIntegral)
+putInt16 = fixedSized 2 (BB.int16BE . fromIntegral)
 
 putInt32 :: Int -> SPut
-putInt32 = fixedSized 4 (BB.writeInt32be . fromIntegral)
+putInt32 = fixedSized 4 (BB.int32BE . fromIntegral)
 
 putByteString :: ByteString -> SPut
-putByteString = writeSized BS.length BB.writeByteString
+putByteString = writeSized BS.length BB.byteString
 
 addPositionW :: Int -> State WState ()
 addPositionW n = do
     (WState m cur) <- ST.get
     ST.put $ WState m (cur+n)
 
-fixedSized :: Int -> (a -> Write) -> a -> SPut
+fixedSized :: Int -> (a -> Builder) -> a -> SPut
 fixedSized n f a = do addPositionW n
                       return (f a)
 
-writeSized :: (a -> Int) -> (a -> Write) -> a -> SPut
+writeSized :: (a -> Int) -> (a -> Builder) -> a -> SPut
 writeSized n f a = do addPositionW (n a)
                       return (f a)
 
@@ -176,4 +176,4 @@ runSGetWithLeftovers parser bs = toResult $ AL.parse (ST.runStateT parser initia
     toResult (AL.Fail _ _ err) = Left err
 
 runSPut :: SPut -> BL.ByteString
-runSPut = BB.toLazyByteString . BB.fromWrite . flip ST.evalState initialWState
+runSPut = BB.toLazyByteString . flip ST.evalState initialWState
