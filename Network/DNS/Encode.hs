@@ -3,6 +3,7 @@
 module Network.DNS.Encode (
     encode
   , composeQuery
+  , composeQueryAD
   ) where
 
 import qualified Blaze.ByteString.Builder as BB
@@ -36,6 +37,21 @@ composeQuery idt qs = encode qry
          }
       , question = qs
       }
+
+composeQueryAD :: Int -> [Question] -> ByteString
+composeQueryAD idt qs = encode qry
+  where
+      hdr = header defaultQuery
+      flg = flags hdr
+      qry = defaultQuery {
+          header = hdr {
+              identifier = idt,
+              flags = flg {
+                  authenData = True
+              }
+           }
+        , question = qs
+        }
 
 ----------------------------------------------------------------
 
@@ -83,6 +99,7 @@ encodeFlags DNSFlags{..} = put16 word
     st :: State Word16 ()
     st = sequence_
               [ set (word16 rcode)
+              , when authenData          $ set (bit 5)
               , when recAvailable        $ set (bit 7)
               , when recDesired          $ set (bit 8)
               , when trunCation          $ set (bit 9)
@@ -149,6 +166,12 @@ encodeRDATA rd = case rd of
         , putInt16 weight
         , putInt16 port
         , encodeDomain dom
+        ]
+    (RD_TLSA u s m d) -> mconcat
+        [ putInt8 u
+        , putInt8 s
+        , putInt8 m
+        , putByteString d
         ]
 
 encodeOData :: OData -> SPut

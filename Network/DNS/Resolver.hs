@@ -14,6 +14,7 @@ module Network.DNS.Resolver (
   , lookupAuth
   -- ** Raw looking up function
   , lookupRaw
+  , lookupRawAD
   , fromDNSMessage
   , fromDNSFormat
   ) where
@@ -291,7 +292,9 @@ lookupAuth = lookupSection authority
 --                                      trunCation = False,
 --                                      recDesired = True,
 --                                      recAvailable = True,
---                                      rcode = NoErr },
+--                                      rcode = NoErr,
+--                                      authenData = False
+--                                    },
 --                        },
 --             question = [Question { qname = \"www.example.com.\",
 --                                    qtype = A}],
@@ -305,19 +308,25 @@ lookupAuth = lookupSection authority
 --  @
 --
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRaw = lookupRawInternal receive
+lookupRaw = lookupRawInternal receive False
+
+lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
+lookupRawAD = lookupRawInternal receive True
+
+
 
 lookupRawInternal ::
     (Socket -> IO DNSMessage)
+    -> Bool
     -> Resolver
     -> Domain
     -> TYPE
     -> IO (Either DNSError DNSMessage)
-lookupRawInternal _ _   dom _
+lookupRawInternal _ _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-lookupRawInternal rcv rlv dom typ = do
+lookupRawInternal rcv ad rlv dom typ = do
     seqno <- genId rlv
-    let query = composeQuery seqno [q]
+    let query = (if ad then composeQueryAD else composeQuery) seqno [q]
         checkSeqno = check seqno
     loop query checkSeqno 0 False
   where

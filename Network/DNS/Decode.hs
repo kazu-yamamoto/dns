@@ -98,6 +98,7 @@ decodeFlags = do
                         (getRecDesired flgs)
                         (getRecAvailable flgs)
                         rcode_
+			(getAuthenData flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
     getOpcode w = Safe.toEnumMay (fromIntegral (shiftR w 11 .&. 0x0f))
     getAuthAnswer w = testBit w 10
@@ -105,6 +106,7 @@ decodeFlags = do
     getRecDesired w = testBit w 8
     getRecAvailable w = testBit w 7
     getRcode w = Safe.toEnumMay (fromIntegral (w .&. 0x0f))
+    getAuthenData w = testBit w 5
 
 ----------------------------------------------------------------
 
@@ -229,6 +231,16 @@ decodeRData OPT ol = RD_OPT <$> decode' ol
             optLen <- getInt16
             dat <- decodeOData optCode optLen
             (dat:) <$> decode' (l - optLen - 4)
+--
+decodeRData TLSA len = RD_TLSA <$> decodeUsage
+                               <*> decodeSelector
+                               <*> decodeMType
+                               <*> decodeADF
+  where
+    decodeUsage    = getInt8
+    decodeSelector = getInt8
+    decodeMType    = getInt8
+    decodeADF      = getNByteString (len - 3)
 decodeRData _  len = RD_OTH <$> getNByteString len
 
 decodeOData :: OPTTYPE -> Int -> SGet OData

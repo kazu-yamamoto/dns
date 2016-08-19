@@ -5,6 +5,8 @@ module Network.DNS.Internal where
 import Control.Exception (Exception)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Builder as L
+import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
@@ -28,6 +30,7 @@ data TYPE = A
           | SRV
           | DNAME
           | OPT
+          | TLSA
           | UNKNOWN Int deriving (Eq, Show, Read)
 
 rrDB :: [(TYPE, Int)]
@@ -43,6 +46,7 @@ rrDB = [
   , (SRV,   33)
   , (DNAME, 39) -- RFC 2672
   , (OPT,   41) -- RFC 6891
+  , (TLSA,  52) -- RFC 6898
   ]
 
 data OPTTYPE = ClientSubnet
@@ -137,6 +141,7 @@ data DNSFlags = DNSFlags {
   , recDesired   :: Bool
   , recAvailable :: Bool
   , rcode        :: RCODE
+  , authenData   :: Bool
   } deriving (Eq, Show)
 
 ----------------------------------------------------------------
@@ -201,6 +206,7 @@ data RData = RD_NS Domain
            | RD_SRV Int Int Int Domain
            | RD_OPT [OData]
            | RD_OTH ByteString
+           | RD_TLSA Int Int Int ByteString
     deriving (Eq)
 
 instance Show RData where
@@ -216,6 +222,7 @@ instance Show RData where
   show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
   show (RD_OPT od) = show od
   show (RD_OTH is) = show is
+  show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ (BS.unpack $ L.toStrict . L.toLazyByteString . L.byteStringHex $ dgst)
 
 
 data OData = OD_ClientSubnet Int Int IP
@@ -236,6 +243,7 @@ defaultQuery = DNSMessage {
          , recDesired   = True
          , recAvailable = False
          , rcode        = NoErr
+         , authenData   = False
          }
      }
   , question   = []
@@ -254,6 +262,7 @@ defaultResponse =
               qOrR = QR_Response
             , authAnswer = True
             , recAvailable = True
+            , authenData = False
             }
         }
       }
