@@ -30,9 +30,20 @@ data TYPE = A
           | SRV
           | DNAME
           | OPT
+          | DS
+          | RRSIG
+          | NSEC
+          | DNSKEY
+          | NSEC3
+          | NSEC3PARAM
           | TLSA
+          | CDS
+          | CDNSKEY
+          | CSYNC
           | UNKNOWN Int deriving (Eq, Show, Read)
 
+-- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
+--
 rrDB :: [(TYPE, Int)]
 rrDB = [
     (A,      1)
@@ -46,7 +57,16 @@ rrDB = [
   , (SRV,   33)
   , (DNAME, 39) -- RFC 6672
   , (OPT,   41) -- RFC 6891
+  , (DS,    43) -- RFC 4034
+  , (RRSIG, 46) -- RFC 4034
+  , (NSEC,  47) -- RFC 4034
+  , (DNSKEY, 48) -- RFC 4034
+  , (NSEC3, 40) -- RFC 5155
+  , (NSEC3PARAM, 51) -- RFC 5155
   , (TLSA,  52) -- RFC 6698
+  , (CDS,   59) -- RFC 7344
+  , (CDNSKEY, 60) -- RFC 7344
+  , (CSYNC, 62) -- RFC 7477
   ]
 
 data OPTTYPE = ClientSubnet
