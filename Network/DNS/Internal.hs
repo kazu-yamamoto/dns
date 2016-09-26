@@ -162,7 +162,7 @@ data RCODE
   | NotImpl
   | Refused
   | BadOpt
-  deriving (Eq, Show, Enum, Bounded)
+  deriving (Eq, Ord, Show, Enum, Bounded)
 
 ----------------------------------------------------------------
 
@@ -207,7 +207,7 @@ data RData = RD_NS Domain
            | RD_OPT [OData]
            | RD_OTH ByteString
            | RD_TLSA Int Int Int ByteString
-    deriving (Eq)
+    deriving (Eq, Ord)
 
 instance Show RData where
   show (RD_NS dom) = BS.unpack dom
@@ -227,7 +227,7 @@ instance Show RData where
 
 data OData = OD_ClientSubnet Int Int IP
            | OD_Unknown Int ByteString
-    deriving (Eq,Show)
+    deriving (Eq,Show,Ord)
 
 ----------------------------------------------------------------
 
