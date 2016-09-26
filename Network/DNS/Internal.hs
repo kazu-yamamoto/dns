@@ -211,7 +211,7 @@ data RData = RD_NS Domain
 
 instance Show RData where
   show (RD_NS dom) = BS.unpack dom
-  show (RD_MX prf dom) = BS.unpack dom ++ " " ++ show prf
+  show (RD_MX prf dom) = show prf ++ " " ++ BS.unpack dom
   show (RD_CNAME dom) = BS.unpack dom
   show (RD_DNAME dom) = BS.unpack dom
   show (RD_A a) = show a
