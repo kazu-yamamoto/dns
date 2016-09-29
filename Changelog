@@ -1,3 +1,9 @@
+2.0.6
+	- Adding Ord instance. [#41](https://github.com/kazu-yamamoto/dns/pull/41)
+	- Adding DNSSEC-related RRTYPEs [#40](https://github.com/kazu-yamamoto/dns/pull/40)
+2.0.5
+	- Supporting DNS-SEC AD (authenticated data). [#38](https://github.com/kazu-yamamoto/dns/pull/38)
+	- Removing the dependency to blaze-builder.
 2.0.4
 	- Renaming a variable to fix preprocessor conflicts [#37](https://github.com/kazu-yamamoto/dns/pull/37)
 2.0.3
