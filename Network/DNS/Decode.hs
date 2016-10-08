@@ -196,8 +196,12 @@ decodeRData DNAME _ = RD_DNAME <$> decodeDomain
 decodeRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
     ignoreLength = BS.tail
-decodeRData A len  = (RD_A . toIPv4) <$> getNBytes len
-decodeRData AAAA len  = (RD_AAAA . toIPv6b) <$> getNBytes len
+decodeRData A len
+  | len < 4   = fail "IPv4 addresses must have at least 4 bytes"
+  | otherwise = (RD_A . toIPv4) <$> getNBytes len
+decodeRData AAAA len
+  | len < 16  = fail "IPv6 addresses must have at least 16 bytes"
+  | otherwise = (RD_AAAA . toIPv6b) <$> getNBytes len
 decodeRData SOA _ = RD_SOA <$> decodeDomain
                            <*> decodeDomain
                            <*> decodeSerial
