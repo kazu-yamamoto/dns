@@ -201,9 +201,12 @@ putByteStringWithLength bs = putInt8 (fromIntegral $ BS.length bs) -- put the le
 
 ----------------------------------------------------------------
 
+rootDomain :: Domain
+rootDomain = BS.pack "."
+
 encodeDomain :: Domain -> SPut
 encodeDomain dom
-    | BS.null dom = put8 0
+    | (BS.null dom || dom == rootDomain) = put8 0
     | otherwise = do
         mpos <- wsPop dom
         cur <- gets wsPosition

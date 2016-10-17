@@ -269,7 +269,7 @@ decodeDomain = do
     let n = getValue c
     -- Syntax hack to avoid using MultiWayIf
     case () of
-        _ | c == 0 -> return ""
+        _ | c == 0 -> return "." -- Perhaps the root domain?
         _ | isPointer c -> do
             d <- getInt8
             let offset = n * 256 + d
@@ -285,7 +285,10 @@ decodeDomain = do
         _ | otherwise -> do
             hs <- getNByteString n
             ds <- decodeDomain
-            let dom = hs `BS.append` "." `BS.append` ds
+            let dom =
+                    case ds of -- avoid trailing ".."
+                        "." -> hs `BS.append` "."
+                        _   -> hs `BS.append` "." `BS.append` ds
             push pos dom
             return dom
   where
