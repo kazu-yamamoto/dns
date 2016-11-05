@@ -373,8 +373,9 @@ lookupRDNS rlv ip = lookupPTR rlv dom
 
 ----------------------------------------------------------------
 
--- | Look up all \'SRV\' records for the given hostname. A SRV record
---   comprises four fields,
+-- | Look up all \'SRV\' records for the given hostname. SRV records
+--   consist (see <https://tools.ietf.org/html/rfc2782>) of the
+--   following four fields:
 --
 --     * Priority (lower is more-preferred)
 --
@@ -391,12 +392,18 @@ lookupRDNS rlv ip = lookupPTR rlv dom
 --
 --   Examples:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "_sip._tcp.cisco.com"
+--   >>> let q = Data.ByteString.Char8.pack "_xmpp-server._tcp.jabber.ietf.org"
 --   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupSRV resolver hostname
---   Right [(1,0,5060,"vcsgw.cisco.com.")]
---
+--   >>> withResolver rs $ \resolver -> lookupSRV resolver q
+--   Right [(5,0,5269,"jabber.ietf.org.")]
+
+-- Though the "jabber.ietf.orgs" SRV record may prove reasonably stable, as
+-- with anything else published in DNS it is subject to change.  Also, this
+-- example only works when connected to the Internet.  Perhaps the above
+-- example should be displayed in a format that is not recognized as a test
+-- by "doctest".
+
 lookupSRV :: Resolver -> Domain -> IO (Either DNSError [(Int,Int,Int,Domain)])
 lookupSRV rlv dom = do
   erds <- DNS.lookup rlv dom SRV
