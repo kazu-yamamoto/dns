@@ -28,8 +28,11 @@ import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.Internal
 import qualified Data.ByteString.Char8 as BS
-import Network.Socket (HostName, Socket, SocketType(Datagram), close, socket, connect)
-import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), PortNumber(..), defaultHints, getAddrInfo)
+import Network.Socket (HostName, Socket, SocketType(Stream, Datagram))
+import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..))
+import Network.Socket (Family(AF_INET, AF_INET6), PortNumber(..))
+import Network.Socket (close, socket, connect, getPeerName, getAddrInfo)
+import Network.Socket (defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, randomR)
 import System.Timeout (timeout)
@@ -267,9 +270,13 @@ lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookupAuth = lookupSection authority
 
 
--- | Look up a name and return the entire DNS Response. Sample output
---   is included below, however it is /not/ tested -- the sequence
---   number is unpredictable (it has to be!).
+-- | Look up a name and return the entire DNS Response.  If the
+--   initial UDP query elicits a truncated answer, the query is
+--   retried over TCP.  The TCP retry may extend the total time
+--   taken by one more timeout beyond timeout * tries.
+--
+--   Sample output is included below, however it is /not/ tested
+--   the sequence number is unpredictable (it has to be!).
 --
 --   The example code:
 --
@@ -310,10 +317,30 @@ lookupAuth = lookupSection authority
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
 lookupRaw = lookupRawInternal receive False
 
+-- | Same as lookupRaw, but the query sets the AD bit, which solicits the
+--   the authentication status in the server reply.  In most applications
+--   (other than diagnostic tools) that want authenticated data It is
+--   unwise to trust the AD bit in the responses of non-local servers, this
+--   interface should in most cases only be used with a loopback resolver.
+--
 lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
 lookupRawAD = lookupRawInternal receive True
 
-
+-- Lookup loop, we try UDP until we get a response.  If the response
+-- is truncated, we try TCP once, with no further UDP retries.
+-- EDNS0 support would significantly reduce the need for TCP retries.
+--
+-- For now, we optimize for low latency high-availability caches
+-- (e.g.  running on a loopback interface), where TCP is cheap
+-- enough.  We could attempt to complete the TCP lookup within the
+-- original time budget of the truncated UDP query, by wrapping both
+-- within a a single 'timeout' thereby staying within the original
+-- time budget, but it seems saner to give TCP a full opportunity to
+-- return results.  TCP latency after a truncated UDP reply will be
+-- atypical.
+--
+-- Future improvements might also include support for TCP on the
+-- initial query, and of course support for multiple nameservers.
 
 lookupRawInternal ::
     (Socket -> IO DNSMessage)
@@ -342,15 +369,37 @@ lookupRawInternal rcv ad rlv dom typ = do
               Nothing  -> loop query checkSeqno (cnt + 1) False
               Just res -> do
                   let valid = checkSeqno res
-                  if valid then
-                      return $ Right res
-                    else
-                      loop query checkSeqno (cnt + 1) False
+                  case valid of
+                      False  -> loop query checkSeqno (cnt + 1) False
+                      True | False <- trunCation $ flags $ header res
+                             -> return $ Right res
+                      _      -> tcpRetry query
     sock = dnsSock rlv
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
     q = makeQuestion dom typ
     check seqno res = identifier (header res) == seqno
+    tcpRetry query = do
+        peer <- getPeerName sock
+        bracket (tcpOpen peer)
+                (maybe (return ()) close)
+                (tcpLookup query peer)
+    tcpOpen peer = do
+        case (peer) of
+            SockAddrInet _ _ ->
+                socket AF_INET Stream defaultProtocol >>= return . Just
+            SockAddrInet6 _ _ _ _ ->
+                socket AF_INET6 Stream defaultProtocol >>= return . Just
+            _ -> return Nothing -- Only IPv4 and IPv6 are possible
+    tcpLookup _ _ Nothing = return $ Left ServerFailure -- can't happen
+    tcpLookup query peer (Just vc) = do
+        response <- timeout tm $ do
+            connect vc $ peer
+            sendAll vc $ encodeVC query
+            receiveVC vc
+        case response of
+            Nothing  -> return $ Left TimeoutExpired
+            Just res -> return $ Right res
 
 #if mingw32_HOST_OS == 1
     -- Windows does not support sendAll in Network.ByteString.Lazy.

@@ -4,6 +4,7 @@ module Network.DNS.Decode (
     decode
   , decodeMany
   , receive
+  , receiveVC
   ) where
 
 import Control.Applicative (many)
@@ -15,8 +16,9 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BL
-import Data.Conduit (($$), Source)
+import Data.Conduit (($$), ($$+), ($$+-), (=$), Source)
 import Data.Conduit.Network (sourceSocket)
+import qualified Data.Conduit.Binary as CB
 import Data.IP (IP(..), toIPv4, toIPv6b)
 import Data.Typeable (Typeable)
 import Data.Word (Word16)
@@ -42,6 +44,19 @@ instance ControlException.Exception RDATAParseError
 
 receive :: Socket -> IO DNSMessage
 receive = receiveDNSFormat . sourceSocket
+
+-- | Receive and parse a single virtual-circuit (TCP) response.  It
+--   is up to the caller to implement any desired timeout.  This
+--   (and the other response decoding functions) may throw ParseError
+--   when the server response is incomplete or malformed.
+
+receiveVC :: Socket -> IO DNSMessage
+receiveVC sock = runResourceT $ do
+    (src, lenbytes) <- sourceSocket sock $$+ CB.take 2
+    let len = case (map fromIntegral $ BL.unpack lenbytes) of
+                hi:lo:[] -> 256 * hi + lo
+                _        -> 0
+    src $$+- CB.isolate len =$ sinkSGet decodeResponse >>= return . fst
 
 ----------------------------------------------------------------
 
