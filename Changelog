@@ -1,3 +1,5 @@
+2.0.9
+	- Implemented TCP fallback after a truncated UDP response. [#46](https://github.com/kazu-yamamoto/dns/pull/46)
 2.0.8
 	- Better handling of encoding and decoding the "root" domain ".". [#45](https://github.com/kazu-yamamoto/dns/pull/45)
 2.0.7
