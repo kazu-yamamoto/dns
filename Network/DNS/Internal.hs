@@ -16,6 +16,9 @@ import Data.Typeable (Typeable)
 -- | Type for domain.
 type Domain = ByteString
 
+-- | Return type of composeQuery from Encode, needed in Resolver
+type Query = L.ByteString
+
 ----------------------------------------------------------------
 
 -- | Types for resource records.
