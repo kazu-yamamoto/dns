@@ -115,9 +115,8 @@ data DNSError =
     -- | The name server was unable to process this query due to a
     --   problem with the name server.
   | ServerFailure
-    -- | Meaningful only for responses from an authoritative name
-    -- server, this code signifies that the
-    -- domain name referenced in the query does not exist.
+    -- | This code signifies that the domain name referenced in the
+    --   query does not exist.
   | NameError
     -- | The name server does not support the requested kind of query.
   | NotImplemented

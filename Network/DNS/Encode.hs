@@ -2,6 +2,7 @@
 
 module Network.DNS.Encode (
     encode
+  , encodeVC
   , composeQuery
   , composeQueryAD
   ) where
@@ -60,6 +61,11 @@ composeQueryAD idt qs = encode qry
 
 encode :: DNSMessage -> ByteString
 encode msg = runSPut (encodeDNSMessage msg)
+
+encodeVC :: ByteString -> ByteString
+encodeVC query =
+    let len = BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BL.length query
+    in len <> query
 
 ----------------------------------------------------------------
 
