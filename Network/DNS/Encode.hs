@@ -176,9 +176,9 @@ encodeRDATA rd = case rd of
         , encodeDomain dom
         ]
     (RD_TLSA u s m d) -> mconcat
-        [ putInt8 u
-        , putInt8 s
-        , putInt8 m
+        [ put8 u
+        , put8 s
+        , put8 m
         , putByteString d
         ]
 

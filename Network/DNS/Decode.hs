@@ -256,9 +256,9 @@ decodeRData TLSA len = RD_TLSA <$> decodeUsage
                                <*> decodeMType
                                <*> decodeADF
   where
-    decodeUsage    = getInt8
-    decodeSelector = getInt8
-    decodeMType    = getInt8
+    decodeUsage    = get8
+    decodeSelector = get8
+    decodeMType    = get8
     decodeADF      = getNByteString (len - 3)
 decodeRData _  len = RD_OTH <$> getNByteString len
 

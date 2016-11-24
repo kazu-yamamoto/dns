@@ -371,35 +371,73 @@ lookupRawInternal rcv ad rlv dom typ = do
                   let valid = checkSeqno res
                   case valid of
                       False  -> loop query checkSeqno (cnt + 1) False
-                      True | False <- trunCation $ flags $ header res
+                      True | not $ trunCation $ flags $ header res
                              -> return $ Right res
-                      _      -> tcpRetry query
+                      _      -> tcpRetry query sock tm
     sock = dnsSock rlv
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
     q = makeQuestion dom typ
     check seqno res = identifier (header res) == seqno
-    tcpRetry query = do
-        peer <- getPeerName sock
-        bracket (tcpOpen peer)
-                (maybe (return ()) close)
-                (tcpLookup query peer)
-    tcpOpen peer = do
-        case (peer) of
-            SockAddrInet _ _ ->
-                socket AF_INET Stream defaultProtocol >>= return . Just
-            SockAddrInet6 _ _ _ _ ->
-                socket AF_INET6 Stream defaultProtocol >>= return . Just
-            _ -> return Nothing -- Only IPv4 and IPv6 are possible
-    tcpLookup _ _ Nothing = return $ Left ServerFailure -- can't happen
-    tcpLookup query peer (Just vc) = do
-        response <- timeout tm $ do
-            connect vc $ peer
-            sendAll vc $ encodeVC query
-            receiveVC vc
-        case response of
-            Nothing  -> return $ Left TimeoutExpired
-            Just res -> return $ Right res
+
+-- Create a TCP socket `just like` our UDP socket and retry the same
+-- query over TCP.  Since TCP is a reliable transport, and we just
+-- got a (truncated) reply from the server over UDP (so it has the
+-- answer, but it is just too large for UDP), we expect to succeed
+-- quickly on the first try.  There will be no further retries.
+
+tcpRetry ::
+    Query
+    -> Socket
+    -> Int
+    -> IO (Either DNSError DNSMessage)
+tcpRetry query sock tm = do
+    peer <- getPeerName sock
+    bracket (tcpOpen peer)
+            (maybe (return ()) close)
+            (tcpLookup query peer tm)
+
+-- Create a TCP socket with the given socket address (taken from a
+-- corresponding UDP socket).  This might throw an I/O Exception
+-- if we run out of file descriptors.  Should this use tryIOError,
+-- and return "Nothing" also in that case?  If so, perhaps similar
+-- code is needed in openSocket, but that has to wait until we
+-- refactor `withResolver` to not do "early" socket allocation, and
+-- instead allocate a fresh UDP socket for each `lookupRawInternal`
+-- invocation.  It would be bad to fail an entire `withResolver`
+-- action, if the socket shortage is transient, and the user intends
+-- to make many DNS queries with the same resolver handle.
+
+tcpOpen :: SockAddr -> IO (Maybe Socket)
+tcpOpen peer = do
+    case (peer) of
+        SockAddrInet _ _ ->
+            socket AF_INET Stream defaultProtocol >>= return . Just
+        SockAddrInet6 _ _ _ _ ->
+            socket AF_INET6 Stream defaultProtocol >>= return . Just
+        _ -> return Nothing -- Only IPv4 and IPv6 are possible
+
+-- Perform a DNS query over TCP, if we were successful in creating
+-- the TCP socket.  The socket creation can only fail if we run out
+-- of file descriptors, we're not making connections here.  Failure
+-- is reported as "server" failure, though it is really our stub
+-- resolver that's failing.  This is likely good enough.
+
+tcpLookup ::
+    Query
+    -> SockAddr
+    -> Int
+    -> Maybe Socket
+    -> IO (Either DNSError DNSMessage)
+tcpLookup _ _ _ Nothing = return $ Left ServerFailure
+tcpLookup query peer tm (Just vc) = do
+    response <- timeout tm $ do
+        connect vc $ peer
+        sendAll vc $ encodeVC query
+        receiveVC vc
+    case response of
+        Nothing  -> return $ Left TimeoutExpired
+        Just res -> return $ Right res
 
 #if mingw32_HOST_OS == 1
     -- Windows does not support sendAll in Network.ByteString.Lazy.
