@@ -1,3 +1,5 @@
+2.0.10
+	- Cleaning up the code. [#47](https://github.com/kazu-yamamoto/dns/pull/47)
 2.0.9
 	- Implemented TCP fallback after a truncated UDP response. [#46](https://github.com/kazu-yamamoto/dns/pull/46)
 2.0.8
