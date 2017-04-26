@@ -30,6 +30,7 @@ Library
                       , attoparsec
                       , binary
                       , bytestring
+                      , bytestring-builder
                       , conduit >= 1.1
                       , conduit-extra >= 1.1
                       , containers
@@ -44,6 +45,7 @@ Library
                       , attoparsec
                       , binary
                       , bytestring
+                      , bytestring-builder
                       , conduit >= 1.1
                       , conduit-extra >= 1.1
                       , containers

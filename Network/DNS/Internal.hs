@@ -4,6 +4,9 @@ module Network.DNS.Internal where
 
 import Control.Exception (Exception)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Builder as L
+import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
@@ -224,11 +227,30 @@ data RData = RD_NS Domain
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
            | RD_DS Word16 Word8 Word8 ByteString
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
 
 data OData = OD_ClientSubnet Word8 Word8 IP
            | OD_Unknown Int ByteString
     deriving (Eq,Show,Ord)
+
+instance Show RData where
+  show (RD_NS dom) = BS.unpack dom
+  show (RD_MX prf dom) = show prf ++ " " ++ BS.unpack dom
+  show (RD_CNAME dom) = BS.unpack dom
+  show (RD_DNAME dom) = BS.unpack dom
+  show (RD_A a) = show a
+  show (RD_AAAA aaaa) = show aaaa
+  show (RD_TXT txt) = BS.unpack txt
+  show (RD_SOA mn _ _ _ _ _ mi) = BS.unpack mn ++ " " ++ show mi
+  show (RD_PTR dom) = BS.unpack dom
+  show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
+  show (RD_OPT od) = show od
+  show (RD_OTH is) = show is
+  show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ hexencode dgst
+  show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ hexencode dv
+
+hexencode :: ByteString -> String
+hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
 
 ----------------------------------------------------------------
 
