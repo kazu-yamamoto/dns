@@ -181,6 +181,12 @@ encodeRDATA rd = case rd of
         , put8 m
         , putByteString d
         ]
+    (RD_DS t a dt dv) -> mconcat
+        [ put16 t
+        , put8 a
+        , put8 dt
+        , putByteString dv
+        ]
 
 encodeOData :: OData -> SPut
 encodeOData (OD_ClientSubnet srcNet scpNet ip) = let dropZeroes = dropWhileEnd (==0)
