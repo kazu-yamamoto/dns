@@ -10,7 +10,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
-import Data.Word (Word8)
+import Data.Word (Word8, Word16)
 
 ----------------------------------------------------------------
 
@@ -230,6 +230,7 @@ data RData = RD_NS Domain
            | RD_OPT [OData]
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
+           | RD_DS Word16 Word8 Word8 ByteString
     deriving (Eq, Ord)
 
 instance Show RData where
@@ -246,6 +247,7 @@ instance Show RData where
   show (RD_OPT od) = show od
   show (RD_OTH is) = show is
   show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ (BS.unpack $ L.toStrict . L.toLazyByteString . L.byteStringHex $ dgst)
+  show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ (BS.unpack $ L.toStrict . L.toLazyByteString . L.byteStringHex $ dv)
 
 
 data OData = OD_ClientSubnet Int Int IP

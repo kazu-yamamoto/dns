@@ -260,6 +260,17 @@ decodeRData TLSA len = RD_TLSA <$> decodeUsage
     decodeSelector = get8
     decodeMType    = get8
     decodeADF      = getNByteString (len - 3)
+--
+decodeRData DS len = RD_DS <$> decodeTag
+                           <*> decodeAlg
+                           <*> decodeDtyp
+                           <*> decodeDval
+  where
+    decodeTag  = get16
+    decodeAlg  = get8
+    decodeDtyp = get8
+    decodeDval = getNByteString (len - 4)
+--
 decodeRData _  len = RD_OTH <$> getNByteString len
 
 decodeOData :: OPTTYPE -> Int -> SGet OData
