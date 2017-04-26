@@ -4,6 +4,7 @@ module Network.DNS.Internal where
 
 import Control.Exception (Exception)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Base64 as B64 (encode)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
@@ -227,6 +228,7 @@ data RData = RD_NS Domain
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
            | RD_DS Word16 Word8 Word8 ByteString
+           | RD_DNSKEY Word16 Word8 Word8 ByteString
     deriving (Eq, Ord)
 
 data OData = OD_ClientSubnet Word8 Word8 IP
@@ -248,9 +250,13 @@ instance Show RData where
   show (RD_OTH is) = show is
   show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ hexencode dgst
   show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ hexencode dv
+  show (RD_DNSKEY f p a k) = show f ++ " " ++ show p ++ " " ++ show a ++ " " ++ b64encode k
 
 hexencode :: ByteString -> String
 hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
+
+b64encode :: ByteString -> String
+b64encode = BS.unpack . B64.encode
 
 ----------------------------------------------------------------
 

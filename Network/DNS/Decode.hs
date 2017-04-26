@@ -271,6 +271,16 @@ getRData DS len = RD_DS <$> decodeTag
     decodeDtyp = get8
     decodeDval = getNByteString (len - 4)
 --
+getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
+                                <*> decodeKeyProto
+                                <*> decodeKeyAlg
+                                <*> decodeKeyBytes
+  where
+    decodeKeyFlags  = get16
+    decodeKeyProto  = get8
+    decodeKeyAlg    = get8
+    decodeKeyBytes  = getNByteString (len - 4)
+--
 getRData _  len = RD_OTH <$> getNByteString len
 
 getOData :: OPTTYPE -> Int -> SGet OData
