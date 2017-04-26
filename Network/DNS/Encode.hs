@@ -205,6 +205,12 @@ putRData rd = case rd of
         , put8 dt
         , putByteString dv
         ]
+    (RD_DNSKEY f p a k) -> mconcat
+        [ put16 f
+        , put8 p
+        , put8 a
+        , putByteString k
+        ]
 
 putOData :: OData -> SPut
 putOData (OD_ClientSubnet srcNet scpNet ip) =
