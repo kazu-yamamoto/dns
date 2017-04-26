@@ -257,6 +257,15 @@ getRData DS len = RD_DS <$> decodeTag
     decodeDval = getNByteString (len - 4)
 --
 getRData NULL len = const RD_NULL <$> getNByteString len
+getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
+                                <*> decodeKeyProto
+                                <*> decodeKeyAlg
+                                <*> decodeKeyBytes
+  where
+    decodeKeyFlags  = get16
+    decodeKeyProto  = get8
+    decodeKeyAlg    = get8
+    decodeKeyBytes  = getNByteString (len - 4)
 --
 getRData _  len = RD_OTH <$> getNByteString len
 

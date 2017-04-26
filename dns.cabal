@@ -29,6 +29,7 @@ Library
   if impl(ghc >= 7)
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
+                      , base64-bytestring
                       , binary
                       , bytestring
                       , bytestring-builder
@@ -44,6 +45,7 @@ Library
   else
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
+                      , base64-bytestring
                       , binary
                       , bytestring
                       , bytestring-builder
