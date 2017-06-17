@@ -29,7 +29,7 @@ import Data.Monoid (mconcat)
 
 -- | Composing query. First argument is a number to identify response.
 
-composeQuery :: Int -> [Question] -> ByteString
+composeQuery :: Word16 -> [Question] -> ByteString
 composeQuery idt qs = encode qry
   where
     hdr = header defaultQuery
@@ -40,7 +40,7 @@ composeQuery idt qs = encode qry
       , question = qs
       }
 
-composeQueryAD :: Int -> [Question] -> ByteString
+composeQueryAD :: Word16 -> [Question] -> ByteString
 composeQueryAD idt qs = encode qry
   where
       hdr = header defaultQuery
@@ -92,7 +92,7 @@ encodeHeader :: DNSHeader -> SPut
 encodeHeader hdr = encodeIdentifier (identifier hdr)
                 <> encodeFlags (flags hdr)
   where
-    encodeIdentifier = putInt16
+    encodeIdentifier = put16
 
 encodeFlags :: DNSFlags -> SPut
 encodeFlags DNSFlags{..} = put16 word

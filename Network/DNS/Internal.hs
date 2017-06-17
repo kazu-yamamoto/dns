@@ -151,7 +151,7 @@ type DNSFormat = DNSMessage
 
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
-    identifier :: Int
+    identifier :: Word16
   , flags      :: DNSFlags
   } deriving (Eq, Show)
 
@@ -292,7 +292,7 @@ defaultResponse =
         }
       }
 
-responseA :: Int -> Question -> [IPv4] -> DNSMessage
+responseA :: Word16 -> Question -> [IPv4] -> DNSMessage
 responseA ident q ips =
   let hd = header defaultResponse
       dom = qname q
@@ -303,7 +303,7 @@ responseA ident q ips =
         , answer = an
       }
 
-responseAAAA :: Int -> Question -> [IPv6] -> DNSMessage
+responseAAAA :: Word16 -> Question -> [IPv6] -> DNSMessage
 responseAAAA ident q ips =
   let hd = header defaultResponse
       dom = qname q
