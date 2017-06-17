@@ -34,9 +34,9 @@ import Network.Socket (Family(AF_INET, AF_INET6), PortNumber(..))
 import Network.Socket (close, socket, connect, getPeerName, getAddrInfo)
 import Network.Socket (defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
-import System.Random (getStdRandom, randomR)
+import System.Random (getStdRandom, random)
 import System.Timeout (timeout)
-
+import Data.Word (Word16)
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>), (<*>), pure)
 #endif
@@ -115,7 +115,7 @@ data ResolvSeed = ResolvSeed {
 -- | Abstract data type of DNS Resolver
 --   When implementing a DNS cache, this MUST NOT be re-used.
 data Resolver = Resolver {
-    genId   :: IO Int
+    genId   :: IO Word16
   , dnsSock :: Socket
   , dnsTimeout :: Int
   , dnsRetry :: Int
@@ -206,8 +206,8 @@ makeResolver seed sock = Resolver {
   , dnsBufsize = rsBufsize seed
   }
 
-getRandom :: IO Int
-getRandom = getStdRandom (randomR (0,65535))
+getRandom :: IO Word16
+getRandom = getStdRandom random
 
 ----------------------------------------------------------------
 

@@ -140,7 +140,7 @@ decodeHeader = do
              ,arCount
              )
   where
-    decodeIdentifier = getInt16
+    decodeIdentifier = get16
     decodeQdCount = getInt16
     decodeAnCount = getInt16
     decodeNsCount = getInt16
