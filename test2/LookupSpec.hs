@@ -6,13 +6,46 @@ import Network.DNS as DNS
 import Test.Hspec
 
 spec :: Spec
-spec = do
+spec = describe "lookup" $ do
 
-    describe "lookupAAAA" $ do
-        it "gets IPv6 addresses" $ do
-            rs <- makeResolvSeed defaultResolvConf
-            withResolver rs $ \resolver -> do
-                DNS.lookupAAAA resolver "mew.org"
-                    `shouldReturn`
-                    Right []
+    it "lookupA" $ do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \resolver -> do
+            addrs <- DNS.lookupA resolver "mew.org"
+            -- mew.org has one or more IPv6 addresses
+            fmap null addrs `shouldBe` Right False
 
+    it "lookupAAAA" $ do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \resolver -> do
+            -- google.com has one or more IPv6 addresses
+            addrs <- DNS.lookupAAAA resolver "google.com"
+            fmap null addrs `shouldBe` Right False
+
+    it "lookupAAAA with emty result" $ do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \resolver -> do
+            addrs <- DNS.lookupAAAA resolver "mew.org"
+            -- mew.org does not have any IPv6 addresses
+            fmap null addrs `shouldBe` Right True
+
+    it "lookupMX" $ do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \resolver -> do
+            addrs <- DNS.lookupMX resolver "mew.org"
+            -- mew.org has one or more MX records.
+            fmap null addrs `shouldBe` Right False
+
+    it "lookupTXT" $ do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \resolver -> do
+            addrs <- DNS.lookupTXT resolver "mew.org"
+            -- mew.org has one or more TXT records.
+            fmap null addrs `shouldBe` Right False
+
+    it "lookupNS" $ do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \resolver -> do
+            addrs <- DNS.lookupNS resolver "mew.org"
+            -- mew.org has one or more NS records.
+            fmap null addrs `shouldBe` Right False
