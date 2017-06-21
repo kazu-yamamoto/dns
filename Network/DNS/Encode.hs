@@ -132,21 +132,21 @@ putRData rd = do
     return rlenBuilder <> return rDataBuilder
 
 putRR :: ResourceRecord -> SPut
-putRR ResourceRecord{..} = mconcat [ putDomain rrname
-                                      , putInt16 (typeToInt rrtype)
-                                      , put16 1
-                                      , putInt32 rrttl
-                                      , putRData rdata
-                                      ]
+putRR (ResourceRecord rrname rrtype rrttl rdata) =
+    mconcat [ putDomain rrname
+            , putInt16 (typeToInt rrtype)
+            , put16 1
+            , putInt32 rrttl
+            , putRData rdata
+            ]
 
-putRR OptRecord{..} = mconcat [ putDomain BS.empty
-                                 , putInt16 (typeToInt OPT)
-                                 , putInt16 orudpsize
-                                 , putInt32 $ if ordnssecok
-                                              then setBit 0 15
-                                              else 0
-                                 , putRData rdata
-                                 ]
+putRR (OptRecord orudpsize ordnssecok _orversion rdata) =
+    mconcat [ putDomain BS.empty
+            , putInt16 (typeToInt OPT)
+            , putInt16 orudpsize
+            , putInt32 $ if ordnssecok then setBit 0 15 else 0
+            , putRData rdata
+            ]
 
 putRDATA :: RData -> SPut
 putRDATA rd = case rd of

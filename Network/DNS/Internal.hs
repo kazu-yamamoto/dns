@@ -202,19 +202,14 @@ makeQuestion = Question
 ----------------------------------------------------------------
 
 -- | Raw data format for resource records.
-data ResourceRecord = ResourceRecord {
-                            rrname :: Domain
-                          , rrtype :: TYPE
-                          , rrttl  :: Int
-                          , rdata  :: RData
-                          }
-                    | OptRecord {
-                            orudpsize   :: Int
-                          , ordnssecok  :: Bool
-                          , orversion   :: Int
-                          , rdata       :: RData
-                          }
-                    deriving (Eq,Show)
+data ResourceRecord
+    = ResourceRecord Domain TYPE Int RData
+    | OptRecord Int Bool Int RData
+    deriving (Eq,Show)
+
+getRdata :: ResourceRecord -> RData
+getRdata (ResourceRecord _ _ _ rdata) = rdata
+getRdata (OptRecord _ _ _ rdata) = rdata
 
 -- | Raw data format for each type.
 data RData = RD_NS Domain

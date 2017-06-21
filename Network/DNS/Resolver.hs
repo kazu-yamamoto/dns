@@ -231,8 +231,9 @@ lookupSection section rlv dom typ = do
     dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
     correct r = rrname r == dom' && rrtype r == typ
     -}
-    correct r = rrtype r == typ
-    toRData = map rdata . filter correct . section
+    correct (ResourceRecord _ rrtype _ _) = rrtype == typ
+    correct (OptRecord _ _ _ _) = False
+    toRData x = map getRdata . filter correct $ section x
 
 -- | Extract necessary information from 'DNSMessage'
 fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
