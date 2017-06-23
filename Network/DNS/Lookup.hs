@@ -73,6 +73,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.IP (IPv4, IPv6)
 import Network.DNS.Resolver as DNS
 import Network.DNS.Types
+import Data.Word (Word16)
 
 ----------------------------------------------------------------
 
@@ -167,7 +168,7 @@ lookupMX rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError (Domain,Int)
-    unTag (RD_MX pr dm) = Right (dm,pr)
+    unTag (RD_MX pr dm) = Right (dm, fromIntegral pr)
     unTag _ = Left UnexpectedRDATA
 
 -- | Look up all \'MX\' records for the given hostname, and then
@@ -404,7 +405,7 @@ lookupRDNS rlv ip = lookupPTR rlv dom
 -- example should be displayed in a format that is not recognized as a test
 -- by "doctest".
 
-lookupSRV :: Resolver -> Domain -> IO (Either DNSError [(Int,Int,Int,Domain)])
+lookupSRV :: Resolver -> Domain -> IO (Either DNSError [(Word16, Word16, Word16, Domain)])
 lookupSRV rlv dom = do
   erds <- DNS.lookup rlv dom SRV
   case erds of
@@ -412,6 +413,6 @@ lookupSRV rlv dom = do
     Left err  -> return (Left err)
     Right rds -> return $ mapM unTag rds
   where
-    unTag :: RData -> Either DNSError (Int,Int,Int,Domain)
+    unTag :: RData -> Either DNSError (Word16, Word16, Word16, Domain)
     unTag (RD_SRV pri wei prt dm) = Right (pri,wei,prt,dm)
     unTag _ = Left UnexpectedRDATA

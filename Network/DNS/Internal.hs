@@ -10,7 +10,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
-import Data.Word (Word8, Word16)
+import Data.Word (Word8, Word16, Word32)
 
 ----------------------------------------------------------------
 
@@ -44,11 +44,12 @@ data TYPE = A
           | CDS
           | CDNSKEY
           | CSYNC
-          | UNKNOWN Int deriving (Eq, Show, Read)
+          | UNKNOWN Word16
+          deriving (Eq, Show, Read)
 
 -- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 --
-rrDB :: [(TYPE, Int)]
+rrDB :: [(TYPE, Word16)]
 rrDB = [
     (A,      1)
   , (NS,     2)
@@ -88,9 +89,9 @@ rookup  key ((x,y):xys)
   | key == y          =  Just x
   | otherwise         =  rookup key xys
 
-intToType :: Int -> TYPE
+intToType :: Word16 -> TYPE
 intToType n = fromMaybe (UNKNOWN n) $ rookup n rrDB
-typeToInt :: TYPE -> Int
+typeToInt :: TYPE -> Word16
 typeToInt (UNKNOWN x)  = x
 typeToInt t = fromMaybe (error "typeToInt") $ lookup t rrDB
 
@@ -169,7 +170,7 @@ data DNSFlags = DNSFlags {
 
 ----------------------------------------------------------------
 
-data QorR = QR_Query | QR_Response deriving (Eq, Show)
+data QorR = QR_Query | QR_Response deriving (Eq, Show, Enum, Bounded)
 
 data OPCODE
   = OP_STD
@@ -203,8 +204,8 @@ makeQuestion = Question
 
 -- | Raw data format for resource records.
 data ResourceRecord
-    = ResourceRecord Domain TYPE Int RData
-    | OptRecord Int Bool Int RData
+    = ResourceRecord Domain TYPE Word32 RData
+    | OptRecord Word16 Bool Word8 RData
     deriving (Eq,Show)
 
 getRdata :: ResourceRecord -> RData
@@ -215,13 +216,13 @@ getRdata (OptRecord _ _ _ rdata) = rdata
 data RData = RD_NS Domain
            | RD_CNAME Domain
            | RD_DNAME Domain
-           | RD_MX Int Domain
+           | RD_MX Word16 Domain
            | RD_PTR Domain
-           | RD_SOA Domain Domain Int Int Int Int Int
+           | RD_SOA Domain Domain Word32 Word32 Word32 Word32 Word32
            | RD_A IPv4
            | RD_AAAA IPv6
            | RD_TXT ByteString
-           | RD_SRV Int Int Int Domain
+           | RD_SRV Word16 Word16 Word16 Domain
            | RD_OPT [OData]
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
@@ -245,7 +246,7 @@ instance Show RData where
   show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ (BS.unpack $ L.toStrict . L.toLazyByteString . L.byteStringHex $ dv)
 
 
-data OData = OD_ClientSubnet Int Int IP
+data OData = OD_ClientSubnet Word8 Word8 IP
            | OD_Unknown Int ByteString
     deriving (Eq,Show,Ord)
 

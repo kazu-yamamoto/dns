@@ -2,6 +2,10 @@
 
 module Network.DNS.Decode (
     decode
+  , decodeDomain
+  , decodeDNSFlags
+  , decodeDNSHeader
+  , decodeResourceRecord
   , decodeMany
   , receive
   , receiveVC
@@ -25,6 +29,7 @@ import Data.Word (Word16)
 import Network (Socket)
 import Network.DNS.Internal
 import Network.DNS.StateBinary
+import Numeric (showHex)
 import qualified Safe
 
 #if __GLASGOW_HASKELL__ < 709
@@ -53,10 +58,10 @@ receive = receiveDNSFormat . sourceSocket
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = runResourceT $ do
     (src, lenbytes) <- sourceSocket sock $$+ CB.take 2
-    let len = case (map fromIntegral $ BL.unpack lenbytes) of
-                hi:lo:[] -> 256 * hi + lo
+    let len = case map fromIntegral $ BL.unpack lenbytes of
+                [hi, lo] -> 256 * hi + lo
                 _        -> 0
-    src $$+- CB.isolate len =$ sinkSGet getResponse >>= return . fst
+    fmap fst (src $$+- CB.isolate len =$ sinkSGet getResponse)
 
 ----------------------------------------------------------------
 
@@ -79,6 +84,18 @@ decodeMany bs = do
       len <- getInt16
       fmap BL.fromStrict (getNByteString len)
 
+decodeDNSFlags :: BL.ByteString -> Either String DNSFlags
+decodeDNSFlags bs = fst <$> runSGet getDNSFlags bs
+
+decodeDNSHeader :: BL.ByteString -> Either String DNSHeader
+decodeDNSHeader bs = fst <$> runSGet getHeader bs
+
+decodeDomain :: BL.ByteString -> Either String Domain
+decodeDomain bs = fst <$> runSGet getDomain bs
+
+decodeResourceRecord :: BL.ByteString -> Either String ResourceRecord
+decodeResourceRecord bs = fst <$> runSGet getResourceRecord bs
+
 ----------------------------------------------------------------
 receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO DNSMessage
 receiveDNSFormat src = fst <$> runResourceT (src $$ sink)
@@ -89,30 +106,34 @@ receiveDNSFormat src = fst <$> runResourceT (src $$ sink)
 
 getResponse :: SGet DNSMessage
 getResponse = do
-    (hd,qdCount,anCount,nsCount,arCount) <- getHeader
+    hd <- getHeader
+    qdCount <- getInt16
+    anCount <- getInt16
+    nsCount <- getInt16
+    arCount <- getInt16
     DNSMessage hd <$> getQueries qdCount
-                  <*> getRRs anCount
-                  <*> getRRs nsCount
-                  <*> getRRs arCount
+                  <*> getResourceRecords anCount
+                  <*> getResourceRecords nsCount
+                  <*> getResourceRecords arCount
 
 ----------------------------------------------------------------
 
-getFlags :: SGet DNSFlags
-getFlags = do
+getDNSFlags :: SGet DNSFlags
+getDNSFlags = do
     word <- get16
-    maybe (fail "Unsupported flags") pure (toFlags word)
+    maybe (fail $ "Unsupported flags: 0x" ++ showHex word "") pure (toFlags word)
   where
     toFlags :: Word16 -> Maybe DNSFlags
     toFlags flgs = do
-      opcode_ <- getOpcode flgs
-      rcode_ <- getRcode flgs
+      oc <- getOpcode flgs
+      rc <- getRcode flgs
       return $ DNSFlags (getQorR flgs)
-                        opcode_
+                        oc
                         (getAuthAnswer flgs)
                         (getTrunCation flgs)
                         (getRecDesired flgs)
                         (getRecAvailable flgs)
-                        rcode_
+                        rc
                         (getAuthenData flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
     getOpcode w = Safe.toEnumMay (fromIntegral (shiftR w 11 .&. 0x0f))
@@ -125,26 +146,11 @@ getFlags = do
 
 ----------------------------------------------------------------
 
-getHeader :: SGet (DNSHeader,Int,Int,Int,Int)
-getHeader = do
-        hd <- DNSHeader <$> decodeIdentifier
-                        <*> getFlags
-        qdCount <- decodeQdCount
-        anCount <- decodeAnCount
-        nsCount <- decodeNsCount
-        arCount <- decodeArCount
-        pure (hd
-             ,qdCount
-             ,anCount
-             ,nsCount
-             ,arCount
-             )
+getHeader :: SGet DNSHeader
+getHeader =
+    DNSHeader <$> decodeIdentifier <*> getDNSFlags
   where
     decodeIdentifier = get16
-    decodeQdCount = getInt16
-    decodeAnCount = getInt16
-    decodeNsCount = getInt16
-    decodeArCount = getInt16
 
 ----------------------------------------------------------------
 
@@ -152,7 +158,7 @@ getQueries :: Int -> SGet [Question]
 getQueries n = replicateM n getQuery
 
 getTYPE :: SGet TYPE
-getTYPE = intToType <$> getInt16
+getTYPE = intToType <$> get16
 
 getOptType :: SGet OPTTYPE
 getOptType = intToOptType <$> getInt16
@@ -162,43 +168,43 @@ getQuery = Question <$> getDomain
                        <*> getTYPE
                        <*  ignoreClass
 
-getRRs :: Int -> SGet [ResourceRecord]
-getRRs n = replicateM n getRR
+getResourceRecords :: Int -> SGet [ResourceRecord]
+getResourceRecords n = replicateM n getResourceRecord
 
-getRR :: SGet ResourceRecord
-getRR = do
+getResourceRecord :: SGet ResourceRecord
+getResourceRecord = do
     dom <- getDomain
     typ <- getTYPE
-    getRR' dom typ
+    getRR dom typ
   where
-    getRR' _ OPT = do
-        udps <- decodeUDPSize
-        _ <- decodeERCode
-        ver <- decodeOPTVer
-        dok <- decodeDNSOK
-        len <- decodeRLen
+    getRR _ OPT = do
+        udps <- decodeUDPSize -- 16
+        _ <- decodeERCode    -- 8
+        ver <- decodeOPTVer  -- 8
+        dok <- decodeDNSOK   -- 16
+        len <- decodeRLen    -- 16
         dat <- getRData OPT len
         return $ OptRecord udps dok ver dat
 
-    getRR' dom t = do
+    getRR dom t = do
         ignoreClass
         ttl <- decodeTTL
         len <- decodeRLen
         dat <- getRData t len
         return $ ResourceRecord dom t ttl dat
 
-    decodeUDPSize = fromIntegral <$> getInt16
-    decodeERCode = getInt8
-    decodeOPTVer = fromIntegral <$> getInt8
-    decodeDNSOK = flip testBit 15 <$> getInt16
-    decodeTTL = fromIntegral <$> get32
+    decodeUDPSize = get16
+    decodeERCode = get8
+    decodeOPTVer = get8
+    decodeDNSOK = flip testBit 15 <$> get16
+    decodeTTL = get32
     decodeRLen = getInt16
 
 getRData :: TYPE -> Int -> SGet RData
 getRData NS _ = RD_NS <$> getDomain
 getRData MX _ = RD_MX <$> decodePreference <*> getDomain
   where
-    decodePreference = getInt16
+    decodePreference = get16
 getRData CNAME _ = RD_CNAME <$> getDomain
 getRData DNAME _ = RD_DNAME <$> getDomain
 getRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
@@ -218,25 +224,25 @@ getRData SOA _ = RD_SOA <$> getDomain
                            <*> decodeExpire
                            <*> decodeMinumun
   where
-    decodeSerial  = getInt32
-    decodeRefesh  = getInt32
-    decodeRetry   = getInt32
-    decodeExpire  = getInt32
-    decodeMinumun = getInt32
+    decodeSerial  = get32
+    decodeRefesh  = get32
+    decodeRetry   = get32
+    decodeExpire  = get32
+    decodeMinumun = get32
 getRData PTR _ = RD_PTR <$> getDomain
 getRData SRV _ = RD_SRV <$> decodePriority
                            <*> decodeWeight
                            <*> decodePort
                            <*> getDomain
   where
-    decodePriority = getInt16
-    decodeWeight   = getInt16
-    decodePort     = getInt16
+    decodePriority = get16
+    decodeWeight   = get16
+    decodePort     = get16
 getRData OPT ol = RD_OPT <$> decode' ol
   where
     decode' :: Int -> SGet [OData]
     decode' l
-        | l  < 0 = fail "decodeOPTData: length inconsistency"
+        | l  < 0 = fail $ "decodeOPTData: length inconsistency (" ++ show l ++ ")"
         | l == 0 = pure []
         | otherwise = do
             optCode <- getOptType
@@ -269,8 +275,8 @@ getRData _  len = RD_OTH <$> getNByteString len
 getOData :: OPTTYPE -> Int -> SGet OData
 getOData ClientSubnet len = do
         fam <- getInt16
-        srcMask <- getInt8
-        scpMask <- getInt8
+        srcMask <- get8
+        scpMask <- get8
         rawip <- fmap fromIntegral . B.unpack <$> getNByteString (len - 4) -- 4 = 2 + 1 + 1
         ip <- case fam of
                     1 -> pure . IPv4 . toIPv4 $ take 4 (rawip ++ repeat 0)
@@ -301,7 +307,7 @@ getDomain = do
         -- As for now, extended labels have no use.
         -- This may change some time in the future.
         _ | isExtLabel c -> return ""
-        _ | otherwise -> do
+        _ -> do
             hs <- getNByteString n
             ds <- getDomain
             let dom =
@@ -313,7 +319,7 @@ getDomain = do
   where
     getValue c = c .&. 0x3f
     isPointer c = testBit c 7 && testBit c 6
-    isExtLabel c = (not $ testBit c 7) && testBit c 6
+    isExtLabel c = not (testBit c 7) && testBit c 6
 
 ignoreClass :: SGet ()
 ignoreClass = () <$ get16
