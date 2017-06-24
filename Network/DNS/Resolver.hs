@@ -260,7 +260,7 @@ fromDNSFormat = fromDNSMessage
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookup resolver hostname A
---   Right [93.184.216.34]
+--   Right [RD_A 93.184.216.34]
 --
 lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookup = lookupSection answer
