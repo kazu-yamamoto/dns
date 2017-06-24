@@ -91,6 +91,7 @@ Test-Suite spec
                       , iproute >= 1.2.4
                       , mtl
                       , network >= 2.3
+                      , QuickCheck >= 2.9
                       , random
                       , resourcet
                       , safe == 0.3.*
