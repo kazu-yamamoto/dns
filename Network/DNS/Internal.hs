@@ -4,13 +4,11 @@ module Network.DNS.Internal where
 
 import Control.Exception (Exception)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
-import Data.Word (Word8, Word16)
+import Data.Word (Word8, Word16, Word32)
 
 ----------------------------------------------------------------
 
@@ -44,11 +42,12 @@ data TYPE = A
           | CDS
           | CDNSKEY
           | CSYNC
-          | UNKNOWN Int deriving (Eq, Show, Read)
+          | UNKNOWN Word16
+          deriving (Eq, Show, Read)
 
 -- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 --
-rrDB :: [(TYPE, Int)]
+rrDB :: [(TYPE, Word16)]
 rrDB = [
     (A,      1)
   , (NS,     2)
@@ -88,9 +87,9 @@ rookup  key ((x,y):xys)
   | key == y          =  Just x
   | otherwise         =  rookup key xys
 
-intToType :: Int -> TYPE
+intToType :: Word16 -> TYPE
 intToType n = fromMaybe (UNKNOWN n) $ rookup n rrDB
-typeToInt :: TYPE -> Int
+typeToInt :: TYPE -> Word16
 typeToInt (UNKNOWN x)  = x
 typeToInt t = fromMaybe (error "typeToInt") $ lookup t rrDB
 
@@ -151,7 +150,7 @@ type DNSFormat = DNSMessage
 
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
-    identifier :: Int
+    identifier :: Word16
   , flags      :: DNSFlags
   } deriving (Eq, Show)
 
@@ -169,7 +168,7 @@ data DNSFlags = DNSFlags {
 
 ----------------------------------------------------------------
 
-data QorR = QR_Query | QR_Response deriving (Eq, Show)
+data QorR = QR_Query | QR_Response deriving (Eq, Show, Enum, Bounded)
 
 data OPCODE
   = OP_STD
@@ -202,55 +201,33 @@ makeQuestion = Question
 ----------------------------------------------------------------
 
 -- | Raw data format for resource records.
-data ResourceRecord = ResourceRecord {
-                            rrname :: Domain
-                          , rrtype :: TYPE
-                          , rrttl  :: Int
-                          , rdata  :: RData
-                          }
-                    | OptRecord {
-                            orudpsize   :: Int
-                          , ordnssecok  :: Bool
-                          , orversion   :: Int
-                          , rdata       :: RData
-                          }
-                    deriving (Eq,Show)
+data ResourceRecord
+    = ResourceRecord Domain TYPE Word32 RData
+    | OptRecord Word16 Bool Word8 RData
+    deriving (Eq,Show)
+
+getRdata :: ResourceRecord -> RData
+getRdata (ResourceRecord _ _ _ rdata) = rdata
+getRdata (OptRecord _ _ _ rdata) = rdata
 
 -- | Raw data format for each type.
 data RData = RD_NS Domain
            | RD_CNAME Domain
            | RD_DNAME Domain
-           | RD_MX Int Domain
+           | RD_MX Word16 Domain
            | RD_PTR Domain
-           | RD_SOA Domain Domain Int Int Int Int Int
+           | RD_SOA Domain Domain Word32 Word32 Word32 Word32 Word32
            | RD_A IPv4
            | RD_AAAA IPv6
            | RD_TXT ByteString
-           | RD_SRV Int Int Int Domain
+           | RD_SRV Word16 Word16 Word16 Domain
            | RD_OPT [OData]
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
            | RD_DS Word16 Word8 Word8 ByteString
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Show)
 
-instance Show RData where
-  show (RD_NS dom) = BS.unpack dom
-  show (RD_MX prf dom) = show prf ++ " " ++ BS.unpack dom
-  show (RD_CNAME dom) = BS.unpack dom
-  show (RD_DNAME dom) = BS.unpack dom
-  show (RD_A a) = show a
-  show (RD_AAAA aaaa) = show aaaa
-  show (RD_TXT txt) = BS.unpack txt
-  show (RD_SOA mn _ _ _ _ _ mi) = BS.unpack mn ++ " " ++ show mi
-  show (RD_PTR dom) = BS.unpack dom
-  show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
-  show (RD_OPT od) = show od
-  show (RD_OTH is) = show is
-  show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ (BS.unpack $ L.toStrict . L.toLazyByteString . L.byteStringHex $ dgst)
-  show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ (BS.unpack $ L.toStrict . L.toLazyByteString . L.byteStringHex $ dv)
-
-
-data OData = OD_ClientSubnet Int Int IP
+data OData = OD_ClientSubnet Word8 Word8 IP
            | OD_Unknown Int ByteString
     deriving (Eq,Show,Ord)
 
@@ -292,7 +269,7 @@ defaultResponse =
         }
       }
 
-responseA :: Int -> Question -> [IPv4] -> DNSMessage
+responseA :: Word16 -> Question -> [IPv4] -> DNSMessage
 responseA ident q ips =
   let hd = header defaultResponse
       dom = qname q
@@ -303,7 +280,7 @@ responseA ident q ips =
         , answer = an
       }
 
-responseAAAA :: Int -> Question -> [IPv6] -> DNSMessage
+responseAAAA :: Word16 -> Question -> [IPv6] -> DNSMessage
 responseAAAA ident q ips =
   let hd = header defaultResponse
       dom = qname q

@@ -50,7 +50,7 @@ testQueryA = defaultQuery {
 testQueryAAAA :: DNSMessage
 testQueryAAAA = defaultQuery {
     header = defaultHeader {
-         identifier = 1000
+         identifier = 1001
        }
   , question = [makeQuestion "www.mew.org." AAAA]
   }
@@ -75,93 +75,26 @@ testResponseA = DNSMessage {
                    , qtype = A
                    }
                 ]
-  , answer = [ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [119, 147, 15, 122]
-                 }
-            , ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [119, 147, 79, 106]
-                 }
-            , ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [183, 60, 55, 43]
-                 }
-            , ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [183, 60, 55, 107]
-                 }
-            , ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [113, 108, 7, 172]
-                 }
-            , ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [113, 108, 7, 174]
-                 }
-            , ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [113, 108, 7, 175]
-                 }
-            , ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = A
-                 , rrttl = 568
-                 , rdata = RD_A $ toIPv4 [119, 147, 15, 100]
-                 }
-            ]
-  , authority = [ ResourceRecord {
-                       rrname = "qzone.qq.com."
-                     , rrtype = NS
-                     , rrttl = 45919
-                     , rdata = RD_NS "ns-tel2.qq.com."
-                     }
-                , ResourceRecord {
-                       rrname = "qzone.qq.com."
-                     , rrtype = NS
-                     , rrttl = 45919
-                     , rdata = RD_NS "ns-tel1.qq.com."
-                     }
-                ]
-  , additional = [ ResourceRecord {
-                        rrname = "ns-tel1.qq.com."
-                      , rrtype = A
-                      , rrttl = 46520
-                      , rdata = RD_A $ toIPv4 [121, 14, 73, 115]
-                      }
-                 , ResourceRecord {
-                        rrname = "ns-tel2.qq.com."
-                      , rrtype = A
-                      , rrttl = 2890
-                      , rdata = RD_A $ toIPv4 [222, 73, 76, 226]
-                      }
-                 , ResourceRecord {
-                        rrname = "ns-tel2.qq.com."
-                      , rrtype = A
-                      , rrttl = 2890
-                      , rdata = RD_A $ toIPv4 [183, 60, 3, 202]
-                      }
-                 , ResourceRecord {
-                        rrname = "ns-tel2.qq.com."
-                      , rrtype = A
-                      , rrttl = 2890
-                      , rdata = RD_A $ toIPv4 [218, 30, 72, 180]
-                      }
-                 ]
+  , answer =
+        [ ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [119, 147, 15, 122])
+        , ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [119, 147, 79, 106])
+        , ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [183, 60, 55, 43])
+        , ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [183, 60, 55, 107])
+        , ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [113, 108, 7, 172])
+        , ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [113, 108, 7, 174])
+        , ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [113, 108, 7, 175])
+        , ResourceRecord "492056364.qzone.qq.com." A 568 (RD_A $ toIPv4 [119, 147, 15, 100])
+        ]
+  , authority =
+        [ ResourceRecord "qzone.qq.com." NS 45919 (RD_NS "ns-tel2.qq.com.")
+        , ResourceRecord "qzone.qq.com." NS 45919 (RD_NS "ns-tel1.qq.com.")
+        ]
+  , additional =
+        [ ResourceRecord "ns-tel1.qq.com." A 46520 (RD_A $ toIPv4 [121, 14, 73, 115])
+        , ResourceRecord "ns-tel2.qq.com." A 2890 (RD_A $ toIPv4 [222, 73, 76, 226])
+        , ResourceRecord "ns-tel2.qq.com." A 2890 (RD_A $ toIPv4 [183, 60, 3, 202])
+        , ResourceRecord "ns-tel2.qq.com." A 2890 (RD_A $ toIPv4 [218, 30, 72, 180])
+        ]
   }
 
 testResponseTXT :: DNSMessage
@@ -184,49 +117,17 @@ testResponseTXT = DNSMessage {
                    , qtype = TXT
                    }
                 ]
-  , answer = [ResourceRecord {
-                   rrname = "492056364.qzone.qq.com."
-                 , rrtype = TXT
-                 , rrttl = 0
-                 , rdata = RD_TXT "simple txt line"
-                 }
-            ]
-  , authority = [ ResourceRecord {
-                       rrname = "qzone.qq.com."
-                     , rrtype = NS
-                     , rrttl = 45919
-                     , rdata = RD_NS "ns-tel2.qq.com."
-                     }
-                , ResourceRecord {
-                       rrname = "qzone.qq.com."
-                     , rrtype = NS
-                     , rrttl = 45919
-                     , rdata = RD_NS "ns-tel1.qq.com."
-                     }
-                ]
-  , additional = [ ResourceRecord {
-                        rrname = "ns-tel1.qq.com."
-                      , rrtype = A
-                      , rrttl = 46520
-                      , rdata = RD_A $ toIPv4 [121, 14, 73, 115]
-                      }
-                 , ResourceRecord {
-                        rrname = "ns-tel2.qq.com."
-                      , rrtype = A
-                      , rrttl = 2890
-                      , rdata = RD_A $ toIPv4 [222, 73, 76, 226]
-                      }
-                 , ResourceRecord {
-                        rrname = "ns-tel2.qq.com."
-                      , rrtype = A
-                      , rrttl = 2890
-                      , rdata = RD_A $ toIPv4 [183, 60, 3, 202]
-                      }
-                 , ResourceRecord {
-                        rrname = "ns-tel2.qq.com."
-                      , rrtype = A
-                      , rrttl = 2890
-                      , rdata = RD_A $ toIPv4 [218, 30, 72, 180]
-                      }
-                 ]
+  , answer =
+        [ ResourceRecord "492056364.qzone.qq.com." TXT 0 (RD_TXT "simple txt line")
+        ]
+  , authority =
+        [ ResourceRecord "qzone.qq.com." NS 45919 (RD_NS "ns-tel2.qq.com.")
+        , ResourceRecord "qzone.qq.com." NS 45919 (RD_NS "ns-tel1.qq.com.")
+        ]
+  , additional =
+        [ ResourceRecord "ns-tel1.qq.com." A 46520 (RD_A $ toIPv4 [121, 14, 73, 115])
+        , ResourceRecord "ns-tel2.qq.com." A 2890 (RD_A $ toIPv4 [222, 73, 76, 226])
+        , ResourceRecord "ns-tel2.qq.com." A 2890 (RD_A $ toIPv4 [183, 60, 3, 202])
+        , ResourceRecord "ns-tel2.qq.com." A 2890 (RD_A $ toIPv4 [218, 30, 72, 180])
+        ]
   }

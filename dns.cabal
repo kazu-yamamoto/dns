@@ -23,8 +23,8 @@ Library
                         Network.DNS.Types
                         Network.DNS.Encode
                         Network.DNS.Decode
-  Other-Modules:        Network.DNS.Internal
-                        Network.DNS.StateBinary
+                        Network.DNS.Internal
+  Other-Modules:        Network.DNS.StateBinary
   if impl(ghc >= 7)
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
@@ -73,7 +73,7 @@ Test-Suite network
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
   Default-Language:     Haskell2010
-  Hs-Source-Dirs:       test, .
+  Hs-Source-Dirs:       test
   Ghc-Options:          -Wall
   Main-Is:              Spec.hs
   Other-Modules:        EncodeSpec
@@ -91,6 +91,7 @@ Test-Suite spec
                       , iproute >= 1.2.4
                       , mtl
                       , network >= 2.3
+                      , QuickCheck >= 2.9
                       , random
                       , resourcet
                       , safe == 0.3.*

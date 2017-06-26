@@ -34,9 +34,9 @@ import Network.Socket (Family(AF_INET, AF_INET6), PortNumber(..))
 import Network.Socket (close, socket, connect, getPeerName, getAddrInfo)
 import Network.Socket (defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
-import System.Random (getStdRandom, randomR)
+import System.Random (getStdRandom, random)
 import System.Timeout (timeout)
-
+import Data.Word (Word16)
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative ((<$>), (<*>), pure)
 #endif
@@ -115,7 +115,7 @@ data ResolvSeed = ResolvSeed {
 -- | Abstract data type of DNS Resolver
 --   When implementing a DNS cache, this MUST NOT be re-used.
 data Resolver = Resolver {
-    genId   :: IO Int
+    genId   :: IO Word16
   , dnsSock :: Socket
   , dnsTimeout :: Int
   , dnsRetry :: Int
@@ -206,8 +206,8 @@ makeResolver seed sock = Resolver {
   , dnsBufsize = rsBufsize seed
   }
 
-getRandom :: IO Int
-getRandom = getStdRandom (randomR (0,65535))
+getRandom :: IO Word16
+getRandom = getStdRandom random
 
 ----------------------------------------------------------------
 
@@ -231,8 +231,9 @@ lookupSection section rlv dom typ = do
     dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
     correct r = rrname r == dom' && rrtype r == typ
     -}
-    correct r = rrtype r == typ
-    toRData = map rdata . filter correct . section
+    correct (ResourceRecord _ rrtype _ _) = rrtype == typ
+    correct (OptRecord _ _ _ _) = False
+    toRData x = map getRdata . filter correct $ section x
 
 -- | Extract necessary information from 'DNSMessage'
 fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
@@ -259,7 +260,7 @@ fromDNSFormat = fromDNSMessage
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookup resolver hostname A
---   Right [93.184.216.34]
+--   Right [RD_A 93.184.216.34]
 --
 lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookup = lookupSection answer

@@ -2,6 +2,10 @@
 
 module Network.DNS.Encode (
     encode
+  , encodeDNSFlags
+  , encodeDNSHeader
+  , encodeDomain
+  , encodeResourceRecord
   , encodeVC
   , composeQuery
   , composeQueryAD
@@ -29,7 +33,7 @@ import Data.Monoid (mconcat)
 
 -- | Composing query. First argument is a number to identify response.
 
-composeQuery :: Int -> [Question] -> ByteString
+composeQuery :: Word16 -> [Question] -> ByteString
 composeQuery idt qs = encode qry
   where
     hdr = header defaultQuery
@@ -40,7 +44,7 @@ composeQuery idt qs = encode qry
       , question = qs
       }
 
-composeQueryAD :: Int -> [Question] -> ByteString
+composeQueryAD :: Word16 -> [Question] -> ByteString
 composeQueryAD idt qs = encode qry
   where
       hdr = header defaultQuery
@@ -60,24 +64,36 @@ composeQueryAD idt qs = encode qry
 -- | Composing DNS data.
 
 encode :: DNSMessage -> ByteString
-encode msg = runSPut (encodeDNSMessage msg)
+encode = runSPut . putDNSMessage
 
 encodeVC :: ByteString -> ByteString
 encodeVC query =
     let len = BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BL.length query
     in len <> query
 
+encodeDNSFlags :: DNSFlags -> ByteString
+encodeDNSFlags = runSPut . putDNSFlags
+
+encodeDNSHeader :: DNSHeader -> ByteString
+encodeDNSHeader = runSPut . putHeader
+
+encodeDomain :: Domain -> ByteString
+encodeDomain = runSPut . putDomain
+
+encodeResourceRecord :: ResourceRecord -> ByteString
+encodeResourceRecord rr = runSPut $ putResourceRecord rr
+
 ----------------------------------------------------------------
 
-encodeDNSMessage :: DNSMessage -> SPut
-encodeDNSMessage msg = encodeHeader hdr
-                    <> encodeNums
-                    <> mconcat (map encodeQuestion qs)
-                    <> mconcat (map encodeRR an)
-                    <> mconcat (map encodeRR au)
-                    <> mconcat (map encodeRR ad)
+putDNSMessage :: DNSMessage -> SPut
+putDNSMessage msg = putHeader hdr
+                    <> putNums
+                    <> mconcat (map putQuestion qs)
+                    <> mconcat (map putResourceRecord an)
+                    <> mconcat (map putResourceRecord au)
+                    <> mconcat (map putResourceRecord ad)
   where
-    encodeNums = mconcat $ fmap putInt16 [length qs
+    putNums = mconcat $ fmap putInt16 [length qs
                                          ,length an
                                          ,length au
                                          ,length ad
@@ -88,14 +104,14 @@ encodeDNSMessage msg = encodeHeader hdr
     au = authority msg
     ad = additional msg
 
-encodeHeader :: DNSHeader -> SPut
-encodeHeader hdr = encodeIdentifier (identifier hdr)
-                <> encodeFlags (flags hdr)
+putHeader :: DNSHeader -> SPut
+putHeader hdr = putIdentifier (identifier hdr)
+                <> putDNSFlags (flags hdr)
   where
-    encodeIdentifier = putInt16
+    putIdentifier = put16
 
-encodeFlags :: DNSFlags -> SPut
-encodeFlags DNSFlags{..} = put16 word
+putDNSFlags :: DNSFlags -> SPut
+putDNSFlags DNSFlags{..} = put16 word
   where
     word16 :: Enum a => a -> Word16
     word16 = toEnum . fromEnum
@@ -117,96 +133,102 @@ encodeFlags DNSFlags{..} = put16 word
 
     word = execState st 0
 
-encodeQuestion :: Question -> SPut
-encodeQuestion Question{..} = encodeDomain qname
-                           <> putInt16 (typeToInt qtype)
+putQuestion :: Question -> SPut
+putQuestion Question{..} = putDomain qname
+                           <> put16 (typeToInt qtype)
                            <> put16 1
 
+putResourceRecord :: ResourceRecord -> SPut
+putResourceRecord rr =
+    case rr of
+        ResourceRecord rrname rrtype rrttl rdata ->
+            mconcat [ putDomain rrname
+                    , put16 (typeToInt rrtype)
+                    , put16 1
+                    , put32 rrttl
+                    , putResourceRData rdata
+                    ]
+        OptRecord orudpsize ordnssecok orversion rdata ->
+            mconcat [ putDomain BS.empty
+                    , put16 (typeToInt OPT)
+                    , put16 orudpsize
+                    , put8 0   -- ERCode
+                    , put8 orversion
+                    , putInt16 $ if ordnssecok then setBit 0 15 else 0
+                    , putResourceRData rdata
+                    ]
+  where
+    putResourceRData :: RData -> SPut
+    putResourceRData rd = do
+        addPositionW 2 -- "simulate" putInt16
+        rDataBuilder <- putRData rd
+        let rdataLength = fromIntegral . BL.length . BB.toLazyByteString $ rDataBuilder
+        let rlenBuilder = BB.int16BE rdataLength
+        return $ rlenBuilder <> rDataBuilder
+
+
 putRData :: RData -> SPut
-putRData rd = do
-    addPositionW 2 -- "simulate" putInt16
-    rDataBuilder <- encodeRDATA rd
-    -- fixmed: SPut must hold length
-    let rdataLength = fromIntegral . BL.length . BB.toLazyByteString $ rDataBuilder
-    let rlenBuilder = BB.int16BE rdataLength
-    return rlenBuilder <> return rDataBuilder
-
-encodeRR :: ResourceRecord -> SPut
-encodeRR ResourceRecord{..} = mconcat [ encodeDomain rrname
-                                      , putInt16 (typeToInt rrtype)
-                                      , put16 1
-                                      , putInt32 rrttl
-                                      , putRData rdata
-                                      ]
-
-encodeRR OptRecord{..} = mconcat [ encodeDomain BS.empty
-                                 , putInt16 (typeToInt OPT)
-                                 , putInt16 orudpsize
-                                 , putInt32 $ if ordnssecok
-                                              then setBit 0 15
-                                              else 0
-                                 , putRData rdata
-                                 ]
-
-encodeRDATA :: RData -> SPut
-encodeRDATA rd = case rd of
-    (RD_A ip)          -> mconcat $ map putInt8 (fromIPv4 ip)
-    (RD_AAAA ip)       -> mconcat $ map putInt8 (fromIPv6b ip)
-    (RD_NS dom)        -> encodeDomain dom
-    (RD_CNAME dom)     -> encodeDomain dom
-    (RD_DNAME dom)     -> encodeDomain dom
-    (RD_PTR dom)       -> encodeDomain dom
-    (RD_MX prf dom)    -> mconcat [putInt16 prf, encodeDomain dom]
-    (RD_TXT txt)       -> putByteStringWithLength txt
-    (RD_OTH bytes)     -> putByteString bytes
-    (RD_OPT opts)      -> mconcat $ fmap encodeOData opts
-    (RD_SOA d1 d2 serial refresh retry expire min') -> mconcat
-        [ encodeDomain d1
-        , encodeDomain d2
-        , putInt32 serial
-        , putInt32 refresh
-        , putInt32 retry
-        , putInt32 expire
-        , putInt32 min'
+putRData rd = case rd of
+    RD_A ip         -> mconcat $ map putInt8 (fromIPv4 ip)
+    RD_AAAA ip      -> mconcat $ map putInt8 (fromIPv6b ip)
+    RD_NS dom       -> putDomain dom
+    RD_CNAME dom    -> putDomain dom
+    RD_DNAME dom    -> putDomain dom
+    RD_PTR dom      -> putDomain dom
+    RD_MX prf dom   -> mconcat [put16 prf, putDomain dom]
+    RD_TXT txt      -> putByteStringWithLength txt
+    RD_OTH bytes    -> putByteString bytes
+    RD_OPT opts     -> mconcat $ fmap putOData opts
+    RD_SOA d1 d2 serial refresh retry expire min' -> mconcat
+        [ putDomain d1
+        , putDomain d2
+        , put32 serial
+        , put32 refresh
+        , put32 retry
+        , put32 expire
+        , put32 min'
         ]
-    (RD_SRV prio weight port dom) -> mconcat
-        [ putInt16 prio
-        , putInt16 weight
-        , putInt16 port
-        , encodeDomain dom
+    RD_SRV prio weight port dom -> mconcat
+        [ put16 prio
+        , put16 weight
+        , put16 port
+        , putDomain dom
         ]
-    (RD_TLSA u s m d) -> mconcat
+    RD_TLSA u s m d -> mconcat
         [ put8 u
         , put8 s
         , put8 m
         , putByteString d
         ]
-    (RD_DS t a dt dv) -> mconcat
+    RD_DS t a dt dv -> mconcat
         [ put16 t
         , put8 a
         , put8 dt
         , putByteString dv
         ]
 
-encodeOData :: OData -> SPut
-encodeOData (OD_ClientSubnet srcNet scpNet ip) = let dropZeroes = dropWhileEnd (==0)
-                                                     (fam,raw) = case ip of
-                                                                    IPv4 ip4 -> (1,dropZeroes $ fromIPv4 ip4)
-                                                                    IPv6 ip6 -> (2,dropZeroes $ fromIPv6b ip6)
-                                                     dataLen = 2 + 2 + length raw
-                                                 in mconcat [putInt16 (optTypeToInt ClientSubnet)
-                                                            ,putInt16 dataLen
-                                                            ,putInt16 fam
-                                                            ,putInt8 srcNet
-                                                            ,putInt8 scpNet
-                                                            ,mconcat $ fmap putInt8 raw
-                                                            ]
-encodeOData (OD_Unknown code bs) = mconcat [putInt16 code
-                                           ,putInt16 $ BS.length bs
-                                           ,putByteString bs
-                                           ]
+putOData :: OData -> SPut
+putOData (OD_ClientSubnet srcNet scpNet ip) =
+    let dropZeroes = dropWhileEnd (==0)
+        (fam,raw) = case ip of
+                        IPv4 ip4 -> (1,dropZeroes $ fromIPv4 ip4)
+                        IPv6 ip6 -> (2,dropZeroes $ fromIPv6b ip6)
+        dataLen = 2 + 2 + length raw
+     in mconcat [ putInt16 (optTypeToInt ClientSubnet)
+                , putInt16 dataLen
+                , putInt16 fam
+                , put8 srcNet
+                , put8 scpNet
+                , mconcat $ fmap putInt8 raw
+                ]
+putOData (OD_Unknown code bs) =
+    mconcat [ putInt16 code
+            , putInt16 $ BS.length bs
+            , putByteString bs
+            ]
 
 -- In the case of the TXT record, we need to put the string length
+-- fixme : What happens with the length > 256 ?
 putByteStringWithLength :: BS.ByteString -> SPut
 putByteStringWithLength bs = putInt8 (fromIntegral $ BS.length bs) -- put the length of the given string
                           <> putByteString bs
@@ -216,24 +238,24 @@ putByteStringWithLength bs = putInt8 (fromIntegral $ BS.length bs) -- put the le
 rootDomain :: Domain
 rootDomain = BS.pack "."
 
-encodeDomain :: Domain -> SPut
-encodeDomain dom
-    | (BS.null dom || dom == rootDomain) = put8 0
+putDomain :: Domain -> SPut
+putDomain dom
+    | BS.null dom || dom == rootDomain = put8 0
     | otherwise = do
         mpos <- wsPop dom
         cur <- gets wsPosition
         case mpos of
-            Just pos -> encodePointer pos
+            Just pos -> putPointer pos
             Nothing  -> wsPush dom cur >>
-                        mconcat [ encodePartialDomain hd
-                                , encodeDomain tl
+                        mconcat [ putPartialDomain hd
+                                , putDomain tl
                                 ]
   where
     (hd, tl') = BS.break (=='.') dom
     tl = if BS.null tl' then tl' else BS.drop 1 tl'
 
-encodePointer :: Int -> SPut
-encodePointer pos = putInt16 (pos .|. 0xc000)
+putPointer :: Int -> SPut
+putPointer pos = putInt16 (pos .|. 0xc000)
 
-encodePartialDomain :: Domain -> SPut
-encodePartialDomain = putByteStringWithLength
+putPartialDomain :: Domain -> SPut
+putPartialDomain = putByteStringWithLength
