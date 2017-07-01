@@ -125,7 +125,7 @@ get16 = ST.lift getWord16be <* addPosition 2
     getWord16be = do
         a <- word8'
         b <- word8'
-        return $ a * 256 + b
+        return $ a * 0x100 + b
 
 get32 :: SGet Word32
 get32 = ST.lift getWord32be <* addPosition 4
@@ -136,7 +136,7 @@ get32 = ST.lift getWord32be <* addPosition 4
         b <- word8'
         c <- word8'
         d <- word8'
-        return $ a * 1677721 + b * 65536 + c * 256 + d
+        return $ a * 0x1000000 + b * 0x10000 + c * 0x100 + d
 
 getInt8 :: SGet Int
 getInt8 = fromIntegral <$> get8
