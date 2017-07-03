@@ -88,7 +88,7 @@ genResourceRecord = frequency
     genRR = do
       dom <- genDomain
       t <- elements [A , AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS]
-      ResourceRecord dom t <$> genTTL <*> mkRData dom t
+      ResourceRecord dom t <$> genWord32 <*> mkRData dom t
     genRDataOpt = do
       odata <- listOf genOData
       pure $ ResourceRecord "" OPT (fromIntegral $ length odata) (RD_OPT odata)
@@ -96,9 +96,6 @@ genResourceRecord = frequency
       dom <- genDomain
       t <- genTYPE
       OptRecord <$> genWord16 <*> genBool <*> genWord8 <*> mkRData dom t
-
-genTTL :: Gen Word32
-genTTL = choose (0, 0xffffff)
 
 mkRData :: Domain -> TYPE -> Gen RData
 mkRData dom typ =
@@ -109,7 +106,7 @@ mkRData dom typ =
         TXT -> RD_TXT <$> genByteString
         MX -> RD_MX <$> genWord16 <*> genDomain
         CNAME -> pure $ RD_CNAME dom
-        SOA -> RD_SOA dom <$> genDomain <*> genTTL <*> genTTL <*> genTTL <*> genTTL <*> genTTL
+        SOA -> RD_SOA dom <$> genDomain <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32
         PTR -> RD_PTR <$> genDomain
         SRV -> RD_SRV <$> genWord16 <*> genWord16 <*> genWord16 <*> genDomain
         DNAME -> RD_DNAME <$> genDomain
