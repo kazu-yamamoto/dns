@@ -43,10 +43,10 @@ import Control.Applicative ((<$>), (<*>), pure)
 
 #if mingw32_HOST_OS == 1
 import Network.Socket (send)
-import qualified Data.ByteString.Lazy.Char8 as LB
+import qualified Data.ByteString.Char8 as BS
 import Control.Monad (when)
 #else
-import Network.Socket.ByteString.Lazy (sendAll)
+import Network.Socket.ByteString (sendAll)
 #endif
 
 ----------------------------------------------------------------
@@ -441,7 +441,7 @@ tcpLookup query peer tm (Just vc) = do
         Just res -> return $ Right res
 
 #if mingw32_HOST_OS == 1
-    -- Windows does not support sendAll in Network.ByteString.Lazy.
+    -- Windows does not support sendAll in Network.ByteString.
     -- This implements sendAll with Haskell Strings.
     sendAll sock bs = do
 	sent <- send sock (LB.unpack bs)

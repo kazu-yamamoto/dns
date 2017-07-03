@@ -17,8 +17,8 @@ import Data.Binary (Word16)
 import Data.Bits ((.|.), bit, shiftL, setBit)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy as BL
-import Data.ByteString.Lazy.Char8 (ByteString)
+import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.ByteString.Char8 (ByteString)
 import Data.IP (IP(..),fromIPv4, fromIPv6b)
 import Data.List (dropWhileEnd)
 import Data.Monoid ((<>))
@@ -68,7 +68,7 @@ encode = runSPut . putDNSMessage
 
 encodeVC :: ByteString -> ByteString
 encodeVC query =
-    let len = BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BL.length query
+    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length query
     in len <> query
 
 encodeDNSFlags :: DNSFlags -> ByteString
@@ -162,7 +162,7 @@ putResourceRecord rr =
     putResourceRData rd = do
         addPositionW 2 -- "simulate" putInt16
         rDataBuilder <- putRData rd
-        let rdataLength = fromIntegral . BL.length . BB.toLazyByteString $ rDataBuilder
+        let rdataLength = fromIntegral . LBS.length . BB.toLazyByteString $ rDataBuilder
         let rlenBuilder = BB.int16BE rdataLength
         return $ rlenBuilder <> rDataBuilder
 
