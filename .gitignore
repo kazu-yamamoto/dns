@@ -1,2 +1,8 @@
 .stack-work
 dist/
+tags
+TAGS
+codex.tags
+*.hi
+*.o
+examples/SimpleServer
