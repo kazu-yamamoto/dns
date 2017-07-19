@@ -4,7 +4,6 @@ module Network.DNS.Internal where
 
 import Control.Exception (Exception)
 import Data.ByteString (ByteString)
-import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
@@ -16,7 +15,7 @@ import Data.Word (Word8, Word16, Word32)
 type Domain = ByteString
 
 -- | Return type of composeQuery from Encode, needed in Resolver
-type Query = L.ByteString
+type Query = ByteString
 
 ----------------------------------------------------------------
 

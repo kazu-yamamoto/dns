@@ -5,13 +5,13 @@ import Control.Monad.State (State, StateT)
 import qualified Control.Monad.State as ST
 import Control.Monad.Trans.Resource (ResourceT)
 import qualified Data.Attoparsec.ByteString as A
-import qualified Data.Attoparsec.ByteString.Lazy as AL
+
 import qualified Data.Attoparsec.Types as T
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BB
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Conduit (Sink)
 import Data.Conduit.Attoparsec (sinkParser)
 import Data.IntMap (IntMap)
@@ -165,15 +165,16 @@ initialState = PState IM.empty 0
 sinkSGet :: SGet a -> Sink ByteString (ResourceT IO) (a, PState)
 sinkSGet parser = sinkParser (ST.runStateT parser initialState)
 
-runSGet :: SGet a -> BL.ByteString -> Either String (a, PState)
-runSGet parser bs = AL.eitherResult $ AL.parse (ST.runStateT parser initialState) bs
+runSGet :: SGet a -> ByteString -> Either String (a, PState)
+runSGet parser bs = A.eitherResult $ A.parse (ST.runStateT parser initialState) bs
 
-runSGetWithLeftovers :: SGet a -> BL.ByteString -> Either String ((a, PState), BL.ByteString)
-runSGetWithLeftovers parser bs = toResult $ AL.parse (ST.runStateT parser initialState) bs
+runSGetWithLeftovers :: SGet a -> ByteString -> Either String ((a, PState), ByteString)
+runSGetWithLeftovers parser bs = toResult $ A.parse (ST.runStateT parser initialState) bs
   where
-    toResult :: AL.Result r -> Either String (r, BL.ByteString)
-    toResult (AL.Done i r) = Right (r, i)
-    toResult (AL.Fail _ _ err) = Left err
+    toResult :: A.Result r -> Either String (r, ByteString)
+    toResult (A.Done i r) = Right (r, i)
+    toResult (A.Partial f) = toResult $ f BS.empty
+    toResult (A.Fail _ _ err) = Left err
 
-runSPut :: SPut -> BL.ByteString
-runSPut = BB.toLazyByteString . flip ST.evalState initialWState
+runSPut :: SPut -> ByteString
+runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState

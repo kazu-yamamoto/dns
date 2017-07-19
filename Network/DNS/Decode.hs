@@ -16,10 +16,11 @@ import Control.Monad (replicateM)
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import qualified Control.Exception as ControlException
 import Data.Bits ((.&.), shiftR, testBit)
+import Data.Char (ord)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Conduit (($$), ($$+), ($$+-), (=$), Source)
 import Data.Conduit.Network (sourceSocket)
 import qualified Data.Conduit.Binary as CB
@@ -58,7 +59,7 @@ receive = receiveDNSFormat . sourceSocket
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = runResourceT $ do
     (src, lenbytes) <- sourceSocket sock $$+ CB.take 2
-    let len = case map fromIntegral $ BL.unpack lenbytes of
+    let len = case map ord $ LBS.unpack lenbytes of
                 [hi, lo] -> 256 * hi + lo
                 _        -> 0
     fmap fst (src $$+- CB.isolate len =$ sinkSGet getResponse)
@@ -67,33 +68,33 @@ receiveVC sock = runResourceT $ do
 
 -- | Parsing DNS data.
 
-decode :: BL.ByteString -> Either String DNSMessage
+decode :: ByteString -> Either String DNSMessage
 decode bs = fst <$> runSGet getResponse bs
 
 -- | Parse many length-encoded DNS records, for example, from TCP traffic.
 
-decodeMany :: BL.ByteString -> Either String ([DNSMessage], BL.ByteString)
+decodeMany :: ByteString -> Either String ([DNSMessage], ByteString)
 decodeMany bs = do
     ((bss, _), leftovers) <- runSGetWithLeftovers lengthEncoded bs
     msgs <- mapM decode bss
     return (msgs, leftovers)
   where
     -- Read a list of length-encoded lazy bytestrings
-    lengthEncoded :: SGet [BL.ByteString]
+    lengthEncoded :: SGet [ByteString]
     lengthEncoded = many $ do
       len <- getInt16
-      fmap BL.fromStrict (getNByteString len)
+      getNByteString len
 
-decodeDNSFlags :: BL.ByteString -> Either String DNSFlags
+decodeDNSFlags :: ByteString -> Either String DNSFlags
 decodeDNSFlags bs = fst <$> runSGet getDNSFlags bs
 
-decodeDNSHeader :: BL.ByteString -> Either String DNSHeader
+decodeDNSHeader :: ByteString -> Either String DNSHeader
 decodeDNSHeader bs = fst <$> runSGet getHeader bs
 
-decodeDomain :: BL.ByteString -> Either String Domain
+decodeDomain :: ByteString -> Either String Domain
 decodeDomain bs = fst <$> runSGet getDomain bs
 
-decodeResourceRecord :: BL.ByteString -> Either String ResourceRecord
+decodeResourceRecord :: ByteString -> Either String ResourceRecord
 decodeResourceRecord bs = fst <$> runSGet getResourceRecord bs
 
 ----------------------------------------------------------------
