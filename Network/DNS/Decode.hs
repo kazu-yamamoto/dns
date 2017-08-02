@@ -176,30 +176,15 @@ getResourceRecord :: SGet ResourceRecord
 getResourceRecord = do
     dom <- getDomain
     typ <- getTYPE
-    getRR dom typ
+    cls <- decodeCLASS
+    ttl <- decodeTTL
+    len <- decodeRLen
+    dat <- getRData typ len
+    return $ ResourceRecord dom typ cls ttl dat
   where
-    getRR _ OPT = do
-        udps <- decodeUDPSize -- 16
-        _ <- decodeERCode    -- 8
-        ver <- decodeOPTVer  -- 8
-        dok <- decodeDNSOK   -- 16
-        len <- decodeRLen    -- 16
-        dat <- getRData OPT len
-        return $ OptRecord udps dok ver dat
-
-    getRR dom t = do
-        ignoreClass
-        ttl <- decodeTTL
-        len <- decodeRLen
-        dat <- getRData t len
-        return $ ResourceRecord dom t ttl dat
-
-    decodeUDPSize = get16
-    decodeERCode = get8
-    decodeOPTVer = get8
-    decodeDNSOK = flip testBit 15 <$> get16
-    decodeTTL = get32
-    decodeRLen = getInt16
+    decodeCLASS = get16
+    decodeTTL   = get32
+    decodeRLen  = getInt16
 
 getRData :: TYPE -> Int -> SGet RData
 getRData NS _ = RD_NS <$> getDomain

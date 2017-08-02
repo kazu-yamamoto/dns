@@ -10,6 +10,10 @@ module Network.DNS.Types (
   -- ** Resource Record Type
   , TYPE (..), intToType, typeToInt
   , OPTTYPE (..), intToOptType, optTypeToInt
+  -- ** Other Types
+  , CLASS
+  , classIN
+  , TTL
   -- * DNS Error
   , DNSError (..)
   -- * DNS Message

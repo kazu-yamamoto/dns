@@ -14,7 +14,7 @@ module Network.DNS.Encode (
 import Control.Monad (when)
 import Control.Monad.State (State, modify, execState, gets)
 import Data.Binary (Word16)
-import Data.Bits ((.|.), bit, shiftL, setBit)
+import Data.Bits ((.|.), bit, shiftL)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -139,24 +139,13 @@ putQuestion Question{..} = putDomain qname
                            <> put16 1
 
 putResourceRecord :: ResourceRecord -> SPut
-putResourceRecord rr =
-    case rr of
-        ResourceRecord rrname rrtype rrttl rdata ->
-            mconcat [ putDomain rrname
-                    , put16 (typeToInt rrtype)
-                    , put16 1
-                    , put32 rrttl
-                    , putResourceRData rdata
-                    ]
-        OptRecord orudpsize ordnssecok orversion rdata ->
-            mconcat [ putDomain BS.empty
-                    , put16 (typeToInt OPT)
-                    , put16 orudpsize
-                    , put8 0   -- ERCode
-                    , put8 orversion
-                    , putInt16 $ if ordnssecok then setBit 0 15 else 0
-                    , putResourceRData rdata
-                    ]
+putResourceRecord ResourceRecord{..} = mconcat [
+    putDomain rrname
+  , put16 (typeToInt rrtype)
+  , put16 rrclass
+  , put32 rrttl
+  , putResourceRData rdata
+  ]
   where
     putResourceRData :: RData -> SPut
     putResourceRData rd = do

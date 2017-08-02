@@ -207,15 +207,23 @@ makeQuestion = Question
 
 ----------------------------------------------------------------
 
--- | Raw data format for resource records.
-data ResourceRecord
-    = ResourceRecord Domain TYPE Word32 RData
-    | OptRecord Word16 Bool Word8 RData
-    deriving (Eq,Show)
+-- Class. Not used.
+type CLASS = Word16
 
-getRdata :: ResourceRecord -> RData
-getRdata (ResourceRecord _ _ _ rdata) = rdata
-getRdata (OptRecord _ _ _ rdata) = rdata
+classIN :: CLASS
+classIN = 1
+
+-- Time to live.
+type TTL = Word32
+
+-- | Raw data format for resource records.
+data ResourceRecord = ResourceRecord {
+    rrname  :: Domain
+  , rrtype  :: TYPE
+  , rrclass :: CLASS
+  , rrttl   :: TTL
+  , rdata   :: RData
+  } deriving (Eq,Show)
 
 -- | Raw data format for each type.
 data RData = RD_NS Domain
@@ -239,6 +247,16 @@ data RData = RD_NS Domain
 data OData = OD_ClientSubnet Word8 Word8 IP
            | OD_Unknown Int ByteString
     deriving (Eq,Show,Ord)
+
+
+-- | Optional record for EDNS0
+data OptRecord = OptRecord {
+    orudpsize   :: Word16
+  , ordnssecok  :: Bool
+  , orversion   :: Word8
+  , orrdata     :: RData
+  }
+  deriving (Eq,Show)
 
 ----------------------------------------------------------------
 
@@ -282,7 +300,7 @@ responseA :: Word16 -> Question -> [IPv4] -> DNSMessage
 responseA ident q ips =
   let hd = header defaultResponse
       dom = qname q
-      an = fmap (ResourceRecord dom A 300 . RD_A) ips
+      an = fmap (ResourceRecord dom A classIN 300 . RD_A) ips
   in  defaultResponse {
           header = hd { identifier=ident }
         , question = [q]
@@ -293,7 +311,7 @@ responseAAAA :: Word16 -> Question -> [IPv6] -> DNSMessage
 responseAAAA ident q ips =
   let hd = header defaultResponse
       dom = qname q
-      an = fmap (ResourceRecord dom AAAA 300 . RD_AAAA) ips
+      an = fmap (ResourceRecord dom AAAA classIN 300 . RD_AAAA) ips
   in  defaultResponse {
           header = hd { identifier=ident }
         , question = [q]
