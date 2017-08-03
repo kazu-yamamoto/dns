@@ -22,6 +22,7 @@ type Query = ByteString
 -- | Types for resource records.
 data TYPE = A
           | AAAA
+          | ANY
           | NS
           | TXT
           | MX
@@ -69,6 +70,7 @@ rrDB = [
   , (CDS,   59) -- RFC 7344
   , (CDNSKEY, 60) -- RFC 7344
   , (CSYNC, 62) -- RFC 7477
+  , (ANY, 255)
   ]
 
 data OPTTYPE = ClientSubnet
