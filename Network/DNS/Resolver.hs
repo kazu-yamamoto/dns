@@ -443,8 +443,8 @@ tcpLookup query peer tm (Just vc) = do
 -- Windows does not support sendAll in Network.ByteString.Lazy.
 -- This implements sendAll with Haskell Strings.
 sendAll sock bs = do
-sent <- send sock (LB.unpack bs)
-when (sent < fromIntegral (LB.length bs)) $ sendAll sock (LB.drop (fromIntegral sent) bs)
+    sent <- send sock (LB.unpack bs)
+    when (sent < fromIntegral (LB.length bs)) $ sendAll sock (LB.drop (fromIntegral sent) bs)
 #endif
 
 isIllegal :: Domain -> Bool
