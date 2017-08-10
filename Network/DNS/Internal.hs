@@ -42,8 +42,8 @@ data TYPE = A
           | CDS
           | CDNSKEY
           | CSYNC
-          | UNKNOWN Word16
-          deriving (Eq, Show, Read)
+          | NULL
+          | UNKNOWN Int deriving (Eq, Show, Read)
 
 -- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 --
@@ -53,6 +53,7 @@ rrDB = [
   , (NS,     2)
   , (CNAME,  5)
   , (SOA,    6)
+  , (NULL,  10)
   , (PTR,   12)
   , (MX,    15)
   , (TXT,   16)
@@ -226,6 +227,8 @@ data RData = RD_NS Domain
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
            | RD_DS Word16 Word8 Word8 ByteString
+           | RD_NULL  -- anything can be in a NULL record.
+                      -- for now we just drop this data.
     deriving (Eq, Ord, Show)
 
 data OData = OD_ClientSubnet Word8 Word8 IP
