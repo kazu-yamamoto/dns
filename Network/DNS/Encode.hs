@@ -206,7 +206,7 @@ putRData rd = case rd of
         , put8 dt
         , putByteString dv
         ]
-    RD_NULL -> mzero
+    RD_NULL -> pure mempty
 
 putOData :: OData -> SPut
 putOData (OD_ClientSubnet srcNet scpNet ip) =
