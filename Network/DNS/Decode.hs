@@ -271,6 +271,8 @@ getRData DS len = RD_DS <$> decodeTag
     decodeDtyp = get8
     decodeDval = getNByteString (len - 4)
 --
+getRData NULL len = const RD_NULL <$> getNByteString len
+--
 getRData _  len = RD_OTH <$> getNByteString len
 
 getOData :: OPTTYPE -> Int -> SGet OData
