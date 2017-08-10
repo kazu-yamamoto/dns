@@ -228,7 +228,7 @@ data RData = RD_NS Domain
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
            | RD_DS Word16 Word8 Word8 ByteString
-           | RD_NULL  -- anything can be in a NULL record.
+           | RD_NULL  -- anything can be in a NULL record,
                       -- for now we just drop this data.
     deriving (Eq, Ord, Show)
 
