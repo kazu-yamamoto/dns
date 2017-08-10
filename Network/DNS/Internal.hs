@@ -43,7 +43,8 @@ data TYPE = A
           | CDNSKEY
           | CSYNC
           | NULL
-          | UNKNOWN Int deriving (Eq, Show, Read)
+          | UNKNOWN Word16
+          deriving (Eq, Show, Read)
 
 -- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 --
