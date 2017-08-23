@@ -185,14 +185,22 @@ getResourceRecord = do
         dok <- decodeDNSOK   -- 16
         len <- decodeRLen    -- 16
         dat <- getRData OPT len
-        return $ OptRecord udps dok ver dat
+        return OptRecord { orudpsize = udps
+                         , ordnssecok = dok
+                         , orversion = ver
+                         , ordata = dat
+                         }
 
     getRR dom t = do
         ignoreClass
         ttl <- decodeTTL
         len <- decodeRLen
         dat <- getRData t len
-        return $ ResourceRecord dom t ttl dat
+        return ResourceRecord { rrname = dom
+                              , rrtype = t
+                              , rrttl  = ttl
+                              , rdata  = dat
+                              }
 
     decodeUDPSize = get16
     decodeERCode = get8

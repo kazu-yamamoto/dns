@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Network.DNS.Internal where
 
@@ -200,14 +201,24 @@ makeQuestion = Question
 ----------------------------------------------------------------
 
 -- | Raw data format for resource records.
-data ResourceRecord
-    = ResourceRecord Domain TYPE Word32 RData
-    | OptRecord Word16 Bool Word8 RData
-    deriving (Eq,Show)
+
+data ResourceRecord = ResourceRecord {
+                            rrname :: Domain
+                          , rrtype :: TYPE
+                          , rrttl  :: Word32
+                          , rdata  :: RData
+                          }
+                    | OptRecord {
+                            orudpsize   :: Word16
+                          , ordnssecok  :: Bool
+                          , orversion   :: Word8
+                          , ordata      :: RData
+                          }
+                    deriving (Eq,Show)
 
 getRdata :: ResourceRecord -> RData
-getRdata (ResourceRecord _ _ _ rdata) = rdata
-getRdata (OptRecord _ _ _ rdata) = rdata
+getRdata ResourceRecord{..} = rdata
+getRdata OptRecord{..} = ordata
 
 -- | Raw data format for each type.
 data RData = RD_NS Domain
