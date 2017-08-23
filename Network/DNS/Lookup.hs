@@ -175,7 +175,7 @@ lookupMX rlv dom = do
 --   resolve their hostnames to IPv4 addresses by calling
 --   'lookupA'. The priorities are not retained.
 --
---   Examples:
+--   Examples (subject to bitrot as the IPs change from time to time):
 --
 --   >>> import Data.List (sort)
 --   >>> let hostname = Data.ByteString.Char8.pack "wide.ad.jp"
@@ -183,7 +183,7 @@ lookupMX rlv dom = do
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
 --   >>> fmap sort ips
---   Right [133.138.10.34,203.178.136.49]
+--   Right [133.138.10.39,203.178.136.30]
 --
 --   Since there is more than one result, it is necessary to sort the
 --   list in order to check for equality.
