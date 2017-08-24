@@ -19,6 +19,11 @@ import Data.Word (Word8, Word16, Word32)
 -- | Type for domain.
 type Domain = ByteString
 
+-- | Type for a mailbox encoded on the wire as a DNS name, but the first label
+-- is conceptually the user name, and sometimes has internal '.' characters
+-- that are not label separators.
+type Mailbox = ByteString
+
 -- | Return type of composeQuery from Encode, needed in Resolver
 type Query = ByteString
 
@@ -230,7 +235,7 @@ data RData = RD_NS Domain
            | RD_DNAME Domain
            | RD_MX Word16 Domain
            | RD_PTR Domain
-           | RD_SOA Domain Domain Word32 Word32 Word32 Word32 Word32
+           | RD_SOA Domain Mailbox Word32 Word32 Word32 Word32 Word32
            | RD_A IPv4
            | RD_AAAA IPv6
            | RD_TXT ByteString
@@ -254,7 +259,9 @@ instance Show RData where
   show (RD_A a) = show a
   show (RD_AAAA aaaa) = show aaaa
   show (RD_TXT txt) = BS.unpack txt
-  show (RD_SOA mn _ _ _ _ _ mi) = BS.unpack mn ++ " " ++ show mi
+  show (RD_SOA mn mr serial refresh retry expire mi) = BS.unpack mn ++ " " ++ BS.unpack mr ++ " " ++
+                                                       show serial ++ " " ++ show refresh ++ " " ++
+                                                       show retry ++ " " ++ show expire ++ " " ++ show mi
   show (RD_PTR dom) = BS.unpack dom
   show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
   show (RD_OPT od) = show od

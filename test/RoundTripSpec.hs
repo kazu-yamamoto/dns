@@ -39,6 +39,11 @@ spec = do
         decodeDomain bs `shouldBe` Right dom
         fmap encodeDomain (decodeDomain bs) `shouldBe` Right bs
 
+    prop "Mailbox" . forAll genMailbox $ \ dom -> do
+        let bs = encodeMailbox dom
+        decodeMailbox bs `shouldBe` Right dom
+        fmap encodeMailbox (decodeMailbox bs) `shouldBe` Right bs
+
     prop "DNSFlags" . forAll genDNSFlags $ \ flgs -> do
         let bs = encodeDNSFlags flgs
         decodeDNSFlags bs `shouldBe` Right flgs
@@ -106,7 +111,7 @@ mkRData dom typ =
         TXT -> RD_TXT <$> genByteString
         MX -> RD_MX <$> genWord16 <*> genDomain
         CNAME -> pure $ RD_CNAME dom
-        SOA -> RD_SOA dom <$> genDomain <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32
+        SOA -> RD_SOA dom <$> genMailbox <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32
         PTR -> RD_PTR <$> genDomain
         SRV -> RD_SRV <$> genWord16 <*> genWord16 <*> genWord16 <*> genDomain
         DNAME -> RD_DNAME <$> genDomain
@@ -135,9 +140,18 @@ genByteString :: Gen BS.ByteString
 genByteString = elements
     [ "", "a", "a.b", "abc", "a.b.c" ]
 
+genMboxString :: Gen BS.ByteString
+genMboxString = elements
+    [ "", "a", "a@b", "abc", "a@b.c" ]
+
 genDomain :: Gen Domain
 genDomain = do
     bs <- genByteString
+    pure $ bs <> "."
+
+genMailbox :: Gen Mailbox
+genMailbox = do
+    bs <- genMboxString
     pure $ bs <> "."
 
 genDNSHeader :: Gen DNSHeader

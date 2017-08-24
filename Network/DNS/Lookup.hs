@@ -42,7 +42,7 @@
 --   one millisecond:
 --
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
---   >>> let badrc = defaultResolvConf { resolvTimeout = 1 }
+--   >>> let badrc = defaultResolvConf { resolvTimeout = 0 }
 --   >>>
 --   >>> rs <- makeResolvSeed badrc
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
