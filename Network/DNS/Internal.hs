@@ -109,6 +109,8 @@ data DNSError =
     -- | The sequence number of the answer doesn't match our query. This
     --   could indicate foul play.
     SequenceNumberMismatch
+    -- | The number of retries for the request was exceeded.
+  | RetryLimitExceeded
     -- | The request simply timed out.
   | TimeoutExpired
     -- | The answer has the correct sequence number, but returned an
