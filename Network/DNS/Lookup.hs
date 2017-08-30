@@ -39,14 +39,14 @@
 --
 --   The only error that we can easily cause is a timeout. We do this
 --   by creating and utilizing a 'ResolvConf' which has a timeout of
---   one millisecond:
+--   one millisecond and a very limited number of retries:
 --
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
---   >>> let badrc = defaultResolvConf { resolvTimeout = 1 }
+--   >>> let badrc = defaultResolvConf { resolvTimeout = 1, resolvRetry = 1 }
 --   >>>
 --   >>> rs <- makeResolvSeed badrc
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
---   Left TimeoutExpired
+--   Left RetryLimitExceeded
 --
 --   As is the convention, successful results will always be wrapped
 --   in a 'Right', while errors will be wrapped in a 'Left'.

@@ -369,7 +369,7 @@ lookupRawInternal rcv ad rlv dom typ = do
     loop query checkSeqno cnt mismatch
       | cnt == retry = do
           let ret | mismatch  = SequenceNumberMismatch
-                  | otherwise = TimeoutExpired
+                  | otherwise = RetryLimitExceeded
           return $ Left ret
       | otherwise    = do
           sendAll sock query
