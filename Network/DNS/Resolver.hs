@@ -19,6 +19,16 @@ module Network.DNS.Resolver (
   , fromDNSFormat
   ) where
 
+#if !defined(mingw32_HOST_OS)
+#define POSIX
+#else
+#define WIN
+#endif
+
+#if __GLASGOW_HASKELL__ < 709
+#define GHC6
+#endif
+
 import Control.Exception (bracket)
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
@@ -36,12 +46,11 @@ import Network.Socket (defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, randomR)
 import System.Timeout (timeout)
-
-#if __GLASGOW_HASKELL__ < 709
+#ifdef GHC6
 import Control.Applicative ((<$>), (<*>), pure)
 #endif
 
-#if mingw32_HOST_OS == 1
+#if defined(WIN) && defined(GHC6)
 import Network.Socket (send)
 import qualified Data.ByteString.Lazy.Char8 as LB
 import Control.Monad (when)
@@ -439,9 +448,9 @@ tcpLookup query peer tm (Just vc) = do
         Nothing  -> return $ Left TimeoutExpired
         Just res -> return $ Right res
 
-#if mingw32_HOST_OS == 1
--- Windows does not support sendAll in Network.ByteString.Lazy.
--- This implements sendAll with Haskell Strings.
+#if defined(WIN) && defined(GHC6)
+-- Windows does not support sendAll in Network.ByteString for older GHCs.
+sendAll :: Socket -> BS.ByteString -> IO ()
 sendAll sock bs = do
     sent <- send sock (LB.unpack bs)
     when (sent < fromIntegral (LB.length bs)) $ sendAll sock (LB.drop (fromIntegral sent) bs)
