@@ -39,14 +39,14 @@
 --
 --   The only error that we can easily cause is a timeout. We do this
 --   by creating and utilizing a 'ResolvConf' which has a timeout of
---   one millisecond:
+--   one millisecond and a very limited number of retries:
 --
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
---   >>> let badrc = defaultResolvConf { resolvTimeout = 1 }
+--   >>> let badrc = defaultResolvConf { resolvTimeout = 1, resolvRetry = 1 }
 --   >>>
 --   >>> rs <- makeResolvSeed badrc
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
---   Left TimeoutExpired
+--   Left RetryLimitExceeded
 --
 --   As is the convention, successful results will always be wrapped
 --   in a 'Right', while errors will be wrapped in a 'Left'.
@@ -183,7 +183,7 @@ lookupMX rlv dom = do
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
 --   >>> fmap sort ips
---   Right [133.138.10.34,203.178.136.49]
+--   Right [133.138.10.39,203.178.136.30]
 --
 --   Since there is more than one result, it is necessary to sort the
 --   list in order to check for equality.
