@@ -42,7 +42,7 @@
 --   one millisecond:
 --
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
---   >>> let badrc = defaultResolvConf { resolvTimeout = 1 }
+--   >>> let badrc = defaultResolvConf { resolvTimeout = 0 }
 --   >>>
 --   >>> rs <- makeResolvSeed badrc
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
@@ -175,7 +175,7 @@ lookupMX rlv dom = do
 --   resolve their hostnames to IPv4 addresses by calling
 --   'lookupA'. The priorities are not retained.
 --
---   Examples:
+--   Examples (subject to bitrot as the IPs change from time to time):
 --
 --   >>> import Data.List (sort)
 --   >>> let hostname = Data.ByteString.Char8.pack "wide.ad.jp"

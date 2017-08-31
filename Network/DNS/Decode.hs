@@ -3,6 +3,7 @@
 module Network.DNS.Decode (
     decode
   , decodeDomain
+  , decodeMailbox
   , decodeDNSFlags
   , decodeDNSHeader
   , decodeResourceRecord
@@ -93,6 +94,9 @@ decodeDNSHeader bs = fst <$> runSGet getHeader bs
 
 decodeDomain :: ByteString -> Either String Domain
 decodeDomain bs = fst <$> runSGet getDomain bs
+
+decodeMailbox :: ByteString -> Either String Mailbox
+decodeMailbox bs = fst <$> runSGet getMailbox bs
 
 decodeResourceRecord :: ByteString -> Either String ResourceRecord
 decodeResourceRecord bs = fst <$> runSGet getResourceRecord bs
@@ -185,14 +189,22 @@ getResourceRecord = do
         dok <- decodeDNSOK   -- 16
         len <- decodeRLen    -- 16
         dat <- getRData OPT len
-        return $ OptRecord udps dok ver dat
+        return OptRecord { orudpsize = udps
+                         , ordnssecok = dok
+                         , orversion = ver
+                         , ordata = dat
+                         }
 
     getRR dom t = do
         ignoreClass
         ttl <- decodeTTL
         len <- decodeRLen
         dat <- getRData t len
-        return $ ResourceRecord dom t ttl dat
+        return ResourceRecord { rrname = dom
+                              , rrtype = t
+                              , rrttl  = ttl
+                              , rdata  = dat
+                              }
 
     decodeUDPSize = get16
     decodeERCode = get8
@@ -217,8 +229,8 @@ getRData A len
 getRData AAAA len
   | len == 16 = (RD_AAAA . toIPv6b) <$> getNBytes len
   | otherwise = fail "IPv6 addresses must be 16 bytes long"
-getRData SOA _ = RD_SOA <$> getDomain
-                           <*> getDomain
+getRData SOA _ = RD_SOA    <$> getDomain
+                           <*> getMailbox
                            <*> decodeSerial
                            <*> decodeRefesh
                            <*> decodeRetry
@@ -271,6 +283,16 @@ getRData DS len = RD_DS <$> decodeTag
     decodeDtyp = get8
     decodeDval = getNByteString (len - 4)
 --
+getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
+                                <*> decodeKeyProto
+                                <*> decodeKeyAlg
+                                <*> decodeKeyBytes
+  where
+    decodeKeyFlags  = get16
+    decodeKeyProto  = get8
+    decodeKeyAlg    = get8
+    decodeKeyBytes  = getNByteString (len - 4)
+--
 getRData _  len = RD_OTH <$> getNByteString len
 
 getOData :: OPTTYPE -> Int -> SGet OData
@@ -289,7 +311,16 @@ getOData (OUNKNOWN i) len = OD_Unknown i <$> getNByteString len
 ----------------------------------------------------------------
 
 getDomain :: SGet Domain
-getDomain = do
+getDomain = getDomain' '.'
+
+getMailbox :: SGet Mailbox
+getMailbox = getDomain' '@'
+
+-- | Get a domain name, using sep1 as the separate between the 1st and 2nd
+-- label.  Subsequent labels (and always the trailing label) are terminated
+-- with a ".".
+getDomain' :: Char -> SGet ByteString
+getDomain' sep1 = do
     pos <- getPosition
     c <- getInt8
     let n = getValue c
@@ -310,11 +341,11 @@ getDomain = do
         _ | isExtLabel c -> return ""
         _ -> do
             hs <- getNByteString n
-            ds <- getDomain
+            ds <- getDomain' '.'
             let dom =
                     case ds of -- avoid trailing ".."
                         "." -> hs `BS.append` "."
-                        _   -> hs `BS.append` "." `BS.append` ds
+                        _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
             push pos dom
             return dom
   where

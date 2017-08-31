@@ -1,9 +1,14 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Network.DNS.Internal where
 
 import Control.Exception (Exception)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Base64 as B64 (encode)
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Builder as L
+import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
@@ -13,6 +18,11 @@ import Data.Word (Word8, Word16, Word32)
 
 -- | Type for domain.
 type Domain = ByteString
+
+-- | Type for a mailbox encoded on the wire as a DNS name, but the first label
+-- is conceptually the user name, and sometimes has internal '.' characters
+-- that are not label separators.
+type Mailbox = ByteString
 
 -- | Return type of composeQuery from Encode, needed in Resolver
 type Query = ByteString
@@ -200,14 +210,24 @@ makeQuestion = Question
 ----------------------------------------------------------------
 
 -- | Raw data format for resource records.
-data ResourceRecord
-    = ResourceRecord Domain TYPE Word32 RData
-    | OptRecord Word16 Bool Word8 RData
-    deriving (Eq,Show)
+
+data ResourceRecord = ResourceRecord {
+                            rrname :: Domain
+                          , rrtype :: TYPE
+                          , rrttl  :: Word32
+                          , rdata  :: RData
+                          }
+                    | OptRecord {
+                            orudpsize   :: Word16
+                          , ordnssecok  :: Bool
+                          , orversion   :: Word8
+                          , ordata      :: RData
+                          }
+                    deriving (Eq,Show)
 
 getRdata :: ResourceRecord -> RData
-getRdata (ResourceRecord _ _ _ rdata) = rdata
-getRdata (OptRecord _ _ _ rdata) = rdata
+getRdata ResourceRecord{..} = rdata
+getRdata OptRecord{..} = ordata
 
 -- | Raw data format for each type.
 data RData = RD_NS Domain
@@ -215,7 +235,7 @@ data RData = RD_NS Domain
            | RD_DNAME Domain
            | RD_MX Word16 Domain
            | RD_PTR Domain
-           | RD_SOA Domain Domain Word32 Word32 Word32 Word32 Word32
+           | RD_SOA Domain Mailbox Word32 Word32 Word32 Word32 Word32
            | RD_A IPv4
            | RD_AAAA IPv6
            | RD_TXT ByteString
@@ -224,11 +244,37 @@ data RData = RD_NS Domain
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
            | RD_DS Word16 Word8 Word8 ByteString
-    deriving (Eq, Ord, Show)
+           | RD_DNSKEY Word16 Word8 Word8 ByteString
+    deriving (Eq, Ord)
 
 data OData = OD_ClientSubnet Word8 Word8 IP
            | OD_Unknown Int ByteString
     deriving (Eq,Show,Ord)
+
+instance Show RData where
+  show (RD_NS dom) = BS.unpack dom
+  show (RD_MX prf dom) = show prf ++ " " ++ BS.unpack dom
+  show (RD_CNAME dom) = BS.unpack dom
+  show (RD_DNAME dom) = BS.unpack dom
+  show (RD_A a) = show a
+  show (RD_AAAA aaaa) = show aaaa
+  show (RD_TXT txt) = BS.unpack txt
+  show (RD_SOA mn mr serial refresh retry expire mi) = BS.unpack mn ++ " " ++ BS.unpack mr ++ " " ++
+                                                       show serial ++ " " ++ show refresh ++ " " ++
+                                                       show retry ++ " " ++ show expire ++ " " ++ show mi
+  show (RD_PTR dom) = BS.unpack dom
+  show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
+  show (RD_OPT od) = show od
+  show (RD_OTH is) = show is
+  show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ hexencode dgst
+  show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ hexencode dv
+  show (RD_DNSKEY f p a k) = show f ++ " " ++ show p ++ " " ++ show a ++ " " ++ b64encode k
+
+hexencode :: ByteString -> String
+hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
+
+b64encode :: ByteString -> String
+b64encode = BS.unpack . B64.encode
 
 ----------------------------------------------------------------
 

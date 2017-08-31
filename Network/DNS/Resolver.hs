@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -231,8 +233,8 @@ lookupSection section rlv dom typ = do
     dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
     correct r = rrname r == dom' && rrtype r == typ
     -}
-    correct (ResourceRecord _ rrtype _ _) = rrtype == typ
-    correct (OptRecord _ _ _ _) = False
+    correct ResourceRecord{..} = rrtype == typ
+    correct OptRecord{..} = False
     toRData x = map getRdata . filter correct $ section x
 
 -- | Extract necessary information from 'DNSMessage'
@@ -260,7 +262,7 @@ fromDNSFormat = fromDNSMessage
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookup resolver hostname A
---   Right [RD_A 93.184.216.34]
+--   Right [93.184.216.34]
 --
 lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookup = lookupSection answer
