@@ -1,4 +1,6 @@
-resolver: lts-5.9
+resolver: lts-6.35
 
 packages:
 - '.'
+extra-deps:
+- QuickCheck-2.10
