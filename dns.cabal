@@ -76,6 +76,7 @@ Test-Suite spec
   Main-Is:              Spec.hs
   Other-Modules:        EncodeSpec
                         DecodeSpec
+                        RoundTripSpec
   Build-Depends:        base
                       , attoparsec
                       , binary

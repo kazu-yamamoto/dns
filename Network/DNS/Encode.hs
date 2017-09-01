@@ -141,21 +141,21 @@ putQuestion Question{..} = putDomain qname
 putResourceRecord :: ResourceRecord -> SPut
 putResourceRecord rr =
     case rr of
-        ResourceRecord rrname rrtype rrttl rdata ->
+        ResourceRecord{..} ->
             mconcat [ putDomain rrname
                     , put16 (typeToInt rrtype)
                     , put16 1
                     , put32 rrttl
                     , putResourceRData rdata
                     ]
-        OptRecord orudpsize ordnssecok orversion rdata ->
+        OptRecord{..} ->
             mconcat [ putDomain BS.empty
                     , put16 (typeToInt OPT)
                     , put16 orudpsize
                     , put8 0   -- ERCode
                     , put8 orversion
                     , putInt16 $ if ordnssecok then setBit 0 15 else 0
-                    , putResourceRData rdata
+                    , putResourceRData ordata
                     ]
   where
     putResourceRData :: RData -> SPut
@@ -165,7 +165,6 @@ putResourceRecord rr =
         let rdataLength = fromIntegral . LBS.length . BB.toLazyByteString $ rDataBuilder
         let rlenBuilder = BB.int16BE rdataLength
         return $ rlenBuilder <> rDataBuilder
-
 
 putRData :: RData -> SPut
 putRData rd = case rd of
