@@ -10,7 +10,7 @@ import Network.DNS.Decode
 import Network.DNS.Encode
 import Test.Hspec
 import Test.Hspec.QuickCheck
-import Test.QuickCheck (Gen, arbitrary, choose, elements, forAll, frequency, listOf, oneof)
+import Test.QuickCheck (Gen, arbitrary, elements, forAll, frequency, listOf, oneof)
 import Data.Word (Word8, Word16, Word32)
 import Data.Monoid ((<>))
 
@@ -89,9 +89,11 @@ genResourceRecord = frequency
       dom <- genDomain
       t <- elements [A , AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS]
       ResourceRecord dom t <$> genWord32 <*> mkRData dom t
+{-
     genRDataOpt = do
       odata <- listOf genOData
       pure $ ResourceRecord "" OPT (fromIntegral $ length odata) (RD_OPT odata)
+-}
     genOptRecord = do
       dom <- genDomain
       t <- genTYPE
