@@ -22,6 +22,7 @@ type Query = ByteString
 -- | Types for resource records.
 data TYPE = A
           | AAAA
+          | ANY
           | NS
           | TXT
           | MX
@@ -41,6 +42,7 @@ data TYPE = A
           | CDS
           | CDNSKEY
           | CSYNC
+          | NULL
           | UNKNOWN Word16
           deriving (Eq, Show, Read)
 
@@ -52,6 +54,7 @@ rrDB = [
   , (NS,     2)
   , (CNAME,  5)
   , (SOA,    6)
+  , (NULL,  10)
   , (PTR,   12)
   , (MX,    15)
   , (TXT,   16)
@@ -69,6 +72,7 @@ rrDB = [
   , (CDS,   59) -- RFC 7344
   , (CDNSKEY, 60) -- RFC 7344
   , (CSYNC, 62) -- RFC 7477
+  , (ANY, 255)
   ]
 
 data OPTTYPE = ClientSubnet
@@ -224,6 +228,8 @@ data RData = RD_NS Domain
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
            | RD_DS Word16 Word8 Word8 ByteString
+           | RD_NULL  -- anything can be in a NULL record,
+                      -- for now we just drop this data.
     deriving (Eq, Ord, Show)
 
 data OData = OD_ClientSubnet Word8 Word8 IP
