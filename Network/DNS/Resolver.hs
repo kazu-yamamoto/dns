@@ -19,7 +19,7 @@ module Network.DNS.Resolver (
   , fromDNSFormat
   ) where
 
-import Control.Exception (bracket)
+import Control.Exception (bracket, throwIO)
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)
@@ -140,10 +140,23 @@ makeResolvSeed conf = ResolvSeed <$> addr
     addr = case resolvInfo conf of
         RCHostName numhost -> makeAddrInfo numhost Nothing
         RCHostPort numhost mport -> makeAddrInfo numhost $ Just mport
-        RCFilePath file -> toAddr <$> readFile file >>= \i -> makeAddrInfo i Nothing
-    toAddr cs = let l:_ = filter ("nameserver" `isPrefixOf`) $ lines cs
-                in extract l
+        RCFilePath file -> do
+            ms <- getDefaultDnsServer file
+            case ms of
+              Nothing -> throwIO BadConfiguration
+              Just s  -> makeAddrInfo s Nothing
+
+getDefaultDnsServer :: FilePath -> IO (Maybe String)
+#if mingw32_HOST_OS == 1
+getDefaultDnsServer _ = return $ Just "8.8.8.8"
+#else
+getDefaultDnsServer file = toAddr <$> readFile file
+  where
+    toAddr cs = case filter ("nameserver" `isPrefixOf`) $ lines cs of
+      []  -> Nothing
+      l:_ -> Just $ extract l
     extract = reverse . dropWhile isSpace . reverse . dropWhile isSpace . drop 11
+#endif
 
 makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
 makeAddrInfo addr mport = do
