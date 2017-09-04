@@ -3,6 +3,7 @@
 module Network.DNS.Internal where
 
 import Control.Exception (Exception)
+import Data.Bits ((.&.), shiftR, testBit)
 import Data.ByteString (ByteString)
 import Data.IP (IP, IPv4, IPv6)
 import Data.Maybe (fromMaybe)
@@ -248,15 +249,32 @@ data OData = OD_ClientSubnet Word8 Word8 IP
            | OD_Unknown Int ByteString
     deriving (Eq,Show,Ord)
 
+-- For OPT pseudo-RR defined in RFC 6891
 
--- | Optional record for EDNS0
-data OptRecord = OptRecord {
-    orudpsize   :: Word16
-  , ordnssecok  :: Bool
-  , orversion   :: Word8
-  , orrdata     :: RData
-  }
-  deriving (Eq,Show)
+orUdpSize :: ResourceRecord -> Word16
+orUdpSize rr
+  | rrtype rr == OPT = rrclass rr
+  | otherwise        = error "Can be used only for OPT"
+
+orExtRcode :: ResourceRecord -> Word8
+orExtRcode rr
+  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0xff000000) 24
+  | otherwise        = error "Can be used only for OPT"
+
+orVersion :: ResourceRecord -> Word8
+orVersion rr
+  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0x00ff0000) 16
+  | otherwise        = error "Can be used only for OPT"
+
+orDnssecOk :: ResourceRecord -> Bool
+orDnssecOk rr
+  | rrtype rr == OPT = rrttl rr `testBit` 15
+  | otherwise        = error "Can be used only for OPT"
+
+orRdata :: ResourceRecord -> RData
+orRdata rr
+  | rrtype rr == OPT = rdata rr
+  | otherwise        = error "Can be used only for OPT"
 
 ----------------------------------------------------------------
 
