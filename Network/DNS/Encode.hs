@@ -5,6 +5,7 @@ module Network.DNS.Encode (
   , encodeDNSFlags
   , encodeDNSHeader
   , encodeDomain
+  , encodeMailbox
   , encodeResourceRecord
   , encodeVC
   , composeQuery
@@ -79,6 +80,9 @@ encodeDNSHeader = runSPut . putHeader
 
 encodeDomain :: Domain -> ByteString
 encodeDomain = runSPut . putDomain
+
+encodeMailbox :: Mailbox -> ByteString
+encodeMailbox = runSPut . putMailbox
 
 encodeResourceRecord :: ResourceRecord -> ByteString
 encodeResourceRecord rr = runSPut $ putResourceRecord rr
@@ -168,9 +172,9 @@ putRData rd = case rd of
     RD_TXT txt      -> putByteStringWithLength txt
     RD_OTH bytes    -> putByteString bytes
     RD_OPT opts     -> mconcat $ fmap putOData opts
-    RD_SOA d1 d2 serial refresh retry expire min' -> mconcat
-        [ putDomain d1
-        , putDomain d2
+    RD_SOA mn mr serial refresh retry expire min' -> mconcat
+        [ putDomain mn
+        , putMailbox mr
         , put32 serial
         , put32 refresh
         , put32 retry
@@ -196,6 +200,12 @@ putRData rd = case rd of
         , putByteString dv
         ]
     RD_NULL -> pure mempty
+    (RD_DNSKEY f p a k) -> mconcat
+        [ put16 f
+        , put8 p
+        , put8 a
+        , putByteString k
+        ]
 
 putOData :: OData -> SPut
 putOData (OD_ClientSubnet srcNet scpNet ip) =
@@ -229,7 +239,13 @@ rootDomain :: Domain
 rootDomain = BS.pack "."
 
 putDomain :: Domain -> SPut
-putDomain dom
+putDomain = putDomain' '.'
+
+putMailbox :: Mailbox -> SPut
+putMailbox = putDomain' '@'
+
+putDomain' :: Char -> ByteString -> SPut
+putDomain' sep dom
     | BS.null dom || dom == rootDomain = put8 0
     | otherwise = do
         mpos <- wsPop dom
@@ -238,10 +254,13 @@ putDomain dom
             Just pos -> putPointer pos
             Nothing  -> wsPush dom cur >>
                         mconcat [ putPartialDomain hd
-                                , putDomain tl
+                                , putDomain' '.' tl
                                 ]
   where
-    (hd, tl') = BS.break (=='.') dom
+    (hd, tl') = case sep of
+        '.' -> BS.break (== '.') dom
+        _ | sep `BS.elem` dom -> BS.break (== sep) dom
+          | otherwise -> BS.break (== '.') dom
     tl = if BS.null tl' then tl' else BS.drop 1 tl'
 
 putPointer :: Int -> SPut
