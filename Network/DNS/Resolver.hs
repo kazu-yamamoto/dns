@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, OverloadedStrings #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -57,6 +58,11 @@ import qualified Data.ByteString.Char8 as BS
 import Control.Monad (when)
 #else
 import Network.Socket.ByteString (sendAll)
+#endif
+
+#if defined(WIN)
+import Foreign.C (CString, peekCString)
+import Foreign.Marshal.Utils (maybePeek)
 #endif
 
 ----------------------------------------------------------------
@@ -157,8 +163,10 @@ makeResolvSeed conf = ResolvSeed <$> addr
               Just s  -> makeAddrInfo s Nothing
 
 getDefaultDnsServer :: FilePath -> IO (Maybe String)
-#if mingw32_HOST_OS == 1
-getDefaultDnsServer _ = return $ Just "8.8.8.8"
+#if defined(WIN)
+getDefaultDnsServer _ = getWindowsDefDnsServer >>= maybePeek peekCString
+
+foreign import ccall "getWindowsDefDnsServer" getWindowsDefDnsServer :: IO CString
 #else
 getDefaultDnsServer file = toAddr <$> readFile file
   where

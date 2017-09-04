@@ -12,6 +12,7 @@ Category:               Network
 Cabal-Version:          >= 1.10
 Build-Type:             Simple
 Extra-Source-Files:     Changelog
+                        cbits/defaultdns.c
 
 Library
   Default-Language:     Haskell2010
@@ -54,6 +55,9 @@ Library
                       , random
                       , resourcet
                       , safe == 0.3.*
+  if os(windows)
+    C-Sources:        cbits/defaultdns.c
+    Extra-Libraries:  iphlpapi
 
 Test-Suite network
   Type:                 exitcode-stdio-1.0
