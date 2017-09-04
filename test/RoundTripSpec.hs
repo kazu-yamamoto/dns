@@ -81,23 +81,12 @@ genTYPE = frequency
 genResourceRecord :: Gen ResourceRecord
 genResourceRecord = frequency
     [ (8, genRR)
-    -- fixme: Add this back in when it works.
-    , (0, genOptRecord)
     ]
   where
     genRR = do
       dom <- genDomain
       t <- elements [A , AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS]
-      ResourceRecord dom t <$> genWord32 <*> mkRData dom t
-{-
-    genRDataOpt = do
-      odata <- listOf genOData
-      pure $ ResourceRecord "" OPT (fromIntegral $ length odata) (RD_OPT odata)
--}
-    genOptRecord = do
-      dom <- genDomain
-      t <- genTYPE
-      OptRecord <$> genWord16 <*> genBool <*> genWord8 <*> mkRData dom t
+      ResourceRecord dom t classIN <$> genWord32 <*> mkRData dom t
 
 mkRData :: Domain -> TYPE -> Gen RData
 mkRData dom typ =
