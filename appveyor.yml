@@ -23,6 +23,6 @@ build_script:
 - stack --no-terminal build --resolver %stack_lts% --reconfigure
 
 test_script:
-- stack --no-terminal test --resolver %stack_lts% --reconfigure
+- stack --no-terminal test dns:network dns:spec --resolver %stack_lts% --reconfigure
 
 deploy: off
