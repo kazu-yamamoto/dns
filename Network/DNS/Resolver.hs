@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, OverloadedStrings #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -19,7 +20,17 @@ module Network.DNS.Resolver (
   , fromDNSFormat
   ) where
 
-import Control.Exception (bracket)
+#if !defined(mingw32_HOST_OS)
+#define POSIX
+#else
+#define WIN
+#endif
+
+#if __GLASGOW_HASKELL__ < 709
+#define GHC708
+#endif
+
+import Control.Exception (bracket, throwIO)
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)
@@ -37,16 +48,21 @@ import Prelude hiding (lookup)
 import System.Random (getStdRandom, random)
 import System.Timeout (timeout)
 import Data.Word (Word16)
-#if __GLASGOW_HASKELL__ < 709
+#ifdef GHC708
 import Control.Applicative ((<$>), (<*>), pure)
 #endif
 
-#if mingw32_HOST_OS == 1
+#if defined(WIN) && defined(GHC708)
 import Network.Socket (send)
 import qualified Data.ByteString.Char8 as BS
 import Control.Monad (when)
 #else
 import Network.Socket.ByteString (sendAll)
+#endif
+
+#if defined(WIN)
+import Foreign.C (CString, peekCString)
+import Foreign.Marshal.Utils (maybePeek)
 #endif
 
 ----------------------------------------------------------------
@@ -140,10 +156,25 @@ makeResolvSeed conf = ResolvSeed <$> addr
     addr = case resolvInfo conf of
         RCHostName numhost -> makeAddrInfo numhost Nothing
         RCHostPort numhost mport -> makeAddrInfo numhost $ Just mport
-        RCFilePath file -> toAddr <$> readFile file >>= \i -> makeAddrInfo i Nothing
-    toAddr cs = let l:_ = filter ("nameserver" `isPrefixOf`) $ lines cs
-                in extract l
+        RCFilePath file -> do
+            ms <- getDefaultDnsServer file
+            case ms of
+              Nothing -> throwIO BadConfiguration
+              Just s  -> makeAddrInfo s Nothing
+
+getDefaultDnsServer :: FilePath -> IO (Maybe String)
+#if defined(WIN)
+getDefaultDnsServer _ = getWindowsDefDnsServer >>= maybePeek peekCString
+
+foreign import ccall "getWindowsDefDnsServer" getWindowsDefDnsServer :: IO CString
+#else
+getDefaultDnsServer file = toAddr <$> readFile file
+  where
+    toAddr cs = case filter ("nameserver" `isPrefixOf`) $ lines cs of
+      []  -> Nothing
+      l:_ -> Just $ extract l
     extract = reverse . dropWhile isSpace . reverse . dropWhile isSpace . drop 11
+#endif
 
 makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
 makeAddrInfo addr mport = do
@@ -440,9 +471,8 @@ tcpLookup query peer tm (Just vc) = do
         Nothing  -> return $ Left TimeoutExpired
         Just res -> return $ Right res
 
-#if mingw32_HOST_OS == 1
--- Windows does not support sendAll in Network.ByteString.
--- This implements sendAll with Haskell Strings.
+#if defined(WIN) && defined(GHC708)
+-- Windows does not support sendAll in Network.ByteString for older GHCs.
 sendAll :: Socket -> BS.ByteString -> IO ()
 sendAll sock bs = do
   sent <- send sock (BS.unpack bs)

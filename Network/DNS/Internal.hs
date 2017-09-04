@@ -137,6 +137,8 @@ data DNSError =
   | OperationRefused
     -- | The server detected a malformed OPT RR.
   | BadOptRecord
+    -- | Configuration is wrong.
+  | BadConfiguration
   deriving (Eq, Show, Typeable)
 
 instance Exception DNSError
