@@ -1,3 +1,14 @@
+2.0.13
+	- Testing with AppVeyor.
+	- Detecting a default DNS server on Windows.
+	- Fixing sendAll on Windows [#72](https://github.com/kazu-yamamoto/dns/pull/72)
+
+2.0.12
+	- Fixing Windows build again
+2.0.11
+	- Fixing the StateBinary.get32 parser [#57](https://github.com/kazu-yamamoto/dns/pull/57)
+	- Removing bytestring-builder dependency [#61](https://github.com/kazu-yamamoto/dns/pull/61)
+	- Fixing Windows build [#62](https://github.com/kazu-yamamoto/dns/pull/62)
 2.0.10
 	- Cleaning up the code. [#47](https://github.com/kazu-yamamoto/dns/pull/47)
 2.0.9
