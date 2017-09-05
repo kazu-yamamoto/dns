@@ -26,7 +26,7 @@ module Network.DNS.Resolver (
 #endif
 
 #if __GLASGOW_HASKELL__ < 709
-#define GHC6
+#define GHC708
 #endif
 
 import Control.Exception (bracket)
@@ -46,11 +46,11 @@ import Network.Socket (defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, randomR)
 import System.Timeout (timeout)
-#ifdef GHC6
+#ifdef GHC708
 import Control.Applicative ((<$>), (<*>), pure)
 #endif
 
-#if defined(WIN) && defined(GHC6)
+#if defined(WIN) && defined(GHC708)
 import Network.Socket (send)
 import qualified Data.ByteString.Lazy.Char8 as LB
 import Control.Monad (when)
@@ -448,7 +448,7 @@ tcpLookup query peer tm (Just vc) = do
         Nothing  -> return $ Left TimeoutExpired
         Just res -> return $ Right res
 
-#if defined(WIN) && defined(GHC6)
+#if defined(WIN) && defined(GHC708)
 -- Windows does not support sendAll in Network.ByteString for older GHCs.
 sendAll :: Socket -> BS.ByteString -> IO ()
 sendAll sock bs = do
