@@ -27,12 +27,12 @@ module Network.DNS.Types (
   -- ** DNS Body
   , Question (..)
   , makeQuestion
-  -- * DNS Error
-  , DNSError (..)
   -- * Query and Response
   , defaultQuery
   , defaultResponse
   , responseA, responseAAAA
+  -- * DNS Error
+  , DNSError (..)
   -- * EDNS0
   , OData (..)
   , OptCode (..), intToOptCode, optCodeToInt
