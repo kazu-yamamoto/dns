@@ -37,7 +37,6 @@ module Network.DNS.Types (
   -- ** EDNS0 Converters
   , orUdpSize, orExtRcode, orVersion, orDnssecOk, orRdata
   -- * Other types
-  , Query
   , Mailbox
   ) where
 
@@ -63,9 +62,6 @@ type Domain = ByteString
 -- is conceptually the user name, and sometimes has internal '.' characters
 -- that are not label separators.
 type Mailbox = ByteString
-
--- | Return type of composeQuery from Encode, needed in Resolver
-type Query = ByteString
 
 ----------------------------------------------------------------
 

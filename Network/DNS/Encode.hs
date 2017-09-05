@@ -40,7 +40,7 @@ import Data.Monoid (mconcat)
 ----------------------------------------------------------------
 
 -- | Composing query.
-composeQuery :: Identifier -> [Question] -> Query
+composeQuery :: Identifier -> [Question] -> ByteString
 composeQuery idt qs = encode qry
   where
     hdr = header defaultQuery
@@ -52,7 +52,7 @@ composeQuery idt qs = encode qry
       }
 
 -- | Composing query with authentic data flag set.
-composeQueryAD :: Identifier -> [Question] -> Query
+composeQueryAD :: Identifier -> [Question] -> ByteString
 composeQueryAD idt qs = encode qry
   where
       hdr = header defaultQuery

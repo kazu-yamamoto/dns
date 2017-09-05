@@ -32,23 +32,20 @@ module Network.DNS.Resolver (
 #endif
 
 import Control.Exception (bracket, throwIO)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8 as BS
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)
+import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
 import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.Types
-import qualified Data.ByteString.Char8 as BS
-import Network.Socket (HostName, Socket, SocketType(Stream, Datagram))
-import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..))
-import Network.Socket (Family(AF_INET, AF_INET6), PortNumber(..))
-import Network.Socket (close, socket, connect, getPeerName, getAddrInfo)
-import Network.Socket (defaultHints, defaultProtocol)
+import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), PortNumber(..), HostName, Socket, SocketType(Stream, Datagram), close, socket, connect, getPeerName, getAddrInfo, defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
 import System.Random (getStdRandom, random)
 import System.Timeout (timeout)
-import Data.Word (Word16)
 #ifdef GHC708
 import Control.Applicative ((<$>), (<*>), pure)
 #endif
@@ -418,11 +415,10 @@ lookupRawInternal rcv ad rlv dom typ = do
 -- answer, but it is just too large for UDP), we expect to succeed
 -- quickly on the first try.  There will be no further retries.
 
-tcpRetry ::
-    Query
-    -> Socket
-    -> Int
-    -> IO (Either DNSError DNSMessage)
+tcpRetry :: ByteString
+         -> Socket
+         -> Int
+         -> IO (Either DNSError DNSMessage)
 tcpRetry query sock tm = do
     peer <- getPeerName sock
     bracket (tcpOpen peer)
@@ -455,12 +451,11 @@ tcpOpen peer = do
 -- is reported as "server" failure, though it is really our stub
 -- resolver that's failing.  This is likely good enough.
 
-tcpLookup ::
-    Query
-    -> SockAddr
-    -> Int
-    -> Maybe Socket
-    -> IO (Either DNSError DNSMessage)
+tcpLookup :: ByteString
+          -> SockAddr
+          -> Int
+          -> Maybe Socket
+          -> IO (Either DNSError DNSMessage)
 tcpLookup _ _ _ Nothing = return $ Left ServerFailure
 tcpLookup query peer tm (Just vc) = do
     response <- timeout tm $ do
