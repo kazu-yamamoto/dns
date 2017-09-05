@@ -42,7 +42,7 @@
 --   one millisecond and a very limited number of retries:
 --
 --   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
---   >>> let badrc = defaultResolvConf { resolvTimeout = 1, resolvRetry = 1 }
+--   >>> let badrc = defaultResolvConf { resolvTimeout = 0, resolvRetry = 1 }
 --   >>>
 --   >>> rs <- makeResolvSeed badrc
 --   >>> withResolver rs $ \resolver -> lookupA resolver hostname
