@@ -175,20 +175,31 @@ type DNSFormat = DNSMessage
 
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
-    identifier :: Word16
-  , flags      :: DNSFlags
+    identifier :: Word16    -- ^ An identifier assigned by the program that
+                            --   generates any kind of query.
+  , flags      :: DNSFlags  -- ^ The second 16bit word.
   } deriving (Eq, Show)
 
 -- | Raw data format for the flags of DNS Query and Response.
 data DNSFlags = DNSFlags {
     qOrR         :: QorR   -- ^ Query or response.
-  , opcode       :: OPCODE
-  , authAnswer   :: Bool
-  , trunCation   :: Bool
-  , recDesired   :: Bool
-  , recAvailable :: Bool
-  , rcode        :: RCODE
-  , authenData   :: Bool
+  , opcode       :: OPCODE -- ^ Kind of query.
+  , authAnswer   :: Bool   -- ^ Authoritative Answer - this bit is valid in responses,
+                           -- and specifies that the responding name server is an
+                           -- authority for the domain name in question section.
+  , trunCation   :: Bool   -- ^ TrunCation - specifies that this message was truncated
+                           -- due to length greater than that permitted on the
+                           -- transmission channel.
+  , recDesired   :: Bool   -- ^ Recursion Desired - this bit may be set in a query and
+                           -- is copied into the response.  If RD is set, it directs
+                           -- the name server to pursue the query recursively.
+                           -- Recursive query support is optional.
+  , recAvailable :: Bool   -- ^ Recursion Available - this be is set or cleared in a
+                           -- response, and denotes whether recursive query support is
+                           -- available in the name server.
+
+  , rcode        :: RCODE  -- ^ Response code.
+  , authenData   :: Bool   -- ^ Authentic Data (RFC4035).
   } deriving (Eq, Show)
 
 ----------------------------------------------------------------
@@ -266,23 +277,28 @@ data ResourceRecord = ResourceRecord {
   } deriving (Eq,Show)
 
 -- | Raw data format for each type.
-data RData = RD_NS Domain
-           | RD_CNAME Domain
-           | RD_DNAME Domain
-           | RD_MX Word16 Domain
-           | RD_PTR Domain
+data RData = RD_NS Domain        -- ^ An authoritative name serve
+           | RD_CNAME Domain     -- ^ The canonical name for an alias
+           | RD_DNAME Domain     -- ^ DNAME (RFC6672)
+           | RD_MX Word16 Domain -- ^ Mail exchange
+           | RD_PTR Domain       -- ^ A domain name pointer
            | RD_SOA Domain Mailbox Word32 Word32 Word32 Word32 Word32
-           | RD_A IPv4
-           | RD_AAAA IPv6
-           | RD_TXT ByteString
+                                 -- ^ Marks the start of a zone of authority
+           | RD_A IPv4           -- ^ IPv4 address
+           | RD_AAAA IPv6        -- ^ IPv6 Address
+           | RD_TXT ByteString   -- ^ Text strings
            | RD_SRV Word16 Word16 Word16 Domain
-           | RD_OPT [OData]
+                                 -- ^ Server Selection (RFC2782)
+           | RD_OPT [OData]      -- ^ OPT (RFC6891)
            | RD_OTH ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
-           | RD_DS Word16 Word8 Word8 ByteString
-           | RD_NULL  -- anything can be in a NULL record,
-                      -- for now we just drop this data.
+                                 -- ^ TLSA (RFC6698)
+           | RD_DS Word16 Word8 Word8 ByteString -- ^ Delegation Signer (RFC4034)
+           | RD_NULL             -- ^ A null RR (EXPERIMENTAL).
+                                 -- Anything can be in a NULL record,
+                                 -- for now we just drop this data.
            | RD_DNSKEY Word16 Word8 Word8 ByteString
+                                 -- ^ DNSKEY (RFC4034)
     deriving (Eq, Ord)
 
 -- | Optional resource data.
