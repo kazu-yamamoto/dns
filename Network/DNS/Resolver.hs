@@ -76,6 +76,10 @@ import Foreign.Marshal.Utils (maybePeek)
 --   >>> let cache = RCHostName "8.8.8.8"
 --
 data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
+                                             -- on Unix.
+                                             -- A default DNS server is
+                                             -- automatically detected
+                                             -- on Windows.
                        | RCHostName HostName -- ^ A numeric IP address
                        | RCHostPort HostName PortNumber -- ^ A numeric IP address and port number
 
