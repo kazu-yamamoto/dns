@@ -165,8 +165,8 @@ getQueries n = replicateM n getQuery
 getTYPE :: SGet TYPE
 getTYPE = intToType <$> get16
 
-getOptType :: SGet OPTTYPE
-getOptType = intToOptType <$> getInt16
+getOptCode :: SGet OptCode
+getOptCode = intToOptCode <$> getInt16
 
 getQuery :: SGet Question
 getQuery = Question <$> getDomain
@@ -235,7 +235,7 @@ getRData OPT ol = RD_OPT <$> decode' ol
         | l  < 0 = fail $ "decodeOPTData: length inconsistency (" ++ show l ++ ")"
         | l == 0 = pure []
         | otherwise = do
-            optCode <- getOptType
+            optCode <- getOptCode
             optLen <- getInt16
             dat <- getOData optCode optLen
             (dat:) <$> decode' (l - optLen - 4)
@@ -273,7 +273,7 @@ getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
 --
 getRData _  len = RD_OTH <$> getNByteString len
 
-getOData :: OPTTYPE -> Int -> SGet OData
+getOData :: OptCode -> Int -> SGet OData
 getOData ClientSubnet len = do
         fam <- getInt16
         srcMask <- get8

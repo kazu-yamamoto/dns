@@ -214,7 +214,7 @@ putOData (OD_ClientSubnet srcNet scpNet ip) =
                         IPv4 ip4 -> (1,dropZeroes $ fromIPv4 ip4)
                         IPv6 ip6 -> (2,dropZeroes $ fromIPv6b ip6)
         dataLen = 2 + 2 + length raw
-     in mconcat [ putInt16 (optTypeToInt ClientSubnet)
+     in mconcat [ putInt16 (optCodeToInt ClientSubnet)
                 , putInt16 dataLen
                 , putInt16 fam
                 , put8 srcNet

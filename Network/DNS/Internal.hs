@@ -30,30 +30,31 @@ type Query = ByteString
 ----------------------------------------------------------------
 
 -- | Types for resource records.
-data TYPE = A
-          | AAAA
-          | ANY
-          | NS
-          | TXT
-          | MX
-          | CNAME
-          | SOA
-          | PTR
-          | SRV
-          | DNAME
-          | OPT
-          | DS
-          | RRSIG
-          | NSEC
-          | DNSKEY
-          | NSEC3
-          | NSEC3PARAM
-          | TLSA
-          | CDS
-          | CDNSKEY
-          | CSYNC
-          | NULL
-          | UNKNOWN Word16
+data TYPE = A          -- ^ IPv4 address
+          | AAAA       -- ^ IPv6 Address
+          | ANY        -- ^ A request for all records the server/cache
+                       --   has available
+          | NS         -- ^ An authoritative name serve
+          | TXT        -- ^ Text strings
+          | MX         -- ^ Mail exchange
+          | CNAME      -- ^ The canonical name for an alias
+          | SOA        -- ^ Marks the start of a zone of authority
+          | PTR        -- ^ A domain name pointer
+          | SRV        -- ^ Server Selection (RFC2782)
+          | DNAME      -- ^ DNAME (RFC6672)
+          | OPT        -- ^ OPT (RFC6891)
+          | DS         -- ^ Delegation Signer (RFC4034)
+          | RRSIG      -- ^ RRSIG (RFC4034)
+          | NSEC       -- ^ NSEC (RFC4034)
+          | DNSKEY     -- ^ DNSKEY (RFC4034)
+          | NSEC3      -- ^ NSEC3 (RFC5155)
+          | NSEC3PARAM -- ^ NSEC3PARAM (RFC5155)
+          | TLSA       -- ^ TLSA (RFC6698)
+          | CDS        -- ^ Child DS (RFC7344)
+          | CDNSKEY    -- ^ DNSKEY(s) the Child wants reflected in DS (RFC7344)
+          | CSYNC      -- ^ Child-To-Parent Synchronization (RFC7477)
+          | NULL       -- ^ A null RR (EXPERIMENTAL)
+          | UNKNOWN Word16  -- ^ Unknown type
           deriving (Eq, Show, Read)
 
 -- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
@@ -85,11 +86,12 @@ rrDB = [
   , (ANY, 255)
   ]
 
-data OPTTYPE = ClientSubnet
-             | OUNKNOWN Int
+-- | Option Code (RFC 6891).
+data OptCode = ClientSubnet -- ^ Client subnet (RFC7871)
+             | OUNKNOWN Int -- ^ Unknown option code
     deriving (Eq)
 
-orDB :: [(OPTTYPE, Int)]
+orDB :: [(OptCode, Int)]
 orDB = [
         (ClientSubnet, 8)
        ]
@@ -100,17 +102,23 @@ rookup  key ((x,y):xys)
   | key == y          =  Just x
   | otherwise         =  rookup key xys
 
+-- | From number to type. Naming is for historical reasons.
 intToType :: Word16 -> TYPE
 intToType n = fromMaybe (UNKNOWN n) $ rookup n rrDB
+
+-- | From type to number. Naming is for historical reasons.
 typeToInt :: TYPE -> Word16
 typeToInt (UNKNOWN x)  = x
 typeToInt t = fromMaybe (error "typeToInt") $ lookup t rrDB
 
-intToOptType :: Int -> OPTTYPE
-intToOptType n = fromMaybe (OUNKNOWN n) $ rookup n orDB
-optTypeToInt :: OPTTYPE -> Int
-optTypeToInt (OUNKNOWN x)  = x
-optTypeToInt t = fromMaybe (error "optTypeToInt") $ lookup t orDB
+-- | From number to option code.
+intToOptCode :: Int -> OptCode
+intToOptCode n = fromMaybe (OUNKNOWN n) $ rookup n orDB
+
+-- | From option code to number.
+optCodeToInt :: OptCode -> Int
+optCodeToInt (OUNKNOWN x)  = x
+optCodeToInt t = fromMaybe (error "optCodeToInt") $ lookup t orDB
 
 ----------------------------------------------------------------
 
@@ -277,36 +285,41 @@ data RData = RD_NS Domain
            | RD_DNSKEY Word16 Word8 Word8 ByteString
     deriving (Eq, Ord)
 
-data OData = OD_ClientSubnet Word8 Word8 IP
-           | OD_Unknown Int ByteString
+-- | Optional resource data.
+data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
+           | OD_Unknown Int ByteString      -- ^ Unknown optional type
     deriving (Eq,Show,Ord)
 
 -- For OPT pseudo-RR defined in RFC 6891
 
+-- | UDP size for EDNS0 (RFC6891).
 orUdpSize :: ResourceRecord -> Word16
 orUdpSize rr
   | rrtype rr == OPT = rrclass rr
   | otherwise        = error "Can be used only for OPT"
 
+-- | Extended RCODE for EDNS0 (RFC6891).
 orExtRcode :: ResourceRecord -> Word8
 orExtRcode rr
   | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0xff000000) 24
   | otherwise        = error "Can be used only for OPT"
 
+-- | Version for EDNS0 (RFC6891).
 orVersion :: ResourceRecord -> Word8
 orVersion rr
   | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0x00ff0000) 16
   | otherwise        = error "Can be used only for OPT"
 
+-- | DNSSEC OK flag (RFC3225) for EDNS0 (RFC6891).
 orDnssecOk :: ResourceRecord -> Bool
 orDnssecOk rr
   | rrtype rr == OPT = rrttl rr `testBit` 15
   | otherwise        = error "Can be used only for OPT"
 
-orRdata :: ResourceRecord -> RData
-orRdata rr
-  | rrtype rr == OPT = rdata rr
-  | otherwise        = error "Can be used only for OPT"
+-- | Option resource data for EDNS0 (RFC6891).
+orRdata :: ResourceRecord -> [OData]
+orRdata (ResourceRecord _ OPT _ _ (RD_OPT odata)) = odata
+orRdata _ = error "Can be used only for OPT"
 
 instance Show RData where
   show (RD_NS dom) = BS.unpack dom
