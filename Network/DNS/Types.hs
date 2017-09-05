@@ -26,7 +26,6 @@ module Network.DNS.Types (
   , RCODE (..)
   -- ** DNS Body
   , Question (..)
-  , makeQuestion
   -- * Query and Response
   , defaultQuery
   , defaultResponse
@@ -292,10 +291,6 @@ data Question = Question {
     qname  :: Domain -- ^ A domain name
   , qtype  :: TYPE   -- ^ The type of the query
   } deriving (Eq, Show)
-
--- | Making 'Question'.
-makeQuestion :: Domain -> TYPE -> Question
-makeQuestion = Question
 
 ----------------------------------------------------------------
 

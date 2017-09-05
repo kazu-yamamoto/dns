@@ -409,7 +409,7 @@ lookupRawInternal rcv ad rlv dom typ = do
     sock = dnsSock rlv
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
-    q = makeQuestion dom typ
+    q = Question dom typ
     check seqno res = identifier (header res) == seqno
 
 -- Create a TCP socket `just like` our UDP socket and retry the same

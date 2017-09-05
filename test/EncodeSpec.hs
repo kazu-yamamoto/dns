@@ -4,7 +4,7 @@ module EncodeSpec where
 
 import Data.IP
 import Network.DNS
-import Network.DNS.Types (defaultQuery, makeQuestion)
+import Network.DNS.Types (defaultQuery, Question(..))
 import Test.Hspec
 
 spec :: Spec
@@ -44,7 +44,7 @@ testQueryA = defaultQuery {
     header = defaultHeader {
          identifier = 1000
        }
-  , question = [makeQuestion "www.mew.org." A]
+  , question = [Question "www.mew.org." A]
   }
 
 testQueryAAAA :: DNSMessage
@@ -52,7 +52,7 @@ testQueryAAAA = defaultQuery {
     header = defaultHeader {
          identifier = 1001
        }
-  , question = [makeQuestion "www.mew.org." AAAA]
+  , question = [Question "www.mew.org." AAAA]
   }
 
 testResponseA :: DNSMessage
