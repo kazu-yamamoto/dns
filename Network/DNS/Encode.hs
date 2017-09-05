@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards, CPP #-}
 
+-- | Encoders for DNS.
 module Network.DNS.Encode (
     -- * Composing Query
     composeQuery
@@ -65,12 +66,12 @@ composeQueryAD idt qs = encode qry
 
 ----------------------------------------------------------------
 
--- | Encoding DNS data.
-encode :: DNSMessage -> Query
+-- | Encoding DNS query or response.
+encode :: DNSMessage -> ByteString
 encode = runSPut . putDNSMessage
 
 -- | Encoding for virtual circuit.
-encodeVC :: Query -> Query
+encodeVC :: ByteString -> ByteString
 encodeVC query =
     let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length query
     in len <> query

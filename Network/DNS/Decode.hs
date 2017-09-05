@@ -1,13 +1,17 @@
 {-# LANGUAGE OverloadedStrings, DeriveDataTypeable, CPP #-}
 
+-- | Decoders for DNS.
 module Network.DNS.Decode (
+    -- * Decoder
     decode
+  , decodeMany
+    -- * Decoder for Each Part
   , decodeDomain
   , decodeMailbox
   , decodeDNSFlags
   , decodeDNSHeader
   , decodeResourceRecord
-  , decodeMany
+    -- * Receiving from socket
   , receive
   , receiveVC
   ) where
@@ -67,7 +71,7 @@ receiveVC sock = runResourceT $ do
 
 ----------------------------------------------------------------
 
--- | Parsing DNS data.
+-- | Decoding DNS query or response.
 
 decode :: ByteString -> Either String DNSMessage
 decode bs = fst <$> runSGet getResponse bs
@@ -86,18 +90,23 @@ decodeMany bs = do
       len <- getInt16
       getNByteString len
 
+-- | Decoding DNS flags.
 decodeDNSFlags :: ByteString -> Either String DNSFlags
 decodeDNSFlags bs = fst <$> runSGet getDNSFlags bs
 
+-- | Decoding DNS header.
 decodeDNSHeader :: ByteString -> Either String DNSHeader
 decodeDNSHeader bs = fst <$> runSGet getHeader bs
 
+-- | Decoding domain.
 decodeDomain :: ByteString -> Either String Domain
 decodeDomain bs = fst <$> runSGet getDomain bs
 
+-- | Decoding mailbox.
 decodeMailbox :: ByteString -> Either String Mailbox
 decodeMailbox bs = fst <$> runSGet getMailbox bs
 
+-- | Decoding resource record.
 decodeResourceRecord :: ByteString -> Either String ResourceRecord
 decodeResourceRecord bs = fst <$> runSGet getResourceRecord bs
 
