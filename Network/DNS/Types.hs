@@ -19,15 +19,15 @@ module Network.DNS.Types (
   -- * DNS Message
   , DNSMessage (..)
   , DNSFormat
-  -- * DNS Header
+  -- ** DNS Header
   , DNSHeader (..)
-  -- * DNS Flags
-  , DNSFlags (..)
-  -- * DNS Body
   , QorR (..)
+  , DNSFlags (..)
   , OPCODE (..)
   , RCODE (..)
+  -- ** DNS Body
   , Question (..)
+  -- * Response composers
   , responseA, responseAAAA
   ) where
 

@@ -155,11 +155,11 @@ instance Exception DNSError
 
 -- | Raw data format for DNS Query and Response.
 data DNSMessage = DNSMessage {
-    header     :: DNSHeader
-  , question   :: [Question]
-  , answer     :: [ResourceRecord]
-  , authority  :: [ResourceRecord]
-  , additional :: [ResourceRecord]
+    header     :: DNSHeader        -- ^ Header
+  , question   :: [Question]       -- ^ The question for the name server
+  , answer     :: [ResourceRecord] -- ^ RRs answering the question
+  , authority  :: [ResourceRecord] -- ^ RRs pointing toward an authority
+  , additional :: [ResourceRecord] -- ^ RRs holding additional information
   } deriving (Eq, Show)
 
 -- | For backward compatibility.
@@ -173,7 +173,7 @@ data DNSHeader = DNSHeader {
 
 -- | Raw data format for the flags of DNS Query and Response.
 data DNSFlags = DNSFlags {
-    qOrR         :: QorR
+    qOrR         :: QorR   -- ^ Query or response.
   , opcode       :: OPCODE
   , authAnswer   :: Bool
   , trunCation   :: Bool
@@ -185,30 +185,51 @@ data DNSFlags = DNSFlags {
 
 ----------------------------------------------------------------
 
-data QorR = QR_Query | QR_Response deriving (Eq, Show, Enum, Bounded)
+-- | Query or response.
+data QorR = QR_Query    -- ^ Query.
+          | QR_Response -- ^ Response.
+          deriving (Eq, Show, Enum, Bounded)
 
+-- | Kind of query.
 data OPCODE
-  = OP_STD
-  | OP_INV
-  | OP_SSR
+  = OP_STD -- ^ A standard query.
+  | OP_INV -- ^ An inverse query.
+  | OP_SSR -- ^ A server status request.
   deriving (Eq, Show, Enum, Bounded)
 
+-- | Response code.
 data RCODE
-  = NoErr
-  | FormatErr
-  | ServFail
-  | NameErr
-  | NotImpl
-  | Refused
-  | BadOpt
+  = NoErr     -- ^ No error condition.
+  | FormatErr -- ^ Format error - The name server was
+              --   unable to interpret the query.
+  | ServFail  -- ^ Server failure - The name server was
+              --   unable to process this query due to a
+              --   problem with the name server.
+  | NameErr   -- ^ Name Error - Meaningful only for
+              --   responses from an authoritative name
+              --   server, this code signifies that the
+              --   domain name referenced in the query does
+              --   not exist.
+  | NotImpl   -- ^ Not Implemented - The name server does
+              --   not support the requested kind of query.
+  | Refused   -- ^ Refused - The name server refuses to
+              --   perform the specified operation for
+              --   policy reasons.  For example, a name
+              --   server may not wish to provide the
+              --   information to the particular requester,
+              --   or a name server may not wish to perform
+              --   a particular operation (e.g., zone
+              --   transfer) for particular data.
+  | BadOpt    -- Fixme: 6 is for Name Exists when it should not
+              -- but this is for EDNS0
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 ----------------------------------------------------------------
 
 -- | Raw data format for DNS questions.
 data Question = Question {
-    qname  :: Domain
-  , qtype  :: TYPE
+    qname  :: Domain -- ^ A domain name
+  , qtype  :: TYPE   -- ^ The type of the query
   } deriving (Eq, Show)
 
 -- | Making "Question".
@@ -217,22 +238,23 @@ makeQuestion = Question
 
 ----------------------------------------------------------------
 
--- Class. Not used.
+-- | Resource record class.
 type CLASS = Word16
 
+-- | Resource record class for the Internet.
 classIN :: CLASS
 classIN = 1
 
--- Time to live.
+-- | Time to live.
 type TTL = Word32
 
 -- | Raw data format for resource records.
 data ResourceRecord = ResourceRecord {
-    rrname  :: Domain
-  , rrtype  :: TYPE
-  , rrclass :: CLASS
-  , rrttl   :: TTL
-  , rdata   :: RData
+    rrname  :: Domain -- ^ Name
+  , rrtype  :: TYPE   -- ^ Resource record type
+  , rrclass :: CLASS  -- ^ Resource record class
+  , rrttl   :: TTL    -- ^ Time to live
+  , rdata   :: RData  -- ^ Resource data
   } deriving (Eq,Show)
 
 -- | Raw data format for each type.
@@ -350,6 +372,7 @@ defaultResponse =
         }
       }
 
+-- | Composing a response from IPv4 addresses
 responseA :: Word16 -> Question -> [IPv4] -> DNSMessage
 responseA ident q ips =
   let hd = header defaultResponse
@@ -361,6 +384,7 @@ responseA ident q ips =
         , answer = an
       }
 
+-- | Composing a response from IPv6 addresses
 responseAAAA :: Word16 -> Question -> [IPv6] -> DNSMessage
 responseAAAA ident q ips =
   let hd = header defaultResponse
