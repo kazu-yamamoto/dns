@@ -4,7 +4,7 @@ module EncodeSpec where
 
 import Data.IP
 import Network.DNS
-import Network.DNS.Internal (defaultQuery, makeQuestion)
+import Network.DNS.Types (defaultQuery, makeQuestion)
 import Test.Hspec
 
 spec :: Spec

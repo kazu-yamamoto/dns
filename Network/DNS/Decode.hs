@@ -29,8 +29,8 @@ import Data.IP (IP(..), toIPv4, toIPv6b)
 import Data.Typeable (Typeable)
 import Data.Word (Word16)
 import Network (Socket)
-import Network.DNS.Internal
 import Network.DNS.StateBinary
+import Network.DNS.Types
 import Numeric (showHex)
 import qualified Safe
 

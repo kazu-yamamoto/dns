@@ -5,9 +5,9 @@ module RoundTripSpec where
 import Control.Monad (replicateM)
 import Data.IP (IP (..), IPv4, IPv6, toIPv4, toIPv6)
 import qualified Data.ByteString.Char8 as BS
-import Network.DNS.Internal
 import Network.DNS.Decode
 import Network.DNS.Encode
+import Network.DNS.Types
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck (Gen, arbitrary, elements, forAll, frequency, listOf, oneof)

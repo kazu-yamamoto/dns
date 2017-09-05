@@ -38,7 +38,7 @@ import Data.Maybe (fromMaybe)
 import Network.BSD (getProtocolNumber)
 import Network.DNS.Decode
 import Network.DNS.Encode
-import Network.DNS.Internal
+import Network.DNS.Types
 import qualified Data.ByteString.Char8 as BS
 import Network.Socket (HostName, Socket, SocketType(Stream, Datagram))
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..))

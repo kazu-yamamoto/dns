@@ -23,8 +23,8 @@ import Data.ByteString.Char8 (ByteString)
 import Data.IP (IP(..),fromIPv4, fromIPv6b)
 import Data.List (dropWhileEnd)
 import Data.Monoid ((<>))
-import Network.DNS.Internal
 import Network.DNS.StateBinary
+import Network.DNS.Types
 
 #if __GLASGOW_HASKELL__ < 709
 import Data.Monoid (mconcat)
