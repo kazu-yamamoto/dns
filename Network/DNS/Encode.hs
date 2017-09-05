@@ -1,15 +1,18 @@
 {-# LANGUAGE RecordWildCards, CPP #-}
 
 module Network.DNS.Encode (
-    encode
+    -- * Composing Query
+    composeQuery
+  , composeQueryAD
+    -- * Encoder
+  , encode
+  , encodeVC
+    -- * Encoder for Each Part
   , encodeDNSFlags
   , encodeDNSHeader
   , encodeDomain
   , encodeMailbox
   , encodeResourceRecord
-  , encodeVC
-  , composeQuery
-  , composeQueryAD
   ) where
 
 import Control.Monad (when)
@@ -32,9 +35,8 @@ import Data.Monoid (mconcat)
 
 ----------------------------------------------------------------
 
--- | Composing query. First argument is a number to identify response.
-
-composeQuery :: Word16 -> [Question] -> ByteString
+-- | Composing query.
+composeQuery :: Identifier -> [Question] -> Query
 composeQuery idt qs = encode qry
   where
     hdr = header defaultQuery
@@ -45,7 +47,8 @@ composeQuery idt qs = encode qry
       , question = qs
       }
 
-composeQueryAD :: Word16 -> [Question] -> ByteString
+-- | Composing query with authentic data flag set.
+composeQueryAD :: Identifier -> [Question] -> Query
 composeQueryAD idt qs = encode qry
   where
       hdr = header defaultQuery
@@ -62,28 +65,33 @@ composeQueryAD idt qs = encode qry
 
 ----------------------------------------------------------------
 
--- | Composing DNS data.
-
-encode :: DNSMessage -> ByteString
+-- | Encoding DNS data.
+encode :: DNSMessage -> Query
 encode = runSPut . putDNSMessage
 
-encodeVC :: ByteString -> ByteString
+-- | Encoding for virtual circuit.
+encodeVC :: Query -> Query
 encodeVC query =
     let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length query
     in len <> query
 
+-- | Encoding DNS flags.
 encodeDNSFlags :: DNSFlags -> ByteString
 encodeDNSFlags = runSPut . putDNSFlags
 
+-- | Encoding DNS header.
 encodeDNSHeader :: DNSHeader -> ByteString
 encodeDNSHeader = runSPut . putHeader
 
+-- | Encoding domain.
 encodeDomain :: Domain -> ByteString
 encodeDomain = runSPut . putDomain
 
+-- | Encoding mailbox.
 encodeMailbox :: Mailbox -> ByteString
 encodeMailbox = runSPut . putMailbox
 
+-- | Encoding resource record.
 encodeResourceRecord :: ResourceRecord -> ByteString
 encodeResourceRecord rr = runSPut $ putResourceRecord rr
 

@@ -20,6 +20,7 @@ module Network.DNS.Types (
   , DNSFormat
   -- ** DNS Header
   , DNSHeader (..)
+  , Identifier
   , QorR (..)
   , DNSFlags (..)
   , OPCODE (..)
@@ -214,11 +215,14 @@ data DNSMessage = DNSMessage {
 -- | For backward compatibility.
 type DNSFormat = DNSMessage
 
+-- | An identifier assigned by the program that
+--   generates any kind of query.
+type Identifier = Word16
+
 -- | Raw data format for the header of DNS Query and Response.
 data DNSHeader = DNSHeader {
-    identifier :: Word16    -- ^ An identifier assigned by the program that
-                            --   generates any kind of query.
-  , flags      :: DNSFlags  -- ^ The second 16bit word.
+    identifier :: Identifier -- ^ An identifier.
+  , flags      :: DNSFlags   -- ^ The second 16bit word.
   } deriving (Eq, Show)
 
 -- | Raw data format for the flags of DNS Query and Response.
