@@ -20,20 +20,19 @@ module Network.DNS (
   --   you may need to use the 'lookup', 'lookupAuth', or 'lookupRaw'
   --   functions.
 
+  , module Network.DNS.Types
+  -- | All of the types that the other modules use.
+
   , module Network.DNS.Utils
   -- | The "Network.DNS.Utils" module contains utility functions used
   --   for processing DNS data.
 
-  , module Network.DNS.Types
-  -- | All of the types that the other modules use.
-
   -- * Low level
-  , module Network.DNS.Decode
-  -- | Decoding a response.
-
   , module Network.DNS.Encode
-  -- | Encoding a query.
+  -- | Encoding a query or response.
 
+  , module Network.DNS.Decode
+  -- | Decoding a qurey or response.
   ) where
 
 import Network.DNS.Lookup

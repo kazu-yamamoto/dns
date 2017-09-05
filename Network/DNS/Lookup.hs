@@ -51,7 +51,7 @@
 --   As is the convention, successful results will always be wrapped
 --   in a 'Right', while errors will be wrapped in a 'Left'.
 --
---   For convenience, you may wish to enable GHC's OverloadedStrings
+--   For convenience, you may wish to enable GHC\'s OverloadedStrings
 --   extension. This will allow you to avoid calling
 --   'Data.ByteString.Char8.pack' on each domain name. See
 --   <http://www.haskell.org/ghc/docs/7.6.3/html/users_guide/type-class-extensions.html#overloaded-strings>
