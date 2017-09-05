@@ -5,6 +5,9 @@ module Network.DNS.Encode (
     -- * Composing Query
     composeQuery
   , composeQueryAD
+    -- * Creating Response
+  , responseA
+  , responseAAAA
     -- * Encoder
   , encode
   , encodeVC
@@ -21,10 +24,10 @@ import Control.Monad.State (State, modify, execState, gets)
 import Data.Binary (Word16)
 import Data.Bits ((.|.), bit, shiftL)
 import qualified Data.ByteString.Builder as BB
+import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.ByteString.Char8 (ByteString)
-import Data.IP (IP(..),fromIPv4, fromIPv6b)
+import Data.IP (IP(..),fromIPv4, fromIPv6b, IPv4, IPv6)
 import Data.List (dropWhileEnd)
 import Data.Monoid ((<>))
 import Network.DNS.StateBinary
@@ -277,3 +280,29 @@ putPointer pos = putInt16 (pos .|. 0xc000)
 
 putPartialDomain :: Domain -> SPut
 putPartialDomain = putByteStringWithLength
+
+----------------------------------------------------------------
+
+-- | Composing a response from IPv4 addresses
+responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
+responseA ident q ips =
+  let hd = header defaultResponse
+      dom = qname q
+      an = fmap (ResourceRecord dom A classIN 300 . RD_A) ips
+  in  defaultResponse {
+          header = hd { identifier=ident }
+        , question = [q]
+        , answer = an
+      }
+
+-- | Composing a response from IPv6 addresses
+responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
+responseAAAA ident q ips =
+  let hd = header defaultResponse
+      dom = qname q
+      an = fmap (ResourceRecord dom AAAA classIN 300 . RD_AAAA) ips
+  in  defaultResponse {
+          header = hd { identifier=ident }
+        , question = [q]
+        , answer = an
+      }

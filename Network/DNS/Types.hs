@@ -17,6 +17,8 @@ module Network.DNS.Types (
   , RData (..)
   -- * DNS Message
   , DNSMessage (..)
+  , defaultQuery
+  , defaultResponse
   , DNSFormat
   -- ** DNS Header
   , DNSHeader (..)
@@ -27,10 +29,6 @@ module Network.DNS.Types (
   , RCODE (..)
   -- ** DNS Body
   , Question (..)
-  -- * Query and Response
-  , defaultQuery
-  , defaultResponse
-  , responseA, responseAAAA
   -- * DNS Error
   , DNSError (..)
   -- * EDNS0
@@ -212,6 +210,7 @@ data DNSMessage = DNSMessage {
   , additional :: [ResourceRecord] -- ^ RRs holding additional information
   } deriving (Eq, Show)
 
+{-# DEPRECATED DNSFormat "Use DNSMessage instead" #-}
 -- | For backward compatibility.
 type DNSFormat = DNSMessage
 
@@ -406,7 +405,7 @@ b64encode = BS.unpack . B64.encode
 
 ----------------------------------------------------------------
 
--- | Default query
+-- | Default query.
 defaultQuery :: DNSMessage
 defaultQuery = DNSMessage {
     header = DNSHeader {
@@ -428,7 +427,7 @@ defaultQuery = DNSMessage {
   , additional = []
   }
 
--- | Default response
+-- | Default response.
 defaultResponse :: DNSMessage
 defaultResponse =
   let hd = header defaultQuery
@@ -444,26 +443,4 @@ defaultResponse =
         }
       }
 
--- | Composing a response from IPv4 addresses
-responseA :: Word16 -> Question -> [IPv4] -> DNSMessage
-responseA ident q ips =
-  let hd = header defaultResponse
-      dom = qname q
-      an = fmap (ResourceRecord dom A classIN 300 . RD_A) ips
-  in  defaultResponse {
-          header = hd { identifier=ident }
-        , question = [q]
-        , answer = an
-      }
-
--- | Composing a response from IPv6 addresses
-responseAAAA :: Word16 -> Question -> [IPv6] -> DNSMessage
-responseAAAA ident q ips =
-  let hd = header defaultResponse
-      dom = qname q
-      an = fmap (ResourceRecord dom AAAA classIN 300 . RD_AAAA) ips
-  in  defaultResponse {
-          header = hd { identifier=ident }
-        , question = [q]
-        , answer = an
-      }
+----------------------------------------------------------------
