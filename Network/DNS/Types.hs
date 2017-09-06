@@ -115,7 +115,7 @@ rrDB = [
   , (RRSIG, 46) -- RFC 4034
   , (NSEC,  47) -- RFC 4034
   , (DNSKEY, 48) -- RFC 4034
-  , (NSEC3, 40) -- RFC 5155
+  , (NSEC3, 50) -- RFC 5155
   , (NSEC3PARAM, 51) -- RFC 5155
   , (TLSA,  52) -- RFC 6698
   , (CDS,   59) -- RFC 7344
