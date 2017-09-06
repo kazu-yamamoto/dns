@@ -66,16 +66,16 @@ type Mailbox = ByteString
 ----------------------------------------------------------------
 
 -- | Types for resource records.
+--   For more information, see https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 data TYPE = A          -- ^ IPv4 address
-          | AAAA       -- ^ IPv6 Address
-          | ANY        -- ^ A request for all records the server/cache
-                       --   has available
           | NS         -- ^ An authoritative name serve
-          | TXT        -- ^ Text strings
-          | MX         -- ^ Mail exchange
           | CNAME      -- ^ The canonical name for an alias
           | SOA        -- ^ Marks the start of a zone of authority
+          | NULL       -- ^ A null RR (EXPERIMENTAL)
           | PTR        -- ^ A domain name pointer
+          | MX         -- ^ Mail exchange
+          | TXT        -- ^ Text strings
+          | AAAA       -- ^ IPv6 Address
           | SRV        -- ^ Server Selection (RFC2782)
           | DNAME      -- ^ DNAME (RFC6672)
           | OPT        -- ^ OPT (RFC6891)
@@ -89,7 +89,9 @@ data TYPE = A          -- ^ IPv4 address
           | CDS        -- ^ Child DS (RFC7344)
           | CDNSKEY    -- ^ DNSKEY(s) the Child wants reflected in DS (RFC7344)
           | CSYNC      -- ^ Child-To-Parent Synchronization (RFC7477)
-          | NULL       -- ^ A null RR (EXPERIMENTAL)
+
+          | ANY        -- ^ A request for all records the server/cache
+                       --   has available
           | UNKNOWN Word16  -- ^ Unknown type
           deriving (Eq, Show, Read)
 
@@ -313,28 +315,35 @@ data ResourceRecord = ResourceRecord {
   } deriving (Eq,Show)
 
 -- | Raw data format for each type.
-data RData = RD_NS Domain        -- ^ An authoritative name serve
+data RData = RD_A IPv4           -- ^ IPv4 address
+           | RD_NS Domain        -- ^ An authoritative name serve
            | RD_CNAME Domain     -- ^ The canonical name for an alias
-           | RD_DNAME Domain     -- ^ DNAME (RFC6672)
-           | RD_MX Word16 Domain -- ^ Mail exchange
-           | RD_PTR Domain       -- ^ A domain name pointer
            | RD_SOA Domain Mailbox Word32 Word32 Word32 Word32 Word32
                                  -- ^ Marks the start of a zone of authority
-           | RD_A IPv4           -- ^ IPv4 address
-           | RD_AAAA IPv6        -- ^ IPv6 Address
-           | RD_TXT ByteString   -- ^ Text strings
-           | RD_SRV Word16 Word16 Word16 Domain
-                                 -- ^ Server Selection (RFC2782)
-           | RD_OPT [OData]      -- ^ OPT (RFC6891)
-           | RD_OTH ByteString
-           | RD_TLSA Word8 Word8 Word8 ByteString
-                                 -- ^ TLSA (RFC6698)
-           | RD_DS Word16 Word8 Word8 ByteString -- ^ Delegation Signer (RFC4034)
            | RD_NULL             -- ^ A null RR (EXPERIMENTAL).
                                  -- Anything can be in a NULL record,
                                  -- for now we just drop this data.
+           | RD_PTR Domain       -- ^ A domain name pointer
+           | RD_MX Word16 Domain -- ^ Mail exchange
+           | RD_TXT ByteString   -- ^ Text strings
+           | RD_AAAA IPv6        -- ^ IPv6 Address
+           | RD_SRV Word16 Word16 Word16 Domain
+                                 -- ^ Server Selection (RFC2782)
+           | RD_DNAME Domain     -- ^ DNAME (RFC6672)
+           | RD_OPT [OData]      -- ^ OPT (RFC6891)
+           | RD_DS Word16 Word8 Word8 ByteString -- ^ Delegation Signer (RFC4034)
+           --RD_RRSIG
+           --RD_NSEC
            | RD_DNSKEY Word16 Word8 Word8 ByteString
                                  -- ^ DNSKEY (RFC4034)
+           --RD_NSEC3
+           --RD_NSEC3PARAM
+           | RD_TLSA Word8 Word8 Word8 ByteString
+                                 -- ^ TLSA (RFC6698)
+           --RD_CDS
+           --RD_CDNSKEY
+           --RD_CSYNC
+           | RD_OTH ByteString   -- ^ Unknown resource data
     deriving (Eq, Ord)
 
 -- | Optional resource data.
