@@ -172,7 +172,7 @@ getQueries :: Int -> SGet [Question]
 getQueries n = replicateM n getQuery
 
 getTYPE :: SGet TYPE
-getTYPE = intToType <$> get16
+getTYPE = toTYPE <$> get16
 
 getOptCode :: SGet OptCode
 getOptCode = intToOptCode <$> getInt16

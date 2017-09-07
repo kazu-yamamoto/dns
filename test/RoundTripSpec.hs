@@ -32,7 +32,7 @@ spec = do
         show (read str :: IPv6) `shouldBe` str
 
     prop "TYPE" . forAll genTYPE $ \ t ->
-        intToType (typeToInt t) `shouldBe` t
+        toTYPE (fromTYPE t) `shouldBe` t
 
     prop "Domain" . forAll genDomain $ \ dom -> do
         let bs = encodeDomain dom
@@ -80,7 +80,7 @@ genTYPE = frequency
             [ A, AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, OPT, DS, RRSIG
             , NSEC, DNSKEY, NSEC3, NSEC3PARAM, TLSA, CDS, CDNSKEY, CSYNC
             ])
-    , (1, intToType <$> genWord16)
+    , (1, toTYPE <$> genWord16)
     ]
 
 genResourceRecord :: Gen ResourceRecord

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- | Data types for DNS Query and Response.
 --   For more information, see <http://www.ietf.org/rfc/rfc1035>.
@@ -12,7 +13,35 @@ module Network.DNS.Types (
   , classIN
   , TTL
   -- ** Resource Record Types
-  , TYPE (..), intToType, typeToInt
+  , TYPE (
+    A
+  , NS
+  , CNAME
+  , SOA
+  , NULL
+  , PTR
+  , MX
+  , TXT
+  , AAAA
+  , SRV
+  , DNAME
+  , OPT
+  , DS
+  , RRSIG
+  , NSEC
+  , DNSKEY
+  , NSEC3
+  , NSEC3PARAM
+  , TLSA
+  , CDS
+  , CDNSKEY
+  , CSYNC
+  , ANY
+  )
+  , toTYPE
+  , fromTYPE
+  , typeToInt
+  , intToType
   -- ** Resource Data
   , RData (..)
   -- * DNS Message
@@ -40,7 +69,6 @@ module Network.DNS.Types (
   , Mailbox
   ) where
 
-
 import Control.Exception (Exception)
 import Data.Bits ((.&.), shiftR, testBit)
 import Data.ByteString (ByteString)
@@ -66,63 +94,108 @@ type Mailbox = ByteString
 ----------------------------------------------------------------
 
 -- | Types for resource records.
---   For more information, see https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
-data TYPE = A          -- ^ IPv4 address
-          | NS         -- ^ An authoritative name serve
-          | CNAME      -- ^ The canonical name for an alias
-          | SOA        -- ^ Marks the start of a zone of authority
-          | NULL       -- ^ A null RR (EXPERIMENTAL)
-          | PTR        -- ^ A domain name pointer
-          | MX         -- ^ Mail exchange
-          | TXT        -- ^ Text strings
-          | AAAA       -- ^ IPv6 Address
-          | SRV        -- ^ Server Selection (RFC2782)
-          | DNAME      -- ^ DNAME (RFC6672)
-          | OPT        -- ^ OPT (RFC6891)
-          | DS         -- ^ Delegation Signer (RFC4034)
-          | RRSIG      -- ^ RRSIG (RFC4034)
-          | NSEC       -- ^ NSEC (RFC4034)
-          | DNSKEY     -- ^ DNSKEY (RFC4034)
-          | NSEC3      -- ^ NSEC3 (RFC5155)
-          | NSEC3PARAM -- ^ NSEC3PARAM (RFC5155)
-          | TLSA       -- ^ TLSA (RFC6698)
-          | CDS        -- ^ Child DS (RFC7344)
-          | CDNSKEY    -- ^ DNSKEY(s) the Child wants reflected in DS (RFC7344)
-          | CSYNC      -- ^ Child-To-Parent Synchronization (RFC7477)
-
-          | ANY        -- ^ A request for all records the server/cache
-                       --   has available
-          | UNKNOWN Word16  -- ^ Unknown type
-          deriving (Eq, Show, Read)
+newtype TYPE = TYPE {
+    -- | From type to number.
+    fromTYPE :: Word16
+  } deriving Eq
 
 -- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
---
-rrDB :: [(TYPE, Word16)]
-rrDB = [
-    (A,      1)
-  , (NS,     2)
-  , (CNAME,  5)
-  , (SOA,    6)
-  , (NULL,  10)
-  , (PTR,   12)
-  , (MX,    15)
-  , (TXT,   16)
-  , (AAAA,  28)
-  , (SRV,   33)
-  , (DNAME, 39) -- RFC 6672
-  , (OPT,   41) -- RFC 6891
-  , (DS,    43) -- RFC 4034
-  , (RRSIG, 46) -- RFC 4034
-  , (NSEC,  47) -- RFC 4034
-  , (DNSKEY, 48) -- RFC 4034
-  , (NSEC3, 50) -- RFC 5155
-  , (NSEC3PARAM, 51) -- RFC 5155
-  , (TLSA,  52) -- RFC 6698
-  , (CDS,   59) -- RFC 7344
-  , (CDNSKEY, 60) -- RFC 7344
-  , (CSYNC, 62) -- RFC 7477
-  , (ANY, 255)
-  ]
+
+-- | IPv4 address
+pattern A :: TYPE
+pattern A          = TYPE   1
+-- | An authoritative name serve
+pattern NS :: TYPE
+pattern NS         = TYPE   2
+-- | The canonical name for an alias
+pattern CNAME :: TYPE
+pattern CNAME      = TYPE   5
+-- | Marks the start of a zone of authority
+pattern SOA :: TYPE
+pattern SOA        = TYPE   6
+-- | A null RR (EXPERIMENTAL)
+pattern NULL :: TYPE
+pattern NULL       = TYPE  10
+-- | A domain name pointer
+pattern PTR :: TYPE
+pattern PTR        = TYPE  12
+-- | Mail exchange
+pattern MX :: TYPE
+pattern MX         = TYPE  15
+-- | Text strings
+pattern TXT :: TYPE
+pattern TXT        = TYPE  16
+-- | IPv6 Address
+pattern AAAA :: TYPE
+pattern AAAA       = TYPE  28
+-- | Server Selection (RFC2782)
+pattern SRV :: TYPE
+pattern SRV        = TYPE  33
+-- | DNAME (RFC6672)
+pattern DNAME :: TYPE
+pattern DNAME      = TYPE  39 -- RFC 6672
+-- | OPT (RFC6891)
+pattern OPT :: TYPE
+pattern OPT        = TYPE  41 -- RFC 6891
+-- | Delegation Signer (RFC4034)
+pattern DS :: TYPE
+pattern DS         = TYPE  43 -- RFC 4034
+-- | RRSIG (RFC4034)
+pattern RRSIG :: TYPE
+pattern RRSIG      = TYPE  46 -- RFC 4034
+-- | NSEC (RFC4034)
+pattern NSEC :: TYPE
+pattern NSEC       = TYPE  47 -- RFC 4034
+-- | DNSKEY (RFC4034)
+pattern DNSKEY :: TYPE
+pattern DNSKEY     = TYPE  48 -- RFC 4034
+-- | NSEC3 (RFC5155)
+pattern NSEC3 :: TYPE
+pattern NSEC3      = TYPE  50 -- RFC 5155
+-- | NSEC3PARAM (RFC5155)
+pattern NSEC3PARAM :: TYPE
+pattern NSEC3PARAM = TYPE  51 -- RFC 5155
+-- | TLSA (RFC6698)
+pattern TLSA :: TYPE
+pattern TLSA       = TYPE  52 -- RFC 6698
+-- | Child DS (RFC7344)
+pattern CDS :: TYPE
+pattern CDS        = TYPE  59 -- RFC 7344
+-- | DNSKEY(s) the Child wants reflected in DS (RFC7344)
+pattern CDNSKEY :: TYPE
+pattern CDNSKEY    = TYPE  60 -- RFC 7344
+-- | Child-To-Parent Synchronization (RFC7477)
+pattern CSYNC :: TYPE
+pattern CSYNC      = TYPE  62 -- RFC 7477
+-- | A request for all records the server/cache has available
+pattern ANY :: TYPE
+pattern ANY        = TYPE 255
+
+instance Show TYPE where
+    show A          = "A"
+    show NS         = "NS"
+    show CNAME      = "CNAME"
+    show SOA        = "SOA"
+    show NULL       = "NULL"
+    show PTR        = "PTR"
+    show MX         = "MX"
+    show TXT        = "TXT"
+    show AAAA       = "AAAA"
+    show SRV        = "SRV"
+    show DNAME      = "DNAME"
+    show OPT        = "OPT"
+    show DS         = "DS"
+    show RRSIG      = "RRSIG"
+    show NSEC       = "NSEC"
+    show DNSKEY     = "DNSKEY"
+    show NSEC3      = "NSEC3"
+    show NSEC3PARAM = "NSEC3PARAM"
+    show TLSA       = "TLSA"
+    show CDS        = "CDS"
+    show CDNSKEY    = "CDNSKEY"
+    show CSYNC      = "CSYNC"
+    show ANY        = "ANY"
+    show x          = "TYPE " ++ (show $ typeToInt x)
 
 -- | Option Code (RFC 6891).
 data OptCode = ClientSubnet -- ^ Client subnet (RFC7871)
@@ -140,14 +213,19 @@ rookup  key ((x,y):xys)
   | key == y          =  Just x
   | otherwise         =  rookup key xys
 
+-- | From number to type.
+toTYPE :: Word16 -> TYPE
+toTYPE = TYPE
+
+{-# DEPRECATED intToType "Use toTYPE instead." #-}
 -- | From number to type. Naming is for historical reasons.
 intToType :: Word16 -> TYPE
-intToType n = fromMaybe (UNKNOWN n) $ rookup n rrDB
+intToType = TYPE
 
+{-# DEPRECATED typeToInt "Use fromTYPE instead." #-}
 -- | From type to number. Naming is for historical reasons.
 typeToInt :: TYPE -> Word16
-typeToInt (UNKNOWN x)  = x
-typeToInt t = fromMaybe (error "typeToInt") $ lookup t rrDB
+typeToInt = fromTYPE
 
 -- | From number to option code.
 intToOptCode :: Int -> OptCode

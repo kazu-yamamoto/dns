@@ -151,13 +151,13 @@ putDNSFlags DNSFlags{..} = put16 word
 
 putQuestion :: Question -> SPut
 putQuestion Question{..} = putDomain qname
-                           <> put16 (typeToInt qtype)
+                           <> put16 (fromTYPE qtype)
                            <> put16 1
 
 putResourceRecord :: ResourceRecord -> SPut
 putResourceRecord ResourceRecord{..} = mconcat [
     putDomain rrname
-  , put16 (typeToInt rrtype)
+  , put16 (fromTYPE rrtype)
   , put16 rrclass
   , put32 rrttl
   , putResourceRData rdata
