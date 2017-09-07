@@ -140,7 +140,7 @@ getDNSFlags = do
     toFlags :: Word16 -> Maybe DNSFlags
     toFlags flgs = do
       oc <- getOpcode flgs
-      rc <- getRcode flgs
+      let rc = getRcode flgs
       return $ DNSFlags (getQorR flgs)
                         oc
                         (getAuthAnswer flgs)
@@ -155,7 +155,7 @@ getDNSFlags = do
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8
     getRecAvailable w = testBit w 7
-    getRcode w = Safe.toEnumMay (fromIntegral (w .&. 0x0f))
+    getRcode w = toRCODEforHeader $ fromIntegral w
     getAuthenData w = testBit w 5
 
 ----------------------------------------------------------------

@@ -172,4 +172,4 @@ genOPCODE :: Gen OPCODE
 genOPCODE  = elements [minBound .. maxBound]
 
 genRCODE :: Gen RCODE
-genRCODE = elements [minBound .. maxBound]
+genRCODE = elements $ map toRCODE [0..15]

@@ -55,7 +55,19 @@ module Network.DNS.Types (
   , QorR (..)
   , DNSFlags (..)
   , OPCODE (..)
-  , RCODE (..)
+  , RCODE (
+    NoErr
+  , FormatErr
+  , ServFail
+  , NameErr
+  , NotImpl
+  , Refused
+  , BadOpt
+  )
+  , toRCODE
+  , fromRCODE
+  , toRCODEforHeader
+  , fromRCODEforHeader
   -- ** DNS Body
   , Question (..)
   -- * DNS Error
@@ -70,7 +82,7 @@ module Network.DNS.Types (
   ) where
 
 import Control.Exception (Exception)
-import Data.Bits ((.&.), shiftR, testBit)
+import Data.Bits ((.&.), (.|.), shiftR, testBit)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64 as B64 (encode)
 import qualified Data.ByteString.Char8 as BS
@@ -273,6 +285,8 @@ data DNSError =
   | BadOptRecord
     -- | Configuration is wrong.
   | BadConfiguration
+    -- | Error is unkown
+  | UnknownError
   deriving (Eq, Show, Typeable)
 
 instance Exception DNSError
@@ -336,32 +350,72 @@ data OPCODE
   | OP_SSR -- ^ A server status request.
   deriving (Eq, Show, Enum, Bounded)
 
--- | Response code.
-data RCODE
-  = NoErr     -- ^ No error condition.
-  | FormatErr -- ^ Format error - The name server was
-              --   unable to interpret the query.
-  | ServFail  -- ^ Server failure - The name server was
-              --   unable to process this query due to a
-              --   problem with the name server.
-  | NameErr   -- ^ Name Error - Meaningful only for
-              --   responses from an authoritative name
-              --   server, this code signifies that the
-              --   domain name referenced in the query does
-              --   not exist.
-  | NotImpl   -- ^ Not Implemented - The name server does
-              --   not support the requested kind of query.
-  | Refused   -- ^ Refused - The name server refuses to
-              --   perform the specified operation for
-              --   policy reasons.  For example, a name
-              --   server may not wish to provide the
-              --   information to the particular requester,
-              --   or a name server may not wish to perform
-              --   a particular operation (e.g., zone
-              --   transfer) for particular data.
-  | BadOpt    -- Fixme: 6 is for Name Exists when it should not
-              -- but this is for EDNS0
-  deriving (Eq, Ord, Show, Enum, Bounded)
+----------------------------------------------------------------
+
+-- | Response code including EDNS0's 12bit ones.
+newtype RCODE = RCODE {
+    -- | From rcode to number.
+    fromRCODE :: Word16
+  } deriving (Eq)
+
+-- | No error condition.
+pattern NoErr     :: RCODE
+pattern NoErr      = RCODE  0
+-- | Format error - The name server was
+--   unable to interpret the query.
+pattern FormatErr :: RCODE
+pattern FormatErr  = RCODE  1
+-- | Server failure - The name server was
+--   unable to process this query due to a
+--   problem with the name server.
+pattern ServFail  :: RCODE
+pattern ServFail   = RCODE  2
+-- | Name Error - Meaningful only for
+--   responses from an authoritative name
+--   server, this code signifies that the
+--   domain name referenced in the query does
+--   not exist.
+pattern NameErr   :: RCODE
+pattern NameErr    = RCODE  3
+-- | Not Implemented - The name server does
+--   not support the requested kind of query.
+pattern NotImpl   :: RCODE
+pattern NotImpl    = RCODE  4
+-- | Refused - The name server refuses to
+--   perform the specified operation for
+--   policy reasons.  For example, a name
+--   server may not wish to provide the
+--   information to the particular requester,
+--   or a name server may not wish to perform
+--   a particular operation (e.g., zone
+--   transfer) for particular data.
+pattern Refused   :: RCODE
+pattern Refused    = RCODE  5
+-- | Bad OPT Version (RFC 6891) or TSIG Signature Failure (RFC2845).
+pattern BadOpt    :: RCODE
+pattern BadOpt     = RCODE 16
+
+instance Show RCODE where
+    show NoErr     = "NoErr"
+    show FormatErr = "Format"
+    show ServFail  = "ServFail"
+    show NameErr   = "NameErr"
+    show NotImpl   = "NotImpl"
+    show Refused   = "Refused"
+    show BadOpt    = "BadOpt"
+    show x         = "RCODE " ++ (show $ fromRCODE x)
+
+-- | From number to rcode.
+toRCODE :: Word16 -> RCODE
+toRCODE = RCODE
+
+-- | From rcode to number for header (4bits only).
+fromRCODEforHeader :: RCODE -> Word16
+fromRCODEforHeader (RCODE w) = w .&. 0x0f
+
+-- | From number in header to rcode (4bits only).
+toRCODEforHeader :: Word16 -> RCODE
+toRCODEforHeader w = RCODE (w .&. 0x0f)
 
 ----------------------------------------------------------------
 
@@ -438,9 +492,12 @@ orUdpSize rr
   | otherwise        = error "Can be used only for OPT"
 
 -- | Extended RCODE for EDNS0 (RFC6891).
-orExtRcode :: ResourceRecord -> Word8
-orExtRcode rr
-  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0xff000000) 24
+orExtRcode :: DNSHeader -> ResourceRecord -> RCODE
+orExtRcode hdr rr
+  | rrtype rr == OPT = let lp = fromRCODEforHeader $ rcode $ flags hdr
+                           up = shiftR (rrttl rr .&. 0xff000000) 20
+                           cd = fromIntegral up .|. lp
+                       in toRCODE cd
   | otherwise        = error "Can be used only for OPT"
 
 -- | Version for EDNS0 (RFC6891).
