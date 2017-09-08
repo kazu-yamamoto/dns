@@ -60,6 +60,13 @@ spec = do
     prop "DNSMessage" . forAll genDNSMessage $ \ msg ->
         decode (encode msg) `shouldBe` Right msg
 
+    prop "EDNS0" . forAll genEDNS0Header $ \(edns0,hdr) -> do
+        let rr0 = fromEDNS0 edns0
+            msg0 = DNSMessage hdr [] [] [] [rr0]
+            Right msg1 = decode $ encode msg0
+            medns1 = toEDNS0 (flags $ header msg0) (head $ additional msg1)
+        medns1 `shouldBe` Just edns0
+
 ----------------------------------------------------------------
 
 genDNSMessage :: Gen DNSMessage
@@ -117,17 +124,6 @@ genIPv4 = toIPv4 <$> replicateM 4 (fromIntegral <$> genWord8)
 genIPv6 :: Gen IPv6
 genIPv6 = toIPv6 <$> replicateM 8 (fromIntegral <$> genWord16)
 
-genOData :: Gen OData
-genOData = oneof
-    [ genOD_Unknown
-    , OD_ClientSubnet <$> genWord8 <*> genWord8 <*> oneof [ IPv4 <$> genIPv4, IPv6 <$> genIPv6 ]
-    ]
-  where
-    genOD_Unknown = do
-      bs <- genByteString
-      let opc = toOptCode $ fromIntegral $ BS.length bs
-      pure $ OD_Unknown opc bs
-
 genByteString :: Gen BS.ByteString
 genByteString = elements
     [ "", "a", "a.b", "abc", "a.b.c" ]
@@ -174,3 +170,35 @@ genOPCODE  = elements [minBound .. maxBound]
 
 genRCODE :: Gen RCODE
 genRCODE = elements $ map toRCODE [0..15]
+
+genEDNS0 :: Gen EDNS0
+genEDNS0 = do
+    erc <- genExtRCODE
+    ok <- genBool
+    od <- genOData
+    return $ defaultEDNS0 {
+        extRCODE = erc
+      , dnssecOk = ok
+      , options  = [od]
+      }
+
+genOData :: Gen OData
+genOData = oneof
+    [ genOD_Unknown
+    , OD_ClientSubnet <$> genWord8 <*> genWord8 <*> oneof [ IPv4 <$> genIPv4, IPv6 <$> genIPv6 ]
+    ]
+  where
+    genOD_Unknown = do
+      bs <- genByteString
+      let opc = toOptCode $ fromIntegral $ BS.length bs
+      pure $ OD_Unknown opc bs
+
+genExtRCODE :: Gen RCODE
+genExtRCODE = elements $ map toRCODE [0..4095]
+
+genEDNS0Header :: Gen (EDNS0, DNSHeader)
+genEDNS0Header = do
+    edns <- genEDNS0
+    hdr <- genDNSHeader
+    let flg = flags hdr
+    return (edns, hdr { flags =  flg { rcode = extRCODE edns } })
