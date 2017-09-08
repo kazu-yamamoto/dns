@@ -478,13 +478,18 @@ sendAll sock bs = do
   when (sent < fromIntegral (BS.length bs)) $ sendAll sock (BS.drop (fromIntegral sent) bs)
 #endif
 
+badLength :: Domain -> Bool
+badLength dom
+    | BS.null dom        = True
+    | BS.last dom == '.' = BS.length dom > 254
+    | otherwise          = BS.length dom > 253
+
 isIllegal :: Domain -> Bool
-isIllegal ""                    = True
 isIllegal dom
+  | badLength dom               = True
   | '.' `BS.notElem` dom        = True
   | ':' `BS.elem` dom           = True
   | '/' `BS.elem` dom           = True
-  | BS.length dom > 253         = True
   | any (\x -> BS.length x > 63)
         (BS.split '.' dom)      = True
-isIllegal _                     = False
+  | otherwise                   = False
