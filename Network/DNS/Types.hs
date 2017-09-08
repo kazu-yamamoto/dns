@@ -406,18 +406,19 @@ pattern NotZone   = RCODE 10
 pattern BadOpt    :: RCODE
 pattern BadOpt     = RCODE 16
 
+-- | Use https://tools.ietf.org/html/rfc2929#section-2.3 names for DNS RCODEs
 instance Show RCODE where
-    show NoErr     = "NoErr"
-    show FormatErr = "Format"
+    show NoErr     = "NoError"
+    show FormatErr = "FormErr"
     show ServFail  = "ServFail"
-    show NameErr   = "NameErr"
-    show NotImpl   = "NotImpl"
+    show NameErr   = "NXDomain"
+    show NotImpl   = "NotImp"
     show Refused   = "Refused"
     show YXDomain  = "YXDomain"
     show YXRRSet   = "YXRRSet"
     show NotAuth   = "NotAuth"
     show NotZone   = "NotZone"
-    show BadOpt    = "BadOpt"
+    show BadOpt    = "BADVERS"
     show x         = "RCODE " ++ (show $ fromRCODE x)
 
 -- | From number to rcode.
