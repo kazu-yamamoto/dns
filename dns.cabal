@@ -11,7 +11,7 @@ Description:
 Category:               Network
 Cabal-Version:          >= 1.10
 Build-Type:             Simple
-Extra-Source-Files:     Changelog
+Extra-Source-Files:     Changelog.md
                         cbits/defaultdns.c
 
 Library
