@@ -1,5 +1,10 @@
 # Highly concurrent DNS library purely in Haskell
 
+## Features
+
+- This library supports both IPv4 and IPv6 for resolving (`A` and `AAAA`) and transport (using `getaddrinfo`).
+- This library can be used for both clients and servers.
+
 ## Related packages
 
 - [Concurrent DNS cache in Haskell](https://hackage.haskell.org/package/concurrent-dns-cache)
