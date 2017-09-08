@@ -209,22 +209,6 @@ instance Show TYPE where
     show ANY        = "ANY"
     show x          = "TYPE " ++ (show $ typeToInt x)
 
--- | Option Code (RFC 6891).
-data OptCode = ClientSubnet -- ^ Client subnet (RFC7871)
-             | OUNKNOWN Int -- ^ Unknown option code
-    deriving (Eq)
-
-orDB :: [(OptCode, Int)]
-orDB = [
-        (ClientSubnet, 8)
-       ]
-
-rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
-rookup _    []          =  Nothing
-rookup  key ((x,y):xys)
-  | key == y          =  Just x
-  | otherwise         =  rookup key xys
-
 -- | From number to type.
 toTYPE :: Word16 -> TYPE
 toTYPE = TYPE
@@ -238,15 +222,6 @@ intToType = TYPE
 -- | From type to number. Naming is for historical reasons.
 typeToInt :: TYPE -> Word16
 typeToInt = fromTYPE
-
--- | From number to option code.
-intToOptCode :: Int -> OptCode
-intToOptCode n = fromMaybe (OUNKNOWN n) $ rookup n orDB
-
--- | From option code to number.
-optCodeToInt :: OptCode -> Int
-optCodeToInt (OUNKNOWN x)  = x
-optCodeToInt t = fromMaybe (error "optCodeToInt") $ lookup t orDB
 
 ----------------------------------------------------------------
 
@@ -478,45 +453,6 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_OTH ByteString   -- ^ Unknown resource data
     deriving (Eq, Ord)
 
--- | Optional resource data.
-data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
-           | OD_Unknown Int ByteString      -- ^ Unknown optional type
-    deriving (Eq,Show,Ord)
-
--- For OPT pseudo-RR defined in RFC 6891
-
--- | UDP size for EDNS0 (RFC6891).
-orUdpSize :: ResourceRecord -> Word16
-orUdpSize rr
-  | rrtype rr == OPT = rrclass rr
-  | otherwise        = error "Can be used only for OPT"
-
--- | Extended RCODE for EDNS0 (RFC6891).
-orExtRcode :: DNSHeader -> ResourceRecord -> RCODE
-orExtRcode hdr rr
-  | rrtype rr == OPT = let lp = fromRCODEforHeader $ rcode $ flags hdr
-                           up = shiftR (rrttl rr .&. 0xff000000) 20
-                           cd = fromIntegral up .|. lp
-                       in toRCODE cd
-  | otherwise        = error "Can be used only for OPT"
-
--- | Version for EDNS0 (RFC6891).
-orVersion :: ResourceRecord -> Word8
-orVersion rr
-  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0x00ff0000) 16
-  | otherwise        = error "Can be used only for OPT"
-
--- | DNSSEC OK flag (RFC3225) for EDNS0 (RFC6891).
-orDnssecOk :: ResourceRecord -> Bool
-orDnssecOk rr
-  | rrtype rr == OPT = rrttl rr `testBit` 15
-  | otherwise        = error "Can be used only for OPT"
-
--- | Option resource data for EDNS0 (RFC6891).
-orRdata :: ResourceRecord -> [OData]
-orRdata (ResourceRecord _ OPT _ _ (RD_OPT odata)) = odata
-orRdata _ = error "Can be used only for OPT"
-
 instance Show RData where
   show (RD_NS dom) = BS.unpack dom
   show (RD_MX prf dom) = show prf ++ " " ++ BS.unpack dom
@@ -584,3 +520,67 @@ defaultResponse =
       }
 
 ----------------------------------------------------------------
+
+-- | Option Code (RFC 6891).
+data OptCode = ClientSubnet -- ^ Client subnet (RFC7871)
+             | OUNKNOWN Int -- ^ Unknown option code
+    deriving (Eq)
+
+orDB :: [(OptCode, Int)]
+orDB = [
+        (ClientSubnet, 8)
+       ]
+
+rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
+rookup _    []          =  Nothing
+rookup  key ((x,y):xys)
+  | key == y          =  Just x
+  | otherwise         =  rookup key xys
+
+-- | From number to option code.
+intToOptCode :: Int -> OptCode
+intToOptCode n = fromMaybe (OUNKNOWN n) $ rookup n orDB
+
+-- | From option code to number.
+optCodeToInt :: OptCode -> Int
+optCodeToInt (OUNKNOWN x)  = x
+optCodeToInt t = fromMaybe (error "optCodeToInt") $ lookup t orDB
+
+-- | Optional resource data.
+data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
+           | OD_Unknown Int ByteString      -- ^ Unknown optional type
+    deriving (Eq,Show,Ord)
+
+-- For OPT pseudo-RR defined in RFC 6891
+
+-- | UDP size for EDNS0 (RFC6891).
+orUdpSize :: ResourceRecord -> Word16
+orUdpSize rr
+  | rrtype rr == OPT = rrclass rr
+  | otherwise        = error "Can be used only for OPT"
+
+-- | Extended RCODE for EDNS0 (RFC6891).
+orExtRcode :: DNSHeader -> ResourceRecord -> RCODE
+orExtRcode hdr rr
+  | rrtype rr == OPT = let lp = fromRCODEforHeader $ rcode $ flags hdr
+                           up = shiftR (rrttl rr .&. 0xff000000) 20
+                           cd = fromIntegral up .|. lp
+                       in toRCODE cd
+  | otherwise        = error "Can be used only for OPT"
+
+-- | Version for EDNS0 (RFC6891).
+orVersion :: ResourceRecord -> Word8
+orVersion rr
+  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0x00ff0000) 16
+  | otherwise        = error "Can be used only for OPT"
+
+-- | DNSSEC OK flag (RFC3225) for EDNS0 (RFC6891).
+orDnssecOk :: ResourceRecord -> Bool
+orDnssecOk rr
+  | rrtype rr == OPT = rrttl rr `testBit` 15
+  | otherwise        = error "Can be used only for OPT"
+
+-- | Option resource data for EDNS0 (RFC6891).
+orRdata :: ResourceRecord -> [OData]
+orRdata (ResourceRecord _ OPT _ _ (RD_OPT odata)) = odata
+orRdata _ = error "Can be used only for OPT"
