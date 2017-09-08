@@ -523,8 +523,10 @@ defaultResponse =
       }
 
 ----------------------------------------------------------------
+-- ENDS0 (RFC 6891)
+----------------------------------------------------------------
 
--- | ENDS Option Code (RFC 6891).
+-- | EDNS0 Option Code (RFC 6891).
 newtype OptCode = OptCode {
     -- | From option code to number.
     fromOptCode :: Word16
@@ -550,8 +552,6 @@ data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
     deriving (Eq,Show,Ord)
 
 ----------------------------------------------------------------
-
--- For OPT pseudo-RR defined in RFC 6891
 
 -- | UDP size for EDNS0 (RFC6891).
 orUdpSize :: ResourceRecord -> Word16
