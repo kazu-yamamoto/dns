@@ -74,7 +74,11 @@ module Network.DNS.Types (
   , DNSError (..)
   -- * EDNS0
   , OData (..)
-  , OptCode (..), intToOptCode, optCodeToInt
+  , OptCode (
+    ClientSubnet
+  )
+  , toOptCode
+  , fromOptCode
   -- ** EDNS0 Converters
   , orUdpSize, orExtRcode, orVersion, orDnssecOk, orRdata
   -- * Other types
@@ -89,7 +93,6 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
-import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
 import Data.Word (Word8, Word16, Word32)
 
@@ -521,35 +524,32 @@ defaultResponse =
 
 ----------------------------------------------------------------
 
--- | Option Code (RFC 6891).
-data OptCode = ClientSubnet -- ^ Client subnet (RFC7871)
-             | OUNKNOWN Int -- ^ Unknown option code
-    deriving (Eq)
+-- | ENDS Option Code (RFC 6891).
+newtype OptCode = OptCode {
+    -- | From option code to number.
+    fromOptCode :: Word16
+  } deriving (Eq,Ord)
 
-orDB :: [(OptCode, Int)]
-orDB = [
-        (ClientSubnet, 8)
-       ]
+-- | Client subnet (RFC7871)
+pattern ClientSubnet :: OptCode
+pattern ClientSubnet = OptCode 8
 
-rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
-rookup _    []          =  Nothing
-rookup  key ((x,y):xys)
-  | key == y          =  Just x
-  | otherwise         =  rookup key xys
+instance Show OptCode where
+    show ClientSubnet = "ClientSubnet"
+    show x            = "OptCode " ++ (show $ fromOptCode x)
 
 -- | From number to option code.
-intToOptCode :: Int -> OptCode
-intToOptCode n = fromMaybe (OUNKNOWN n) $ rookup n orDB
+toOptCode :: Word16 -> OptCode
+toOptCode = OptCode
 
--- | From option code to number.
-optCodeToInt :: OptCode -> Int
-optCodeToInt (OUNKNOWN x)  = x
-optCodeToInt t = fromMaybe (error "optCodeToInt") $ lookup t orDB
+----------------------------------------------------------------
 
 -- | Optional resource data.
 data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
-           | OD_Unknown Int ByteString      -- ^ Unknown optional type
+           | OD_Unknown OptCode ByteString  -- ^ Unknown optional type
     deriving (Eq,Show,Ord)
+
+----------------------------------------------------------------
 
 -- For OPT pseudo-RR defined in RFC 6891
 

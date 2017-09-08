@@ -226,7 +226,7 @@ putOData (OD_ClientSubnet srcNet scpNet ip) =
                         IPv4 ip4 -> (1,dropZeroes $ fromIPv4 ip4)
                         IPv6 ip6 -> (2,dropZeroes $ fromIPv6b ip6)
         dataLen = 2 + 2 + length raw
-     in mconcat [ putInt16 (optCodeToInt ClientSubnet)
+     in mconcat [ put16 $ fromOptCode ClientSubnet
                 , putInt16 dataLen
                 , putInt16 fam
                 , put8 srcNet
@@ -234,7 +234,7 @@ putOData (OD_ClientSubnet srcNet scpNet ip) =
                 , mconcat $ fmap putInt8 raw
                 ]
 putOData (OD_Unknown code bs) =
-    mconcat [ putInt16 code
+    mconcat [ put16 $ fromOptCode code
             , putInt16 $ BS.length bs
             , putByteString bs
             ]

@@ -125,7 +125,8 @@ genOData = oneof
   where
     genOD_Unknown = do
       bs <- genByteString
-      pure $ OD_Unknown (fromIntegral $ BS.length bs) bs
+      let opc = toOptCode $ fromIntegral $ BS.length bs
+      pure $ OD_Unknown opc bs
 
 genByteString :: Gen BS.ByteString
 genByteString = elements

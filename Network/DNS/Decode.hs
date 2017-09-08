@@ -175,7 +175,7 @@ getTYPE :: SGet TYPE
 getTYPE = toTYPE <$> get16
 
 getOptCode :: SGet OptCode
-getOptCode = intToOptCode <$> getInt16
+getOptCode = toOptCode <$> get16
 
 getQuery :: SGet Question
 getQuery = Question <$> getDomain
@@ -293,7 +293,7 @@ getOData ClientSubnet len = do
                     2 -> pure . IPv6 . toIPv6b $ take 16 (rawip ++ repeat 0)
                     _ -> fail "Unsupported address family"
         pure $ OD_ClientSubnet srcMask scpMask ip
-getOData (OUNKNOWN i) len = OD_Unknown i <$> getNByteString len
+getOData opc len = OD_Unknown opc <$> getNByteString len
 
 ----------------------------------------------------------------
 
