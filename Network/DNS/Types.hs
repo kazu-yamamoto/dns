@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Data types for DNS Query and Response.
 --   For more information, see <http://www.ietf.org/rfc/rfc1035>.
@@ -73,23 +74,33 @@ module Network.DNS.Types (
   -- * DNS Error
   , DNSError (..)
   -- * EDNS0
+  , EDNS0
+  , udpSize
+  , extRCODE
+  , dnssecOk
+  , options
+  , defaultEDNS0
+  , fromEDNS0
+  , toEDNS0
+  -- * EDNS0 option data
   , OData (..)
-  , OptCode (..), intToOptCode, optCodeToInt
-  -- ** EDNS0 Converters
-  , orUdpSize, orExtRcode, orVersion, orDnssecOk, orRdata
+  , OptCode (
+    ClientSubnet
+  )
+  , toOptCode
+  , fromOptCode
   -- * Other types
   , Mailbox
   ) where
 
 import Control.Exception (Exception)
-import Data.Bits ((.&.), (.|.), shiftR, testBit)
+import Data.Bits ((.&.), (.|.), shiftR, shiftL, testBit, setBit)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64 as B64 (encode)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
-import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
 import Data.Word (Word8, Word16, Word32)
 
@@ -209,22 +220,6 @@ instance Show TYPE where
     show ANY        = "ANY"
     show x          = "TYPE " ++ (show $ typeToInt x)
 
--- | Option Code (RFC 6891).
-data OptCode = ClientSubnet -- ^ Client subnet (RFC7871)
-             | OUNKNOWN Int -- ^ Unknown option code
-    deriving (Eq)
-
-orDB :: [(OptCode, Int)]
-orDB = [
-        (ClientSubnet, 8)
-       ]
-
-rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
-rookup _    []          =  Nothing
-rookup  key ((x,y):xys)
-  | key == y          =  Just x
-  | otherwise         =  rookup key xys
-
 -- | From number to type.
 toTYPE :: Word16 -> TYPE
 toTYPE = TYPE
@@ -238,15 +233,6 @@ intToType = TYPE
 -- | From type to number. Naming is for historical reasons.
 typeToInt :: TYPE -> Word16
 typeToInt = fromTYPE
-
--- | From number to option code.
-intToOptCode :: Int -> OptCode
-intToOptCode n = fromMaybe (OUNKNOWN n) $ rookup n orDB
-
--- | From option code to number.
-optCodeToInt :: OptCode -> Int
-optCodeToInt (OUNKNOWN x)  = x
-optCodeToInt t = fromMaybe (error "optCodeToInt") $ lookup t orDB
 
 ----------------------------------------------------------------
 
@@ -478,45 +464,6 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_OTH ByteString   -- ^ Unknown resource data
     deriving (Eq, Ord)
 
--- | Optional resource data.
-data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
-           | OD_Unknown Int ByteString      -- ^ Unknown optional type
-    deriving (Eq,Show,Ord)
-
--- For OPT pseudo-RR defined in RFC 6891
-
--- | UDP size for EDNS0 (RFC6891).
-orUdpSize :: ResourceRecord -> Word16
-orUdpSize rr
-  | rrtype rr == OPT = rrclass rr
-  | otherwise        = error "Can be used only for OPT"
-
--- | Extended RCODE for EDNS0 (RFC6891).
-orExtRcode :: DNSHeader -> ResourceRecord -> RCODE
-orExtRcode hdr rr
-  | rrtype rr == OPT = let lp = fromRCODEforHeader $ rcode $ flags hdr
-                           up = shiftR (rrttl rr .&. 0xff000000) 20
-                           cd = fromIntegral up .|. lp
-                       in toRCODE cd
-  | otherwise        = error "Can be used only for OPT"
-
--- | Version for EDNS0 (RFC6891).
-orVersion :: ResourceRecord -> Word8
-orVersion rr
-  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0x00ff0000) 16
-  | otherwise        = error "Can be used only for OPT"
-
--- | DNSSEC OK flag (RFC3225) for EDNS0 (RFC6891).
-orDnssecOk :: ResourceRecord -> Bool
-orDnssecOk rr
-  | rrtype rr == OPT = rrttl rr `testBit` 15
-  | otherwise        = error "Can be used only for OPT"
-
--- | Option resource data for EDNS0 (RFC6891).
-orRdata :: ResourceRecord -> [OData]
-orRdata (ResourceRecord _ OPT _ _ (RD_OPT odata)) = odata
-orRdata _ = error "Can be used only for OPT"
-
 instance Show RData where
   show (RD_NS dom) = BS.unpack dom
   show (RD_MX prf dom) = show prf ++ " " ++ BS.unpack dom
@@ -584,3 +531,74 @@ defaultResponse =
       }
 
 ----------------------------------------------------------------
+-- EDNS0 (RFC 6891)
+----------------------------------------------------------------
+
+-- | EDNS0 infromation defined in RFC 6891.
+data EDNS0 = EDNS0 {
+    -- | UDP payload size.
+    udpSize  :: Word16
+    -- | Extended RCODE.
+  , extRCODE :: RCODE
+    -- | Is DNSSEC OK?
+  , dnssecOk :: Bool
+    -- | EDNS0 option data.
+  , options  :: [OData]
+  } deriving (Eq, Show)
+
+-- | Default information for EDNS0.
+defaultEDNS0 :: EDNS0
+defaultEDNS0 = EDNS0 4096 NoErr False []
+
+-- | Generating a resource record for the additional section based on EDNS0.
+-- 'DNSFlags' is not generated.
+-- Just set the same 'RCODE' to 'DNSFlags'.
+fromEDNS0 :: EDNS0 -> ResourceRecord
+fromEDNS0 edns = ResourceRecord name' type' class' ttl' rdata'
+  where
+    name'  = "."
+    type'  = OPT
+    class' = udpSize edns
+    ttl0'   = fromIntegral (fromRCODE (extRCODE edns) .&. 0x0ff0) `shiftL` 20
+    ttl'
+      | dnssecOk edns = ttl0' `setBit` 15
+      | otherwise     = ttl0'
+    rdata' = RD_OPT $ options edns
+
+-- | Generating EDNS0 information from the OPT RR.
+toEDNS0 :: DNSFlags -> ResourceRecord -> Maybe EDNS0
+toEDNS0 flgs (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
+    Just $ EDNS0 udpsiz (toRCODE erc) secok opts
+  where
+    lp = fromRCODEforHeader $ rcode flgs
+    up = shiftR (ttl' .&. 0xff000000) 20
+    erc = fromIntegral up .|. lp
+    secok = ttl' `testBit` 15
+toEDNS0 _ _ = Nothing
+
+----------------------------------------------------------------
+
+-- | EDNS0 Option Code (RFC 6891).
+newtype OptCode = OptCode {
+    -- | From option code to number.
+    fromOptCode :: Word16
+  } deriving (Eq,Ord)
+
+-- | Client subnet (RFC7871)
+pattern ClientSubnet :: OptCode
+pattern ClientSubnet = OptCode 8
+
+instance Show OptCode where
+    show ClientSubnet = "ClientSubnet"
+    show x            = "OptCode " ++ (show $ fromOptCode x)
+
+-- | From number to option code.
+toOptCode :: Word16 -> OptCode
+toOptCode = OptCode
+
+----------------------------------------------------------------
+
+-- | Optional resource data.
+data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
+           | OD_Unknown OptCode ByteString  -- ^ Unknown optional type
+    deriving (Eq,Show,Ord)
