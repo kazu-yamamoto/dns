@@ -349,6 +349,11 @@ newtype RCODE = RCODE {
     fromRCODE :: Word16
   } deriving (Eq)
 
+-- | Provide an Enum instance for backwards compatibility
+instance Enum RCODE where
+    fromEnum = fromIntegral . fromRCODE
+    toEnum = RCODE . fromIntegral
+
 -- | No error condition.
 pattern NoErr     :: RCODE
 pattern NoErr      = RCODE  0
