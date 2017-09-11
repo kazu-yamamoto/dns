@@ -45,7 +45,7 @@ import Control.Applicative
 ----------------------------------------------------------------
 
 
-data RDATAParseError = RDATAParseError String
+newtype RDATAParseError = RDATAParseError String
  deriving (Show, Typeable)
 
 instance ControlException.Exception RDATAParseError

@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP, OverloadedStrings #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -441,13 +440,10 @@ tcpRetry query sock tm = do
 -- to make many DNS queries with the same resolver handle.
 
 tcpOpen :: SockAddr -> IO (Maybe Socket)
-tcpOpen peer = do
-    case (peer) of
-        SockAddrInet _ _ ->
-            socket AF_INET Stream defaultProtocol >>= return . Just
-        SockAddrInet6 _ _ _ _ ->
-            socket AF_INET6 Stream defaultProtocol >>= return . Just
-        _ -> return Nothing -- Only IPv4 and IPv6 are possible
+tcpOpen peer = case peer of
+    SockAddrInet{}  -> Just <$> socket AF_INET  Stream defaultProtocol
+    SockAddrInet6{} -> Just <$> socket AF_INET6 Stream defaultProtocol
+    _ -> return Nothing -- Only IPv4 and IPv6 are possible
 
 -- Perform a DNS query over TCP, if we were successful in creating
 -- the TCP socket.  The socket creation can only fail if we run out
@@ -463,7 +459,7 @@ tcpLookup :: ByteString
 tcpLookup _ _ _ Nothing = return $ Left ServerFailure
 tcpLookup query peer tm (Just vc) = do
     response <- timeout tm $ do
-        connect vc $ peer
+        connect vc peer
         sendAll vc $ encodeVC query
         receiveVC vc
     case response of
