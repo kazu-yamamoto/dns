@@ -223,7 +223,7 @@ instance Show TYPE where
     show CDNSKEY    = "CDNSKEY"
     show CSYNC      = "CSYNC"
     show ANY        = "ANY"
-    show x          = "TYPE " ++ (show $ typeToInt x)
+    show x          = "TYPE " ++ (show $ fromTYPE x)
 
 -- | From number to type.
 toTYPE :: Word16 -> TYPE
