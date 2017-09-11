@@ -63,6 +63,11 @@ module Network.DNS.Types (
   , NameErr
   , NotImpl
   , Refused
+  , YXDomain
+  , YXRRSet
+  , NXRRSet
+  , NotAuth
+  , NotZone
   , BadOpt
   )
   , toRCODE
@@ -344,6 +349,11 @@ newtype RCODE = RCODE {
     fromRCODE :: Word16
   } deriving (Eq)
 
+-- | Provide an Enum instance for backwards compatibility
+instance Enum RCODE where
+    fromEnum = fromIntegral . fromRCODE
+    toEnum = RCODE . fromIntegral
+
 -- | No error condition.
 pattern NoErr     :: RCODE
 pattern NoErr      = RCODE  0
@@ -377,18 +387,43 @@ pattern NotImpl    = RCODE  4
 --   transfer) for particular data.
 pattern Refused   :: RCODE
 pattern Refused    = RCODE  5
+-- | YXDomain - Dynamic update response, a pre-requisite domain that should not
+-- exist, does exist.
+pattern YXDomain :: RCODE
+pattern YXDomain  = RCODE 6
+-- | YXRRSet - Dynamic update response, a pre-requisite RRSet that should not
+-- exist, does exist.
+pattern YXRRSet  :: RCODE
+pattern YXRRSet   = RCODE 7
+-- | NXRRSet - Dynamic update response, a pre-requisite RRSet that should
+-- exist, does not exist.
+pattern NXRRSet  :: RCODE
+pattern NXRRSet   = RCODE 8
+-- | NotAuth - Dynamic update response, the server is not authoritative for the
+-- zone named in the Zone Section.
+pattern NotAuth  :: RCODE
+pattern NotAuth   = RCODE 9
+-- | NotZone - Dynamic update response, a name used in the Prerequisite or
+-- Update Section is not within the zone denoted by the Zone Section.
+pattern NotZone  :: RCODE
+pattern NotZone   = RCODE 10
 -- | Bad OPT Version (RFC 6891) or TSIG Signature Failure (RFC2845).
 pattern BadOpt    :: RCODE
 pattern BadOpt     = RCODE 16
 
+-- | Use https://tools.ietf.org/html/rfc2929#section-2.3 names for DNS RCODEs
 instance Show RCODE where
-    show NoErr     = "NoErr"
-    show FormatErr = "Format"
+    show NoErr     = "NoError"
+    show FormatErr = "FormErr"
     show ServFail  = "ServFail"
-    show NameErr   = "NameErr"
-    show NotImpl   = "NotImpl"
+    show NameErr   = "NXDomain"
+    show NotImpl   = "NotImp"
     show Refused   = "Refused"
-    show BadOpt    = "BadOpt"
+    show YXDomain  = "YXDomain"
+    show YXRRSet   = "YXRRSet"
+    show NotAuth   = "NotAuth"
+    show NotZone   = "NotZone"
+    show BadOpt    = "BADVERS"
     show x         = "RCODE " ++ (show $ fromRCODE x)
 
 -- | From number to rcode.
