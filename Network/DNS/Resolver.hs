@@ -161,13 +161,13 @@ makeResolvSeed conf = do
   where
     findAddresses :: IO (NonEmpty AddrInfo)
     findAddresses = case resolvInfo conf of
-        RCHostName numhost       -> (:| []) <$> (makeAddrInfo numhost Nothing)
-        RCHostPort numhost mport -> (:| []) <$> (makeAddrInfo numhost (Just mport))
+        RCHostName numhost       -> (:| []) <$> makeAddrInfo numhost Nothing
+        RCHostPort numhost mport -> (:| []) <$> makeAddrInfo numhost (Just mport)
         RCFilePath file -> do
             nss <- getDefaultDnsServers file
             case nss of
               []     -> throwIO BadConfiguration
-              (l:ls) -> (:|) <$> (makeAddrInfo l Nothing) <*> forM ls (flip makeAddrInfo Nothing)
+              (l:ls) -> (:|) <$> makeAddrInfo l Nothing <*> forM ls (flip makeAddrInfo Nothing)
 
 getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
@@ -386,13 +386,22 @@ lookupRawInternal ::
     -> IO (Either DNSError DNSMessage)
 lookupRawInternal _ _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-lookupRawInternal rcv ad rlv dom typ = do
-    seqno <- genId rlv
-    let query = (if ad then composeQueryAD else composeQuery) seqno [q]
-        checkSeqno = check seqno
-    loop query checkSeqno 0 False
+lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
   where
-    loop query checkSeqno cnt mismatch
+    loop :: (Socket, Maybe (NonEmpty Socket)) -> IO (Either DNSError DNSMessage)
+    loop (sock, alternatives) = do
+      res <- initialise >>= \(query, checkSeqno) -> performLookup sock query checkSeqno 0 False
+      case res of
+        Left e  -> maybe (return (Left e)) (loop . NE.uncons) alternatives
+        Right v -> pure (Right v)
+
+    initialise = do
+      seqno <- genId rlv
+      let query = (if ad then composeQueryAD else composeQuery) seqno [q]
+      let checkSeqno = check seqno
+      return (query, checkSeqno)
+
+    performLookup sock query checkSeqno cnt mismatch
       | cnt == retry = do
           let ret | mismatch  = SequenceNumberMismatch
                   | otherwise = RetryLimitExceeded
@@ -401,15 +410,14 @@ lookupRawInternal rcv ad rlv dom typ = do
           sendAll sock query
           response <- timeout tm (rcv sock)
           case response of
-              Nothing  -> loop query checkSeqno (cnt + 1) False
+              Nothing  -> performLookup sock query checkSeqno (cnt + 1) False
               Just res -> do
                   let valid = checkSeqno res
                   case valid of
-                      False  -> loop query checkSeqno (cnt + 1) False
+                      False  -> performLookup sock query checkSeqno (cnt + 1) False
                       True | not $ trunCation $ flags $ header res
                              -> return $ Right res
                       _      -> tcpRetry query sock tm
-    sock = NE.head (dnsSocks rlv)
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
     q = Question dom typ
