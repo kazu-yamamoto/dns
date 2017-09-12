@@ -41,7 +41,7 @@ module Network.DNS.Types (
   ) where
 
 
-import Control.Exception (Exception)
+import Control.Exception (Exception, IOException)
 import Data.Bits ((.&.), shiftR, testBit)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64 as B64 (encode)
@@ -195,6 +195,7 @@ data DNSError =
   | BadOptRecord
     -- | Configuration is wrong.
   | BadConfiguration
+  | NetworkFailure IOException
   deriving (Eq, Show, Typeable)
 
 instance Exception DNSError

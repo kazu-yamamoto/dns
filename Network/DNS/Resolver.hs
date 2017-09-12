@@ -30,7 +30,7 @@ module Network.DNS.Resolver (
 #define GHC708
 #endif
 
-import Control.Exception (bracket, throwIO)
+import Control.Exception (try, bracket, throwIO)
 import Control.Monad (forM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -375,7 +375,7 @@ lookupRawAD = lookupRawInternal receive True
 -- atypical.
 --
 -- Future improvements might also include support for TCP on the
--- initial query, and of course support for multiple nameservers.
+-- initial query.
 
 lookupRawInternal ::
     (Socket -> IO DNSMessage)
@@ -390,10 +390,11 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
   where
     loop :: (Socket, Maybe (NonEmpty Socket)) -> IO (Either DNSError DNSMessage)
     loop (sock, alternatives) = do
-      res <- initialise >>= \(query, checkSeqno) -> performLookup sock query checkSeqno 0 False
+      res <- initialise >>= \(query, checkSeqno) -> try (performLookup sock query checkSeqno 0 False)
       case res of
-        Left e  -> maybe (return (Left e)) (loop . NE.uncons) alternatives
-        Right v -> pure (Right v)
+        Left e  -> maybe (return (Left (NetworkFailure e))) (loop . NE.uncons) alternatives
+        Right (Left e)  -> maybe (return (Left e)) (loop . NE.uncons) alternatives
+        Right (Right v) -> pure (Right v)
 
     initialise = do
       seqno <- genId rlv
