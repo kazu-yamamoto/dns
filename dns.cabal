@@ -12,7 +12,8 @@ Category:               Network
 Cabal-Version:          >= 1.10
 Build-Type:             Simple
 Extra-Source-Files:     Changelog.md
-                        cbits/defaultdns.c
+                        cbits/dns.c
+                        include/dns.h
 
 Library
   Default-Language:     Haskell2010
@@ -25,6 +26,8 @@ Library
                         Network.DNS.Encode
                         Network.DNS.Decode
   Other-Modules:        Network.DNS.StateBinary
+  if impl(ghc < 8)
+    Build-Depends:      semigroups
   if impl(ghc >= 7)
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
@@ -41,6 +44,7 @@ Library
                       , random
                       , resourcet
                       , safe == 0.3.*
+                      , text
   else
     Build-Depends:      base >= 4 && < 5
                       , attoparsec
@@ -58,8 +62,10 @@ Library
                       , random
                       , resourcet
                       , safe == 0.3.*
+                      , text
   if os(windows)
-    C-Sources:        cbits/defaultdns.c
+    C-Sources:        cbits/dns.c
+    Include-Dirs:     include
     Extra-Libraries:  iphlpapi
 
 Test-Suite network
