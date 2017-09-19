@@ -1,6 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP, OverloadedStrings #-}
-{-# LANGUAGE ForeignFunctionInterface #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -31,15 +30,16 @@ module Network.DNS.Resolver (
 #define GHC708
 #endif
 
-import Control.Exception (bracket, throwIO)
+import Control.Exception (try, bracket, throwIO)
+import Control.Monad (forM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.Char (isSpace)
-import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
 import Network.DNS.Decode
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
 import Network.DNS.Encode
 import Network.DNS.Types
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), PortNumber(..), HostName, Socket, SocketType(Stream, Datagram), close, socket, connect, getPeerName, getAddrInfo, defaultHints, defaultProtocol)
@@ -59,8 +59,12 @@ import Network.Socket.ByteString (sendAll)
 #endif
 
 #if defined(WIN)
-import Foreign.C (CString, peekCString)
-import Foreign.Marshal.Utils (maybePeek)
+import Foreign.Storable (Storable(..))
+import qualified Data.Text as T
+import Network.DNS.Windows
+#else
+import Data.Char (isSpace)
+import Data.List (isPrefixOf)
 #endif
 
 ----------------------------------------------------------------
@@ -124,19 +128,19 @@ defaultResolvConf = ResolvConf {
 -- | Abstract data type of DNS Resolver seed.
 --   When implementing a DNS cache, this should be re-used.
 data ResolvSeed = ResolvSeed {
-    addrInfo :: AddrInfo
-  , rsTimeout :: Int
-  , rsRetry :: Int
-  , rsBufsize :: Integer
+    nameservers :: NonEmpty AddrInfo
+  , rsTimeout   :: Int
+  , rsRetry     :: Int
+  , rsBufsize   :: Integer
 }
 
 -- | Abstract data type of DNS Resolver
 --   When implementing a DNS cache, this MUST NOT be re-used.
 data Resolver = Resolver {
-    genId   :: IO Word16
-  , dnsSock :: Socket
+    genId      :: IO Word16
+  , dnsSocks   :: NonEmpty Socket
   , dnsTimeout :: Int
-  , dnsRetry :: Int
+  , dnsRetry   :: Int
   , dnsBufsize :: Integer
 }
 
@@ -150,31 +154,37 @@ data Resolver = Resolver {
 --    >>> rs <- makeResolvSeed defaultResolvConf
 --
 makeResolvSeed :: ResolvConf -> IO ResolvSeed
-makeResolvSeed conf = ResolvSeed <$> addr
-                                 <*> pure (resolvTimeout conf)
-                                 <*> pure (resolvRetry conf)
-                                 <*> pure (resolvBufsize conf)
+makeResolvSeed conf = do
+  let tm      = resolvTimeout conf
+  let retry   = resolvRetry conf
+  let bufSize = resolvBufsize conf
+  nameservers <- findAddresses
+  return $ ResolvSeed nameservers tm retry bufSize
   where
-    addr = case resolvInfo conf of
-        RCHostName numhost -> makeAddrInfo numhost Nothing
-        RCHostPort numhost mport -> makeAddrInfo numhost $ Just mport
+    findAddresses :: IO (NonEmpty AddrInfo)
+    findAddresses = case resolvInfo conf of
+        RCHostName numhost       -> (:| []) <$> makeAddrInfo numhost Nothing
+        RCHostPort numhost mport -> (:| []) <$> makeAddrInfo numhost (Just mport)
         RCFilePath file -> do
-            ms <- getDefaultDnsServer file
-            case ms of
-              Nothing -> throwIO BadConfiguration
-              Just s  -> makeAddrInfo s Nothing
+            nss <- getDefaultDnsServers file
+            case nss of
+              []     -> throwIO BadConfiguration
+              (l:ls) -> (:|) <$> makeAddrInfo l Nothing <*> forM ls (flip makeAddrInfo Nothing)
 
-getDefaultDnsServer :: FilePath -> IO (Maybe String)
+getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
-getDefaultDnsServer _ = getWindowsDefDnsServer >>= maybePeek peekCString
-
-foreign import ccall "getWindowsDefDnsServer" getWindowsDefDnsServer :: IO CString
+getDefaultDnsServers _ = do
+  res <- peek =<< getWindowsDefDnsServers
+  case dnsError res of
+    0 -> return $ map T.unpack (T.splitOn "," (T.pack (dnsAddresses res)))
+    _ -> do
+      -- TODO: Do proper error handling here.
+      return mempty
 #else
-getDefaultDnsServer file = toAddr <$> readFile file
+getDefaultDnsServers file = toAddresses <$> readFile file
   where
-    toAddr cs = case filter ("nameserver" `isPrefixOf`) $ lines cs of
-      []  -> Nothing
-      l:_ -> Just $ extract l
+    toAddresses :: String -> [String]
+    toAddresses cs = map extract (filter ("nameserver" `isPrefixOf`) (lines cs))
     extract = reverse . dropWhile isSpace . reverse . dropWhile isSpace . drop 11
 #endif
 
@@ -203,37 +213,33 @@ makeAddrInfo addr mport = do
 --   'Resolver'. If multiple 'Resolver's are necessary for
 --   concurrent purpose, use 'withResolvers'.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
-withResolver seed func = bracket (openSocket seed) close $ \sock -> do
-    connectSocket sock seed
-    func $ makeResolver seed sock
+withResolver seed f = bracket (initSockets seed) (mapM_ close) (f . makeResolver seed)
 
 -- | Giving thread-safe 'Resolver's to the function of the second
 --   argument. Sockets for UDP are opened inside and are surely closed.
 --   For each 'Resolver', multiple lookups must be done sequentially.
 --   'Resolver's can be used concurrently.
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
-withResolvers seeds func = bracket openSockets closeSockets $ \socks -> do
-    mapM_ (uncurry connectSocket) $ zip socks seeds
+withResolvers seeds func = bracket (mapM initSockets seeds) closeSockets $ \socks -> do
     let resolvs = zipWith makeResolver seeds socks
     func resolvs
   where
-    openSockets = mapM openSocket seeds
-    closeSockets = mapM close
+    closeSockets = mapM_ close . concatMap NE.toList
 
-openSocket :: ResolvSeed -> IO Socket
-openSocket seed = socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
+-- | Atomically create and connect to all the nameservers listed in the given
+-- `ResolvSeed`.
+initSockets :: ResolvSeed -> IO (NonEmpty Socket)
+initSockets seed = mapM initSocket addrs
   where
-    ai = addrInfo seed
+    initSocket ai = do sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
+                       connect sock (addrAddress ai)
+                       return sock
+    addrs         = nameservers seed
 
-connectSocket :: Socket -> ResolvSeed -> IO ()
-connectSocket sock seed = connect sock (addrAddress ai)
-  where
-    ai = addrInfo seed
-
-makeResolver :: ResolvSeed -> Socket -> Resolver
-makeResolver seed sock = Resolver {
+makeResolver :: ResolvSeed -> NonEmpty Socket -> Resolver
+makeResolver seed socks = Resolver {
     genId = getRandom
-  , dnsSock = sock
+  , dnsSocks = socks
   , dnsTimeout = rsTimeout seed
   , dnsRetry = rsRetry seed
   , dnsBufsize = rsBufsize seed
@@ -374,7 +380,7 @@ lookupRawAD = lookupRawInternal receive True
 -- atypical.
 --
 -- Future improvements might also include support for TCP on the
--- initial query, and of course support for multiple nameservers.
+-- initial query.
 
 lookupRawInternal ::
     (Socket -> IO DNSMessage)
@@ -385,13 +391,23 @@ lookupRawInternal ::
     -> IO (Either DNSError DNSMessage)
 lookupRawInternal _ _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-lookupRawInternal rcv ad rlv dom typ = do
-    seqno <- genId rlv
-    let query = (if ad then composeQueryAD else composeQuery) seqno [q]
-        checkSeqno = check seqno
-    loop query checkSeqno 0 False
+lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
   where
-    loop query checkSeqno cnt mismatch
+    loop :: (Socket, Maybe (NonEmpty Socket)) -> IO (Either DNSError DNSMessage)
+    loop (sock, alternatives) = do
+      res <- initialise >>= \(query, checkSeqno) -> try (performLookup sock query checkSeqno 0 False)
+      case res of
+        Left e  -> maybe (return (Left (NetworkFailure e))) (loop . NE.uncons) alternatives
+        Right (Left e)  -> maybe (return (Left e)) (loop . NE.uncons) alternatives
+        Right (Right v) -> pure (Right v)
+
+    initialise = do
+      seqno <- genId rlv
+      let query = (if ad then composeQueryAD else composeQuery) seqno [q]
+      let checkSeqno = check seqno
+      return (query, checkSeqno)
+
+    performLookup sock query checkSeqno cnt mismatch
       | cnt == retry = do
           let ret | mismatch  = SequenceNumberMismatch
                   | otherwise = RetryLimitExceeded
@@ -400,15 +416,14 @@ lookupRawInternal rcv ad rlv dom typ = do
           sendAll sock query
           response <- timeout tm (rcv sock)
           case response of
-              Nothing  -> loop query checkSeqno (cnt + 1) False
+              Nothing  -> performLookup sock query checkSeqno (cnt + 1) False
               Just res -> do
                   let valid = checkSeqno res
                   case valid of
-                      False  -> loop query checkSeqno (cnt + 1) False
+                      False  -> performLookup sock query checkSeqno (cnt + 1) False
                       True | not $ trunCation $ flags $ header res
                              -> return $ Right res
                       _      -> tcpRetry query sock tm
-    sock = dnsSock rlv
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
     q = Question dom typ
@@ -442,13 +457,10 @@ tcpRetry query sock tm = do
 -- to make many DNS queries with the same resolver handle.
 
 tcpOpen :: SockAddr -> IO (Maybe Socket)
-tcpOpen peer = do
-    case (peer) of
-        SockAddrInet _ _ ->
-            socket AF_INET Stream defaultProtocol >>= return . Just
-        SockAddrInet6 _ _ _ _ ->
-            socket AF_INET6 Stream defaultProtocol >>= return . Just
-        _ -> return Nothing -- Only IPv4 and IPv6 are possible
+tcpOpen peer = case peer of
+    SockAddrInet{}  -> Just <$> socket AF_INET  Stream defaultProtocol
+    SockAddrInet6{} -> Just <$> socket AF_INET6 Stream defaultProtocol
+    _ -> return Nothing -- Only IPv4 and IPv6 are possible
 
 -- Perform a DNS query over TCP, if we were successful in creating
 -- the TCP socket.  The socket creation can only fail if we run out
@@ -464,7 +476,7 @@ tcpLookup :: ByteString
 tcpLookup _ _ _ Nothing = return $ Left ServerFailure
 tcpLookup query peer tm (Just vc) = do
     response <- timeout tm $ do
-        connect vc $ peer
+        connect vc peer
         sendAll vc $ encodeVC query
         receiveVC vc
     case response of

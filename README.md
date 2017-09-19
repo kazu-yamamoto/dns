@@ -16,6 +16,11 @@
 
 ## Todo
 
+### master branch
+
+- Default DNS server detection on Windows (waiting for cleaning up)
+
+### ghc8 branch
+
 - EDNS0
 - DNSSEC
-- Default DNS server detection on Windows (now included in the `master` branch).

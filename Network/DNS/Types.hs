@@ -98,7 +98,7 @@ module Network.DNS.Types (
   , Mailbox
   ) where
 
-import Control.Exception (Exception)
+import Control.Exception (Exception, IOException)
 import Data.Bits ((.&.), (.|.), shiftR, shiftL, testBit, setBit)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64 as B64 (encode)
@@ -276,6 +276,8 @@ data DNSError =
   | BadOptRecord
     -- | Configuration is wrong.
   | BadConfiguration
+    -- | Network failure.
+  | NetworkFailure IOException
     -- | Error is unkown
   | UnknownError
   deriving (Eq, Show, Typeable)
