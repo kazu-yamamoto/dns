@@ -34,8 +34,6 @@ import Control.Exception (try, bracket, throwIO)
 import Control.Monad (forM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.Char (isSpace)
-import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
@@ -61,8 +59,12 @@ import Network.Socket.ByteString (sendAll)
 #endif
 
 #if defined(WIN)
-import Foreign.C (CString, peekCString)
-import Foreign.Marshal.Utils (maybePeek)
+import Foreign.Storable (Storable(..))
+import qualified Data.Text as T
+import Network.DNS.Windows
+#else
+import Data.Char (isSpace)
+import Data.List (isPrefixOf)
 #endif
 
 ----------------------------------------------------------------
@@ -172,10 +174,12 @@ makeResolvSeed conf = do
 getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
 getDefaultDnsServers _ = do
-  res <- getWindowsDefDnsServer >>= maybePeek peekCString
-  return $ maybe mempty (: []) res
-
-foreign import ccall "getWindowsDefDnsServer" getWindowsDefDnsServer :: IO CString
+  res <- peek =<< getWindowsDefDnsServers
+  case dnsError res of
+    0 -> return $ map T.unpack (T.splitOn "," (T.pack (dnsAddresses res)))
+    _ -> do
+      -- TODO: Do proper error handling here.
+      return mempty
 #else
 getDefaultDnsServers file = toAddresses <$> readFile file
   where
