@@ -34,8 +34,6 @@ import Control.Exception (try, bracket, throwIO)
 import Control.Monad (forM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.Char (isSpace)
-import Data.List (isPrefixOf)
 import Data.Maybe (fromMaybe)
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
@@ -61,11 +59,12 @@ import Network.Socket.ByteString (sendAll)
 #endif
 
 #if defined(WIN)
-import Foreign.C (peekCString, newCString)
 import Foreign.Storable (Storable(..))
-import Foreign.Ptr (Ptr)
-import Data.Word (Word32)
 import qualified Data.Text as T
+import Network.DNS.Windows
+#else
+import Data.Char (isSpace)
+import Data.List (isPrefixOf)
 #endif
 
 ----------------------------------------------------------------
@@ -171,34 +170,6 @@ makeResolvSeed conf = do
             case nss of
               []     -> throwIO BadConfiguration
               (l:ls) -> (:|) <$> makeAddrInfo l Nothing <*> forM ls (flip makeAddrInfo Nothing)
-
-
-#if defined(WIN)
-
-#if __GLASGOW_HASKELL__ < 800
-#let alignment t = "%lu", (unsigned long)offsetof(struct {char x__; t (y__); }, y__)
-#endif
-
-#include "dns.h"
-data Dns_t = Dns_t {
-    dnsError :: Word32
-  , dnsAddresses :: String
-  } deriving Show
-
-foreign import ccall "getWindowsDefDnsServers" getWindowsDefDnsServers :: IO (Ptr Dns_t)
-
-instance Storable Dns_t where
-  alignment _ = #{alignment dns_t}
-  sizeOf _    = #{size dns_t}
-  peek ptr = do
-    a <- #{peek dns_t, error} ptr
-    b <- #{peek dns_t, dnsAddresses} ptr >>= peekCString
-    return (Dns_t a b)
-  poke ptr (Dns_t a b) = do
-    #{poke dns_t, error} ptr a
-    newCString b >>= #{poke dns_t, dnsAddresses} ptr
-
-#endif
 
 getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
