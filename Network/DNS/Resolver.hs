@@ -30,7 +30,7 @@ module Network.DNS.Resolver (
 #define GHC708
 #endif
 
-import Control.Exception (try, bracket, throwIO)
+import Control.Exception (bracket, throwIO)
 import Control.Monad (forM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -44,6 +44,7 @@ import Network.DNS.Encode
 import Network.DNS.Types
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), PortNumber(..), HostName, Socket, SocketType(Stream, Datagram), close, socket, connect, getPeerName, getAddrInfo, defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
+import System.IO.Error (annotateIOError, tryIOError)
 import System.Random (getStdRandom, random)
 import System.Timeout (timeout)
 #ifdef GHC708
@@ -395,11 +396,11 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
   where
     loop :: (Socket, Maybe (NonEmpty Socket)) -> IO (Either DNSError DNSMessage)
     loop (sock, alternatives) = do
-      res <- initialise >>= \(query, checkSeqno) -> try (performLookup sock query checkSeqno 0 False)
+      res <- initialise >>= \(query, checkSeqno) ->
+        performLookup sock query checkSeqno 0 False
       case res of
-        Left e  -> maybe (return (Left (NetworkFailure e))) (loop . NE.uncons) alternatives
-        Right (Left e)  -> maybe (return (Left e)) (loop . NE.uncons) alternatives
-        Right (Right v) -> pure (Right v)
+        Left e  -> maybe (return (Left e)) (loop . NE.uncons) alternatives
+        Right v -> pure (Right v)
 
     initialise = do
       seqno <- genId rlv
@@ -413,17 +414,25 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
                   | otherwise = RetryLimitExceeded
           return $ Left ret
       | otherwise    = do
-          sendAll sock query
-          response <- timeout tm (rcv sock)
+          -- We don't expect to block or raise exceptions when writing UDP.
+          -- Reads, can time out, or, since we connect the UDP socket, throw
+          -- connection refused.  Regardless, we simply handle timeouts and
+          -- exceptions for the combined write request + read reply operation.
+          -- IO exceptions are annotated with the protocol and address.
+          response <- timeout tm (tryIOError (sendAll sock query >> rcv sock))
           case response of
               Nothing  -> performLookup sock query checkSeqno (cnt + 1) False
-              Just res -> do
+              Just (Right res) -> do
                   let valid = checkSeqno res
                   case valid of
                       False  -> performLookup sock query checkSeqno (cnt + 1) False
                       True | not $ trunCation $ flags $ header res
                              -> return $ Right res
                       _      -> tcpRetry query sock tm
+              Just (Left e) -> do
+                  peer <- getPeerName sock
+                  return $ Left $ NetworkFailure $
+                      annotateIOError e (show peer) Nothing $ Just "UDP"
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
     q = Question dom typ
@@ -475,13 +484,17 @@ tcpLookup :: ByteString
           -> IO (Either DNSError DNSMessage)
 tcpLookup _ _ _ Nothing = return $ Left ServerFailure
 tcpLookup query peer tm (Just vc) = do
-    response <- timeout tm $ do
+    -- With TCP, we can get fail or time out with any of connect, send
+    -- or receive.
+    response <- timeout tm $ tryIOError $ do
         connect vc peer
         sendAll vc $ encodeVC query
         receiveVC vc
     case response of
         Nothing  -> return $ Left TimeoutExpired
-        Just res -> return $ Right res
+        Just (Right res) -> return $ Right res
+        Just (Left e)    -> return $ Left $ NetworkFailure $
+            annotateIOError e (show peer) Nothing $ Just "TCP"
 
 #if defined(WIN) && defined(GHC708)
 -- Windows does not support sendAll in Network.ByteString for older GHCs.
