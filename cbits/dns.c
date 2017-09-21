@@ -61,13 +61,8 @@ DWORD getWindowsDefDnsServers(char* dnsAddresses, size_t bufferLen) {
 
     }
 
-    else {
-        if (pFixedInfo) FREE(pFixedInfo);
-        return dwRetVal;
-    }
-
     if (pFixedInfo) FREE(pFixedInfo);
-    return NO_ERROR;
+    return dwRetVal;
 }
 
 /*
