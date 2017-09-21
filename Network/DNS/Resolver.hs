@@ -60,6 +60,7 @@ import Network.Socket.ByteString (sendAll)
 #endif
 
 #if defined(WIN)
+import qualified Data.List.Split as Split
 import Foreign.C.String
 import Foreign.Marshal.Alloc (allocaBytes)
 import Data.Word
@@ -180,8 +181,8 @@ getDefaultDnsServers _ = do
      res <- getWindowsDefDnsServers cString 128
      case res of
        0 -> do
-         addresses <- BS.pack <$> peekCString cString
-         return $ map BS.unpack (filter (not . BS.null) . BS.split ',' $ addresses)
+         addresses <- peekCString cString
+         return $ filter (not . null) . Split.splitOn "," $ addresses
        _ -> do
          -- TODO: Do proper error handling here.
          return mempty
