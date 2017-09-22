@@ -51,6 +51,7 @@ DWORD getWindowsDefDnsServers(char* dnsAddresses, size_t bufferLen) {
 	  if (count != 0) dnsAddresses[offset - 1] = ',';
 	  // Copy the IP address, including the null terminator.
 	  strcpy_s(dnsAddresses + offset, copySize, head->IpAddress.String);
+	  if (spaceAvailable == 0) break;
 	} else
 	  break;
 
