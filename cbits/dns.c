@@ -37,26 +37,26 @@ DWORD getWindowsDefDnsServers(char* dnsAddresses, size_t bufferLen) {
       int offset = 0;
       int spaceAvailable = bufferLen;
       IP_ADDR_STRING* head = &pFixedInfo->DnsServerList;
+      int count = 0;
 
-      while (head != NULL && spaceAvailable >= 16) {
+      while (head != NULL) {
         int ipLen = strlen(head->IpAddress.String);
         int copySize = ipLen + 1;
 
-        // Copy the IP address, including the null terminator.
-        strcpy_s(dnsAddresses + offset, copySize, head->IpAddress.String);
-
         spaceAvailable -= copySize;
-        if (spaceAvailable <= 0) break;
+	if (spaceAvailable >= 0) {
+	  // Write the separator.
+	  // The string is already terminated due to the call to
+	  // strcpy_s, which copies the null terminator.
+	  if (count != 0) dnsAddresses[offset - 1] = ',';
+	  // Copy the IP address, including the null terminator.
+	  strcpy_s(dnsAddresses + offset, copySize, head->IpAddress.String);
+	} else
+	  break;
 
         offset += copySize;
-
-        // Write the separator, but only if this is not the last one,
-        // otherwise the string is already terminated due to the call to
-        // strcpy_s, which copies the null terminator.
-
+	count++;
         head = head->Next;
-        if (head != NULL)
-          dnsAddresses[offset - 1] = ',';
       }
 
     }
