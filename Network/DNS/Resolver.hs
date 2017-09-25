@@ -60,9 +60,10 @@ import Network.Socket.ByteString (sendAll)
 #endif
 
 #if defined(WIN)
-import Foreign.Storable (Storable(..))
-import qualified Data.Text as T
-import Network.DNS.Windows
+import qualified Data.List.Split as Split
+import Foreign.C.String
+import Foreign.Marshal.Alloc (allocaBytes)
+import Data.Word
 #else
 import Data.Char (isSpace)
 import Data.List (isPrefixOf)
@@ -174,13 +175,17 @@ makeResolvSeed conf = do
 
 getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
+foreign import ccall "getWindowsDefDnsServers" getWindowsDefDnsServers :: CString -> Int -> IO Word32
 getDefaultDnsServers _ = do
-  res <- peek =<< getWindowsDefDnsServers
-  case dnsError res of
-    0 -> return $ map T.unpack (T.splitOn "," (T.pack (dnsAddresses res)))
-    _ -> do
-      -- TODO: Do proper error handling here.
-      return mempty
+  allocaBytes 128 $ \cString -> do
+     res <- getWindowsDefDnsServers cString 128
+     case res of
+       0 -> do
+         addresses <- peekCString cString
+         return $ filter (not . null) . Split.splitOn "," $ addresses
+       _ -> do
+         -- TODO: Do proper error handling here.
+         return mempty
 #else
 getDefaultDnsServers file = toAddresses <$> readFile file
   where
