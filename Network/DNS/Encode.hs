@@ -137,7 +137,7 @@ putDNSFlags DNSFlags{..} = put16 word
 
     st :: State Word16 ()
     st = sequence_
-              [ set (word16 rcode)
+              [ set (fromIntegral $ fromRCODEforHeader rcode)
               , when authenData          $ set (bit 5)
               , when recAvailable        $ set (bit 7)
               , when recDesired          $ set (bit 8)
@@ -151,13 +151,13 @@ putDNSFlags DNSFlags{..} = put16 word
 
 putQuestion :: Question -> SPut
 putQuestion Question{..} = putDomain qname
-                           <> put16 (typeToInt qtype)
+                           <> put16 (fromTYPE qtype)
                            <> put16 1
 
 putResourceRecord :: ResourceRecord -> SPut
 putResourceRecord ResourceRecord{..} = mconcat [
     putDomain rrname
-  , put16 (typeToInt rrtype)
+  , put16 (fromTYPE rrtype)
   , put16 rrclass
   , put32 rrttl
   , putResourceRData rdata
@@ -182,7 +182,6 @@ putRData rd = case rd of
     RD_PTR dom      -> putDomain dom
     RD_MX prf dom   -> mconcat [put16 prf, putDomain dom]
     RD_TXT txt      -> putByteStringWithLength txt
-    RD_OTH bytes    -> putByteString bytes
     RD_OPT opts     -> mconcat $ fmap putOData opts
     RD_SOA mn mr serial refresh retry expire min' -> mconcat
         [ putDomain mn
@@ -218,6 +217,7 @@ putRData rd = case rd of
         , put8 a
         , putByteString k
         ]
+    UnknownRData bytes -> putByteString bytes
 
 putOData :: OData -> SPut
 putOData (OD_ClientSubnet srcNet scpNet ip) =
@@ -226,15 +226,15 @@ putOData (OD_ClientSubnet srcNet scpNet ip) =
                         IPv4 ip4 -> (1,dropZeroes $ fromIPv4 ip4)
                         IPv6 ip6 -> (2,dropZeroes $ fromIPv6b ip6)
         dataLen = 2 + 2 + length raw
-     in mconcat [ putInt16 (optCodeToInt ClientSubnet)
+     in mconcat [ put16 $ fromOptCode ClientSubnet
                 , putInt16 dataLen
                 , putInt16 fam
                 , put8 srcNet
                 , put8 scpNet
                 , mconcat $ fmap putInt8 raw
                 ]
-putOData (OD_Unknown code bs) =
-    mconcat [ putInt16 code
+putOData (UnknownOData code bs) =
+    mconcat [ put16 $ fromOptCode code
             , putInt16 $ BS.length bs
             , putByteString bs
             ]

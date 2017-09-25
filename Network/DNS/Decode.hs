@@ -140,7 +140,7 @@ getDNSFlags = do
     toFlags :: Word16 -> Maybe DNSFlags
     toFlags flgs = do
       oc <- getOpcode flgs
-      rc <- getRcode flgs
+      let rc = getRcode flgs
       return $ DNSFlags (getQorR flgs)
                         oc
                         (getAuthAnswer flgs)
@@ -155,7 +155,7 @@ getDNSFlags = do
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8
     getRecAvailable w = testBit w 7
-    getRcode w = Safe.toEnumMay (fromIntegral (w .&. 0x0f))
+    getRcode w = toRCODEforHeader $ fromIntegral w
     getAuthenData w = testBit w 5
 
 ----------------------------------------------------------------
@@ -172,10 +172,10 @@ getQueries :: Int -> SGet [Question]
 getQueries n = replicateM n getQuery
 
 getTYPE :: SGet TYPE
-getTYPE = intToType <$> get16
+getTYPE = toTYPE <$> get16
 
 getOptCode :: SGet OptCode
-getOptCode = intToOptCode <$> getInt16
+getOptCode = toOptCode <$> get16
 
 getQuery :: SGet Question
 getQuery = Question <$> getDomain
@@ -280,7 +280,7 @@ getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
     decodeKeyAlg    = get8
     decodeKeyBytes  = getNByteString (len - 4)
 --
-getRData _  len = RD_OTH <$> getNByteString len
+getRData _  len = UnknownRData <$> getNByteString len
 
 getOData :: OptCode -> Int -> SGet OData
 getOData ClientSubnet len = do
@@ -293,7 +293,7 @@ getOData ClientSubnet len = do
                     2 -> pure . IPv6 . toIPv6b $ take 16 (rawip ++ repeat 0)
                     _ -> fail "Unsupported address family"
         pure $ OD_ClientSubnet srcMask scpMask ip
-getOData (OUNKNOWN i) len = OD_Unknown i <$> getNByteString len
+getOData opc len = UnknownOData opc <$> getNByteString len
 
 ----------------------------------------------------------------
 

@@ -1,4 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 -- | Data types for DNS Query and Response.
 --   For more information, see <http://www.ietf.org/rfc/rfc1035>.
@@ -12,7 +15,33 @@ module Network.DNS.Types (
   , classIN
   , TTL
   -- ** Resource Record Types
-  , TYPE (..), intToType, typeToInt
+  , TYPE (
+    A
+  , NS
+  , CNAME
+  , SOA
+  , NULL
+  , PTR
+  , MX
+  , TXT
+  , AAAA
+  , SRV
+  , DNAME
+  , OPT
+  , DS
+  , RRSIG
+  , NSEC
+  , DNSKEY
+  , NSEC3
+  , NSEC3PARAM
+  , TLSA
+  , CDS
+  , CDNSKEY
+  , CSYNC
+  , ANY
+  )
+  , fromTYPE
+  , toTYPE
   -- ** Resource Data
   , RData (..)
   -- * DNS Message
@@ -26,30 +55,56 @@ module Network.DNS.Types (
   , QorR (..)
   , DNSFlags (..)
   , OPCODE (..)
-  , RCODE (..)
+  , RCODE (
+    NoErr
+  , FormatErr
+  , ServFail
+  , NameErr
+  , NotImpl
+  , Refused
+  , YXDomain
+  , YXRRSet
+  , NXRRSet
+  , NotAuth
+  , NotZone
+  , BadOpt
+  )
+  , fromRCODE
+  , toRCODE
+  , fromRCODEforHeader
+  , toRCODEforHeader
   -- ** DNS Body
   , Question (..)
   -- * DNS Error
   , DNSError (..)
   -- * EDNS0
+  , EDNS0
+  , udpSize
+  , extRCODE
+  , dnssecOk
+  , options
+  , defaultEDNS0
+  , fromEDNS0
+  , toEDNS0
+  -- * EDNS0 option data
   , OData (..)
-  , OptCode (..), intToOptCode, optCodeToInt
-  -- ** EDNS0 Converters
-  , orUdpSize, orExtRcode, orVersion, orDnssecOk, orRdata
+  , OptCode (
+    ClientSubnet
+  )
+  , fromOptCode
+  , toOptCode
   -- * Other types
   , Mailbox
   ) where
 
-
 import Control.Exception (Exception, IOException)
-import Data.Bits ((.&.), shiftR, testBit)
+import Data.Bits ((.&.), (.|.), shiftR, shiftL, testBit, setBit)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64 as B64 (encode)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
-import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable)
 import Data.Word (Word8, Word16, Word32)
 
@@ -65,8 +120,116 @@ type Mailbox = ByteString
 
 ----------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ >= 800
 -- | Types for resource records.
---   For more information, see https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
+newtype TYPE = TYPE {
+    -- | From type to number.
+    fromTYPE :: Word16
+  } deriving Eq
+
+-- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
+
+-- | IPv4 address
+pattern A :: TYPE
+pattern A          = TYPE   1
+-- | An authoritative name serve
+pattern NS :: TYPE
+pattern NS         = TYPE   2
+-- | The canonical name for an alias
+pattern CNAME :: TYPE
+pattern CNAME      = TYPE   5
+-- | Marks the start of a zone of authority
+pattern SOA :: TYPE
+pattern SOA        = TYPE   6
+-- | A null RR (EXPERIMENTAL)
+pattern NULL :: TYPE
+pattern NULL       = TYPE  10
+-- | A domain name pointer
+pattern PTR :: TYPE
+pattern PTR        = TYPE  12
+-- | Mail exchange
+pattern MX :: TYPE
+pattern MX         = TYPE  15
+-- | Text strings
+pattern TXT :: TYPE
+pattern TXT        = TYPE  16
+-- | IPv6 Address
+pattern AAAA :: TYPE
+pattern AAAA       = TYPE  28
+-- | Server Selection (RFC2782)
+pattern SRV :: TYPE
+pattern SRV        = TYPE  33
+-- | DNAME (RFC6672)
+pattern DNAME :: TYPE
+pattern DNAME      = TYPE  39 -- RFC 6672
+-- | OPT (RFC6891)
+pattern OPT :: TYPE
+pattern OPT        = TYPE  41 -- RFC 6891
+-- | Delegation Signer (RFC4034)
+pattern DS :: TYPE
+pattern DS         = TYPE  43 -- RFC 4034
+-- | RRSIG (RFC4034)
+pattern RRSIG :: TYPE
+pattern RRSIG      = TYPE  46 -- RFC 4034
+-- | NSEC (RFC4034)
+pattern NSEC :: TYPE
+pattern NSEC       = TYPE  47 -- RFC 4034
+-- | DNSKEY (RFC4034)
+pattern DNSKEY :: TYPE
+pattern DNSKEY     = TYPE  48 -- RFC 4034
+-- | NSEC3 (RFC5155)
+pattern NSEC3 :: TYPE
+pattern NSEC3      = TYPE  50 -- RFC 5155
+-- | NSEC3PARAM (RFC5155)
+pattern NSEC3PARAM :: TYPE
+pattern NSEC3PARAM = TYPE  51 -- RFC 5155
+-- | TLSA (RFC6698)
+pattern TLSA :: TYPE
+pattern TLSA       = TYPE  52 -- RFC 6698
+-- | Child DS (RFC7344)
+pattern CDS :: TYPE
+pattern CDS        = TYPE  59 -- RFC 7344
+-- | DNSKEY(s) the Child wants reflected in DS (RFC7344)
+pattern CDNSKEY :: TYPE
+pattern CDNSKEY    = TYPE  60 -- RFC 7344
+-- | Child-To-Parent Synchronization (RFC7477)
+pattern CSYNC :: TYPE
+pattern CSYNC      = TYPE  62 -- RFC 7477
+-- | A request for all records the server/cache has available
+pattern ANY :: TYPE
+pattern ANY        = TYPE 255
+
+instance Show TYPE where
+    show A          = "A"
+    show NS         = "NS"
+    show CNAME      = "CNAME"
+    show SOA        = "SOA"
+    show NULL       = "NULL"
+    show PTR        = "PTR"
+    show MX         = "MX"
+    show TXT        = "TXT"
+    show AAAA       = "AAAA"
+    show SRV        = "SRV"
+    show DNAME      = "DNAME"
+    show OPT        = "OPT"
+    show DS         = "DS"
+    show RRSIG      = "RRSIG"
+    show NSEC       = "NSEC"
+    show DNSKEY     = "DNSKEY"
+    show NSEC3      = "NSEC3"
+    show NSEC3PARAM = "NSEC3PARAM"
+    show TLSA       = "TLSA"
+    show CDS        = "CDS"
+    show CDNSKEY    = "CDNSKEY"
+    show CSYNC      = "CSYNC"
+    show ANY        = "ANY"
+    show x          = "TYPE " ++ (show $ fromTYPE x)
+
+-- | From number to type.
+toTYPE :: Word16 -> TYPE
+toTYPE = TYPE
+#else
+-- | Types for resource records.
 data TYPE = A          -- ^ IPv4 address
           | NS         -- ^ An authoritative name serve
           | CNAME      -- ^ The canonical name for an alias
@@ -89,74 +252,65 @@ data TYPE = A          -- ^ IPv4 address
           | CDS        -- ^ Child DS (RFC7344)
           | CDNSKEY    -- ^ DNSKEY(s) the Child wants reflected in DS (RFC7344)
           | CSYNC      -- ^ Child-To-Parent Synchronization (RFC7477)
-
           | ANY        -- ^ A request for all records the server/cache
                        --   has available
-          | UNKNOWN Word16  -- ^ Unknown type
+          | UnknownTYPE Word16  -- ^ Unknown type
           deriving (Eq, Show, Read)
 
--- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
---
-rrDB :: [(TYPE, Word16)]
-rrDB = [
-    (A,      1)
-  , (NS,     2)
-  , (CNAME,  5)
-  , (SOA,    6)
-  , (NULL,  10)
-  , (PTR,   12)
-  , (MX,    15)
-  , (TXT,   16)
-  , (AAAA,  28)
-  , (SRV,   33)
-  , (DNAME, 39) -- RFC 6672
-  , (OPT,   41) -- RFC 6891
-  , (DS,    43) -- RFC 4034
-  , (RRSIG, 46) -- RFC 4034
-  , (NSEC,  47) -- RFC 4034
-  , (DNSKEY, 48) -- RFC 4034
-  , (NSEC3, 50) -- RFC 5155
-  , (NSEC3PARAM, 51) -- RFC 5155
-  , (TLSA,  52) -- RFC 6698
-  , (CDS,   59) -- RFC 7344
-  , (CDNSKEY, 60) -- RFC 7344
-  , (CSYNC, 62) -- RFC 7477
-  , (ANY, 255)
-  ]
+-- | From type to number.
+fromTYPE :: TYPE -> Word16
+fromTYPE A          =  1
+fromTYPE NS         =  2
+fromTYPE CNAME      =  5
+fromTYPE SOA        =  6
+fromTYPE NULL       = 10
+fromTYPE PTR        = 12
+fromTYPE MX         = 15
+fromTYPE TXT        = 16
+fromTYPE AAAA       = 28
+fromTYPE SRV        = 33
+fromTYPE DNAME      = 39
+fromTYPE OPT        = 41
+fromTYPE DS         = 43
+fromTYPE RRSIG      = 46
+fromTYPE NSEC       = 47
+fromTYPE DNSKEY     = 48
+fromTYPE NSEC3      = 50
+fromTYPE NSEC3PARAM = 51
+fromTYPE TLSA       = 52
+fromTYPE CDS        = 59
+fromTYPE CDNSKEY    = 60
+fromTYPE CSYNC      = 62
+fromTYPE ANY        = 255
+fromTYPE (UnknownTYPE x) = x
 
--- | Option Code (RFC 6891).
-data OptCode = ClientSubnet -- ^ Client subnet (RFC7871)
-             | OUNKNOWN Int -- ^ Unknown option code
-    deriving (Eq)
-
-orDB :: [(OptCode, Int)]
-orDB = [
-        (ClientSubnet, 8)
-       ]
-
-rookup                  :: (Eq b) => b -> [(a,b)] -> Maybe a
-rookup _    []          =  Nothing
-rookup  key ((x,y):xys)
-  | key == y          =  Just x
-  | otherwise         =  rookup key xys
-
--- | From number to type. Naming is for historical reasons.
-intToType :: Word16 -> TYPE
-intToType n = fromMaybe (UNKNOWN n) $ rookup n rrDB
-
--- | From type to number. Naming is for historical reasons.
-typeToInt :: TYPE -> Word16
-typeToInt (UNKNOWN x)  = x
-typeToInt t = fromMaybe (error "typeToInt") $ lookup t rrDB
-
--- | From number to option code.
-intToOptCode :: Int -> OptCode
-intToOptCode n = fromMaybe (OUNKNOWN n) $ rookup n orDB
-
--- | From option code to number.
-optCodeToInt :: OptCode -> Int
-optCodeToInt (OUNKNOWN x)  = x
-optCodeToInt t = fromMaybe (error "optCodeToInt") $ lookup t orDB
+-- | From number to type.
+toTYPE :: Word16 -> TYPE
+toTYPE  1 = A
+toTYPE  2 = NS
+toTYPE  5 = CNAME
+toTYPE  6 = SOA
+toTYPE 10 = NULL
+toTYPE 12 = PTR
+toTYPE 15 = MX
+toTYPE 16 = TXT
+toTYPE 28 = AAAA
+toTYPE 33 = SRV
+toTYPE 39 = DNAME
+toTYPE 41 = OPT
+toTYPE 43 = DS
+toTYPE 46 = RRSIG
+toTYPE 47 = NSEC
+toTYPE 48 = DNSKEY
+toTYPE 50 = NSEC3
+toTYPE 51 = NSEC3PARAM
+toTYPE 52 = TLSA
+toTYPE 59 = CDS
+toTYPE 60 = CDNSKEY
+toTYPE 62 = CSYNC
+toTYPE 255 = ANY
+toTYPE x   = UnknownTYPE x
+#endif
 
 ----------------------------------------------------------------
 
@@ -195,7 +349,10 @@ data DNSError =
   | BadOptRecord
     -- | Configuration is wrong.
   | BadConfiguration
+    -- | Network failure.
   | NetworkFailure IOException
+    -- | Error is unknown
+  | UnknownDNSError
   deriving (Eq, Show, Typeable)
 
 instance Exception DNSError
@@ -259,6 +416,104 @@ data OPCODE
   | OP_SSR -- ^ A server status request.
   deriving (Eq, Show, Enum, Bounded)
 
+----------------------------------------------------------------
+
+#if __GLASGOW_HASKELL__ >= 800
+-- | Response code including EDNS0's 12bit ones.
+newtype RCODE = RCODE {
+    -- | From rcode to number.
+    fromRCODE :: Word16
+  } deriving (Eq)
+
+-- | Provide an Enum instance for backwards compatibility
+instance Enum RCODE where
+    fromEnum = fromIntegral . fromRCODE
+    toEnum = RCODE . fromIntegral
+
+-- | No error condition.
+pattern NoErr     :: RCODE
+pattern NoErr      = RCODE  0
+-- | Format error - The name server was
+--   unable to interpret the query.
+pattern FormatErr :: RCODE
+pattern FormatErr  = RCODE  1
+-- | Server failure - The name server was
+--   unable to process this query due to a
+--   problem with the name server.
+pattern ServFail  :: RCODE
+pattern ServFail   = RCODE  2
+-- | Name Error - Meaningful only for
+--   responses from an authoritative name
+--   server, this code signifies that the
+--   domain name referenced in the query does
+--   not exist.
+pattern NameErr   :: RCODE
+pattern NameErr    = RCODE  3
+-- | Not Implemented - The name server does
+--   not support the requested kind of query.
+pattern NotImpl   :: RCODE
+pattern NotImpl    = RCODE  4
+-- | Refused - The name server refuses to
+--   perform the specified operation for
+--   policy reasons.  For example, a name
+--   server may not wish to provide the
+--   information to the particular requester,
+--   or a name server may not wish to perform
+--   a particular operation (e.g., zone
+--   transfer) for particular data.
+pattern Refused   :: RCODE
+pattern Refused    = RCODE  5
+-- | YXDomain - Dynamic update response, a pre-requisite domain that should not
+-- exist, does exist.
+pattern YXDomain :: RCODE
+pattern YXDomain  = RCODE 6
+-- | YXRRSet - Dynamic update response, a pre-requisite RRSet that should not
+-- exist, does exist.
+pattern YXRRSet  :: RCODE
+pattern YXRRSet   = RCODE 7
+-- | NXRRSet - Dynamic update response, a pre-requisite RRSet that should
+-- exist, does not exist.
+pattern NXRRSet  :: RCODE
+pattern NXRRSet   = RCODE 8
+-- | NotAuth - Dynamic update response, the server is not authoritative for the
+-- zone named in the Zone Section.
+pattern NotAuth  :: RCODE
+pattern NotAuth   = RCODE 9
+-- | NotZone - Dynamic update response, a name used in the Prerequisite or
+-- Update Section is not within the zone denoted by the Zone Section.
+pattern NotZone  :: RCODE
+pattern NotZone   = RCODE 10
+-- | Bad OPT Version (RFC 6891) or TSIG Signature Failure (RFC2845).
+pattern BadOpt    :: RCODE
+pattern BadOpt     = RCODE 16
+
+-- | Use https://tools.ietf.org/html/rfc2929#section-2.3 names for DNS RCODEs
+instance Show RCODE where
+    show NoErr     = "NoError"
+    show FormatErr = "FormErr"
+    show ServFail  = "ServFail"
+    show NameErr   = "NXDomain"
+    show NotImpl   = "NotImp"
+    show Refused   = "Refused"
+    show YXDomain  = "YXDomain"
+    show YXRRSet   = "YXRRSet"
+    show NotAuth   = "NotAuth"
+    show NotZone   = "NotZone"
+    show BadOpt    = "BADVERS"
+    show x         = "RCODE " ++ (show $ fromRCODE x)
+
+-- | From number to rcode.
+toRCODE :: Word16 -> RCODE
+toRCODE = RCODE
+
+-- | From rcode to number for header (4bits only).
+fromRCODEforHeader :: RCODE -> Word16
+fromRCODEforHeader (RCODE w) = w .&. 0x0f
+
+-- | From number in header to rcode (4bits only).
+toRCODEforHeader :: Word16 -> RCODE
+toRCODEforHeader w = RCODE (w .&. 0x0f)
+#else
 -- | Response code.
 data RCODE
   = NoErr     -- ^ No error condition.
@@ -282,9 +537,62 @@ data RCODE
               --   or a name server may not wish to perform
               --   a particular operation (e.g., zone
               --   transfer) for particular data.
-  | BadOpt    -- Fixme: 6 is for Name Exists when it should not
-              -- but this is for EDNS0
-  deriving (Eq, Ord, Show, Enum, Bounded)
+  | YXDomain  -- ^ Dynamic update response, a pre-requisite
+              --   domain that should not exist, does exist.
+  | YXRRSet   -- ^ Dynamic update response, a pre-requisite
+              --   RRSet that should not exist, does exist.
+  | NXRRSet   -- ^ Dynamic update response, a pre-requisite
+              --   RRSet that should exist, does not exist.
+  | NotAuth   -- ^ Dynamic update response, the server is not
+              --   authoritative for the zone named in the Zone Section.
+  | NotZone   -- ^ Dynamic update response, a name used in the
+              --   Prerequisite or Update Section is not within the zone
+              --   denoted by the Zone Section.
+  | BadOpt    -- ^ Bad OPT Version (RFC 6891) or TSIG Signature
+              --   Failure (RFC2845).
+  | UnknownRCODE Word16
+  deriving (Eq, Ord, Show)
+
+-- | From rcode to number.
+fromRCODE :: RCODE -> Word16
+fromRCODE NoErr     =  0
+fromRCODE FormatErr =  1
+fromRCODE ServFail  =  2
+fromRCODE NameErr   =  3
+fromRCODE NotImpl   =  4
+fromRCODE Refused   =  5
+fromRCODE YXDomain  =  6
+fromRCODE YXRRSet   =  7
+fromRCODE NXRRSet   =  8
+fromRCODE NotAuth   =  9
+fromRCODE NotZone   = 10
+fromRCODE BadOpt    = 16
+fromRCODE (UnknownRCODE x) = x
+
+-- | From number to rcode.
+toRCODE :: Word16 -> RCODE
+toRCODE  0 = NoErr
+toRCODE  1 = FormatErr
+toRCODE  2 = ServFail
+toRCODE  3 = NameErr
+toRCODE  4 = NotImpl
+toRCODE  5 = Refused
+toRCODE  6 = YXDomain
+toRCODE  7 = YXRRSet
+toRCODE  8 = NXRRSet
+toRCODE  9 = NotAuth
+toRCODE 10 = NotZone
+toRCODE 16 = BadOpt
+toRCODE  x = UnknownRCODE x
+
+-- | From rcode to number for header (4bits only).
+fromRCODEforHeader :: RCODE -> Word16
+fromRCODEforHeader rc = fromRCODE rc .&. 0x0f
+
+-- | From number in header to rcode (4bits only).
+toRCODEforHeader :: Word16 -> RCODE
+toRCODEforHeader w = toRCODE (w .&. 0x0f)
+#endif
 
 ----------------------------------------------------------------
 
@@ -344,44 +652,8 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            --RD_CDS
            --RD_CDNSKEY
            --RD_CSYNC
-           | RD_OTH ByteString   -- ^ Unknown resource data
+           | UnknownRData ByteString   -- ^ Unknown resource data
     deriving (Eq, Ord)
-
--- | Optional resource data.
-data OData = OD_ClientSubnet Word8 Word8 IP -- ^ Client subnet (RFC7871)
-           | OD_Unknown Int ByteString      -- ^ Unknown optional type
-    deriving (Eq,Show,Ord)
-
--- For OPT pseudo-RR defined in RFC 6891
-
--- | UDP size for EDNS0 (RFC6891).
-orUdpSize :: ResourceRecord -> Word16
-orUdpSize rr
-  | rrtype rr == OPT = rrclass rr
-  | otherwise        = error "Can be used only for OPT"
-
--- | Extended RCODE for EDNS0 (RFC6891).
-orExtRcode :: ResourceRecord -> Word8
-orExtRcode rr
-  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0xff000000) 24
-  | otherwise        = error "Can be used only for OPT"
-
--- | Version for EDNS0 (RFC6891).
-orVersion :: ResourceRecord -> Word8
-orVersion rr
-  | rrtype rr == OPT = fromIntegral $ shiftR (rrttl rr .&. 0x00ff0000) 16
-  | otherwise        = error "Can be used only for OPT"
-
--- | DNSSEC OK flag (RFC3225) for EDNS0 (RFC6891).
-orDnssecOk :: ResourceRecord -> Bool
-orDnssecOk rr
-  | rrtype rr == OPT = rrttl rr `testBit` 15
-  | otherwise        = error "Can be used only for OPT"
-
--- | Option resource data for EDNS0 (RFC6891).
-orRdata :: ResourceRecord -> [OData]
-orRdata (ResourceRecord _ OPT _ _ (RD_OPT odata)) = odata
-orRdata _ = error "Can be used only for OPT"
 
 instance Show RData where
   show (RD_NS dom) = BS.unpack dom
@@ -397,7 +669,7 @@ instance Show RData where
   show (RD_PTR dom) = BS.unpack dom
   show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
   show (RD_OPT od) = show od
-  show (RD_OTH is) = show is
+  show (UnknownRData is) = show is
   show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ hexencode dgst
   show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ hexencode dv
   show RD_NULL = "NULL"
@@ -450,3 +722,91 @@ defaultResponse =
       }
 
 ----------------------------------------------------------------
+-- EDNS0 (RFC 6891)
+----------------------------------------------------------------
+
+-- | EDNS0 infromation defined in RFC 6891.
+data EDNS0 = EDNS0 {
+    -- | UDP payload size.
+    udpSize  :: Word16
+    -- | Extended RCODE.
+  , extRCODE :: RCODE
+    -- | Is DNSSEC OK?
+  , dnssecOk :: Bool
+    -- | EDNS0 option data.
+  , options  :: [OData]
+  } deriving (Eq, Show)
+
+-- | Default information for EDNS0.
+defaultEDNS0 :: EDNS0
+defaultEDNS0 = EDNS0 4096 NoErr False []
+
+-- | Generating a resource record for the additional section based on EDNS0.
+-- 'DNSFlags' is not generated.
+-- Just set the same 'RCODE' to 'DNSFlags'.
+fromEDNS0 :: EDNS0 -> ResourceRecord
+fromEDNS0 edns = ResourceRecord name' type' class' ttl' rdata'
+  where
+    name'  = "."
+    type'  = OPT
+    class' = udpSize edns
+    ttl0'   = fromIntegral (fromRCODE (extRCODE edns) .&. 0x0ff0) `shiftL` 20
+    ttl'
+      | dnssecOk edns = ttl0' `setBit` 15
+      | otherwise     = ttl0'
+    rdata' = RD_OPT $ options edns
+
+-- | Generating EDNS0 information from the OPT RR.
+toEDNS0 :: DNSFlags -> ResourceRecord -> Maybe EDNS0
+toEDNS0 flgs (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
+    Just $ EDNS0 udpsiz (toRCODE erc) secok opts
+  where
+    lp = fromRCODEforHeader $ rcode flgs
+    up = shiftR (ttl' .&. 0xff000000) 20
+    erc = fromIntegral up .|. lp
+    secok = ttl' `testBit` 15
+toEDNS0 _ _ = Nothing
+
+----------------------------------------------------------------
+
+#if __GLASGOW_HASKELL__ >= 800
+-- | EDNS0 Option Code (RFC 6891).
+newtype OptCode = OptCode {
+    -- | From option code to number.
+    fromOptCode :: Word16
+  } deriving (Eq,Ord)
+
+-- | Client subnet (RFC7871)
+pattern ClientSubnet :: OptCode
+pattern ClientSubnet = OptCode 8
+
+instance Show OptCode where
+    show ClientSubnet = "ClientSubnet"
+    show x            = "OptCode " ++ (show $ fromOptCode x)
+
+-- | From number to option code.
+toOptCode :: Word16 -> OptCode
+toOptCode = OptCode
+#else
+-- | Option Code (RFC 6891).
+data OptCode = ClientSubnet          -- ^ Client subnet (RFC7871)
+             | UnknownOptCode Word16 -- ^ Unknown option code
+    deriving (Eq, Ord, Show)
+
+-- | From option code to number.
+fromOptCode :: OptCode -> Word16
+fromOptCode ClientSubnet = 8
+fromOptCode (UnknownOptCode x) = x
+
+-- | From number to option code.
+toOptCode :: Word16 -> OptCode
+toOptCode 8 = ClientSubnet
+toOptCode x = UnknownOptCode x
+#endif
+
+----------------------------------------------------------------
+
+-- | Optional resource data.
+data OData = OD_ClientSubnet Word8 Word8 IP   -- ^ Client subnet (RFC7871)
+           | UnknownOData OptCode ByteString  -- ^ Unknown optional type
+    deriving (Eq,Show,Ord)

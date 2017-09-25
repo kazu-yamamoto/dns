@@ -289,6 +289,7 @@ fromDNSMessage ans conv = case errcode ans of
     NotImpl   -> Left NotImplemented
     Refused   -> Left OperationRefused
     BadOpt    -> Left BadOptRecord
+    _         -> Left UnknownDNSError
   where
     errcode = rcode . flags . header
 
