@@ -208,7 +208,7 @@ getRData CNAME _ = RD_CNAME <$> getDomain
 getRData DNAME _ = RD_DNAME <$> getDomain
 getRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
   where
-    ignoreLength = BS.tail
+    ignoreLength = BS.drop 1
 getRData A len
   | len == 4  = (RD_A . toIPv4) <$> getNBytes len
   | otherwise = fail "IPv4 addresses must be 4 bytes long"
