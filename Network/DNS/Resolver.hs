@@ -140,7 +140,7 @@ data ResolvSeed = ResolvSeed {
 --   When implementing a DNS cache, this MUST NOT be re-used.
 data Resolver = Resolver {
     genId      :: IO Word16
-  , dnsSocks   :: NonEmpty Socket
+  , dnsServers :: NonEmpty AddrInfo
   , dnsTimeout :: Int
   , dnsRetry   :: Int
   , dnsBufsize :: Integer
@@ -213,44 +213,30 @@ makeAddrInfo addr mport = do
 
 
 -- | Giving a thread-safe 'Resolver' to the function of the second
---   argument. A socket for UDP is opened inside and is surely closed.
---   Multiple 'withResolver's can be used concurrently.
+--   argument.  Multiple 'withResolver's can be used concurrently.
 --   Multiple lookups must be done sequentially with a given
---   'Resolver'. If multiple 'Resolver's are necessary for
---   concurrent purpose, use 'withResolvers'.
+--   'Resolver'. If multiple 'Resolver's are needed concurrently,
+--   use 'withResolvers'.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
-withResolver seed f = bracket (initSockets seed) (mapM_ close) (f . makeResolver seed)
+withResolver seed f = f $ makeResolver seed
 
 -- | Giving thread-safe 'Resolver's to the function of the second
---   argument. Sockets for UDP are opened inside and are surely closed.
---   For each 'Resolver', multiple lookups must be done sequentially.
---   'Resolver's can be used concurrently.
+--   argument.  For each 'Resolver', multiple lookups must be done
+--   sequentially.  'Resolver's can be used concurrently.
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
-withResolvers seeds func = bracket (mapM initSockets seeds) closeSockets $ \socks -> do
-    let resolvs = zipWith makeResolver seeds socks
-    func resolvs
-  where
-    closeSockets = mapM_ close . concatMap NE.toList
+withResolvers seeds f = f $ map makeResolver seeds
 
--- | Atomically create and connect to all the nameservers listed in the given
--- `ResolvSeed`.
-initSockets :: ResolvSeed -> IO (NonEmpty Socket)
-initSockets seed = mapM initSocket addrs
-  where
-    initSocket ai = do sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
-                       connect sock (addrAddress ai)
-                       return sock
-    addrs         = nameservers seed
-
-makeResolver :: ResolvSeed -> NonEmpty Socket -> Resolver
-makeResolver seed socks = Resolver {
+makeResolver :: ResolvSeed -> Resolver
+makeResolver seed = Resolver {
     genId = getRandom
-  , dnsSocks = socks
+  , dnsServers = nameservers seed
   , dnsTimeout = rsTimeout seed
   , dnsRetry = rsRetry seed
   , dnsBufsize = rsBufsize seed
   }
 
+-- | XXX: This is unlikely to be cryptographically strong.  We should use a
+-- generator that resists cryptanalysis.
 getRandom :: IO Word16
 getRandom = getStdRandom random
 
@@ -397,15 +383,22 @@ lookupRawInternal ::
     -> IO (Either DNSError DNSMessage)
 lookupRawInternal _ _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
+lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
   where
-    loop :: (Socket, Maybe (NonEmpty Socket)) -> IO (Either DNSError DNSMessage)
-    loop (sock, alternatives) = do
+    loop :: (AddrInfo, Maybe (NonEmpty AddrInfo)) -> IO (Either DNSError DNSMessage)
+    loop (ai, ais) = do
       res <- initialise >>= \(query, checkSeqno) ->
-        performLookup sock query checkSeqno 0 False
+        bracket (udpOpen ai)
+                (close)
+                (\sock -> performLookup ai sock query checkSeqno 0 False)
       case res of
-        Left e  -> maybe (return (Left e)) (loop . NE.uncons) alternatives
+        Left e  -> maybe (return (Left e)) (loop . NE.uncons) ais
         Right v -> pure (Right v)
+
+    udpOpen ai = do
+        sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
+        connect sock (addrAddress ai)
+        return sock
 
     initialise = do
       seqno <- genId rlv
@@ -413,7 +406,7 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
       let checkSeqno = check seqno
       return (query, checkSeqno)
 
-    performLookup sock query checkSeqno cnt mismatch
+    performLookup ai sock query checkSeqno cnt mismatch
       | cnt == retry = do
           let ret | mismatch  = SequenceNumberMismatch
                   | otherwise = RetryLimitExceeded
@@ -426,14 +419,14 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
           -- IO exceptions are annotated with the protocol and address.
           response <- timeout tm (tryIOError (sendAll sock query >> rcv sock))
           case response of
-              Nothing  -> performLookup sock query checkSeqno (cnt + 1) False
+              Nothing  -> performLookup ai sock query checkSeqno (cnt + 1) False
               Just (Right res) -> do
                   let valid = checkSeqno res
                   case valid of
-                      False  -> performLookup sock query checkSeqno (cnt + 1) False
+                      False  -> performLookup ai sock query checkSeqno (cnt + 1) False
                       True | not $ trunCation $ flags $ header res
                              -> return $ Right res
-                      _      -> tcpRetry query sock tm
+                      _      -> tcpRetry query ai tm
               Just (Left e) -> do
                   peer <- getPeerName sock
                   return $ Left $ NetworkFailure $
@@ -450,14 +443,14 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsSocks rlv))
 -- quickly on the first try.  There will be no further retries.
 
 tcpRetry :: ByteString
-         -> Socket
+         -> AddrInfo
          -> Int
          -> IO (Either DNSError DNSMessage)
-tcpRetry query sock tm = do
-    peer <- getPeerName sock
-    bracket (tcpOpen peer)
+tcpRetry query ai tm = do
+    let addr = addrAddress ai
+    bracket (tcpOpen $ addr)
             (maybe (return ()) close)
-            (tcpLookup query peer tm)
+            (tcpLookup query addr tm)
 
 -- Create a TCP socket with the given socket address (taken from a
 -- corresponding UDP socket).  This might throw an I/O Exception
