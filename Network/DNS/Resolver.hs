@@ -396,6 +396,11 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
         Left e  -> maybe (return (Left e)) (loop . NE.uncons) ais
         Right v -> pure (Right v)
 
+    -- | XXX: Here, and in tcpOpen below, we can encounter uncaught exceptions
+    -- if the per-process or system file-descriptor limit is exceeded, or (UDP
+    -- only) to free ephemeral ports are available.  We should add another
+    -- DNSError constructor for local errors, that wraps around IOException,
+    -- and handle these rare, but not impossible, errors.
     udpOpen ai = do
         sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
         connect sock (addrAddress ai)
@@ -449,21 +454,14 @@ tcpRetry :: ByteString
          -> IO (Either DNSError DNSMessage)
 tcpRetry query ai tm = do
     let addr = addrAddress ai
-    bracket (tcpOpen $ addr)
+    bracket (tcpOpen addr)
             (maybe (return ()) close)
             (tcpLookup query addr tm)
 
--- Create a TCP socket with the given socket address (taken from a
--- corresponding UDP socket).  This might throw an I/O Exception
--- if we run out of file descriptors.  Should this use tryIOError,
--- and return "Nothing" also in that case?  If so, perhaps similar
--- code is needed in openSocket, but that has to wait until we
--- refactor `withResolver` to not do "early" socket allocation, and
--- instead allocate a fresh UDP socket for each `lookupRawInternal`
--- invocation.  It would be bad to fail an entire `withResolver`
--- action, if the socket shortage is transient, and the user intends
--- to make many DNS queries with the same resolver handle.
-
+-- Create a TCP socket with the given socket address. XXX: This might raise an
+-- I/O Exception if we run out of file descriptors.  See related comment for
+-- 'udpOpen'.
+--
 tcpOpen :: SockAddr -> IO (Maybe Socket)
 tcpOpen peer = case peer of
     SockAddrInet{}  -> Just <$> socket AF_INET  Stream defaultProtocol
