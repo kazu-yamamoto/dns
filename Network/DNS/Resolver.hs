@@ -293,6 +293,7 @@ fromDNSMessage ans conv = case errcode ans of
   where
     errcode = rcode . flags . header
 
+{-# DEPRECATED fromDNSFormat "Use fromDNSMessage instead" #-}
 -- | For backward compatibility.
 fromDNSFormat :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
 fromDNSFormat = fromDNSMessage
