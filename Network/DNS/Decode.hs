@@ -221,13 +221,13 @@ getRData SOA _ = RD_SOA    <$> getDomain
                            <*> decodeRefesh
                            <*> decodeRetry
                            <*> decodeExpire
-                           <*> decodeMinumun
+                           <*> decodeMinimum
   where
     decodeSerial  = get32
     decodeRefesh  = get32
     decodeRetry   = get32
     decodeExpire  = get32
-    decodeMinumun = get32
+    decodeMinimum = get32
 getRData PTR _ = RD_PTR <$> getDomain
 getRData SRV _ = RD_SRV <$> decodePriority
                            <*> decodeWeight

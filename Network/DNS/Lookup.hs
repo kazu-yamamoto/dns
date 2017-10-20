@@ -73,7 +73,7 @@ import qualified Data.ByteString.Char8 as BS
 import Data.IP (IPv4, IPv6)
 import Network.DNS.Resolver as DNS
 import Network.DNS.Types
-import Data.Word (Word16)
+import Data.Word (Word16,Word32)
 
 ----------------------------------------------------------------
 
@@ -317,6 +317,33 @@ lookupTXT rlv dom = do
   where
     unTag :: RData -> Either DNSError ByteString
     unTag (RD_TXT x) = Right x
+    unTag _ = Left UnexpectedRDATA
+
+----------------------------------------------------------------
+
+-- | Look up the \'SOA\' record for the given domain. The results include the
+--   domain, mailbox, serial number, refresh time, retry time, expiration
+--   time, and minimum TTL.
+--
+--   This can be useful to validate TTLs for a server or get an abuse
+--   contact address for a domain.
+--
+--   >>> let domain = Data.ByteString.Char8.pack "mew.org"
+--   >>>
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupSOA resolver domain
+--   Right [("ns1.mew.org.","kazu@mew.org.",201406240,3600,300,3600000,3600)]
+-- 
+lookupSOA :: Resolver -> Domain -> IO (Either DNSError [(Domain,Mailbox,Word32,Word32,Word32,Word32,Word32)])
+lookupSOA rlv dom = do
+  erds <- DNS.lookup rlv dom SOA
+  case erds of
+    -- See lookupXviaMX for an explanation of this construct.
+    Left err  -> return (Left err)
+    Right rds -> return $ mapM unTag rds
+  where
+    unTag :: RData -> Either DNSError (Domain,Mailbox,Word32,Word32,Word32,Word32,Word32)
+    unTag (RD_SOA mn mr serial refresh retry expire min) = Right (mn, mr, serial, refresh, retry, expire, min)
     unTag _ = Left UnexpectedRDATA
 
 ----------------------------------------------------------------
