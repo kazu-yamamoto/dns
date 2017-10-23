@@ -63,6 +63,7 @@ module Network.DNS.Lookup (
   , lookupNS
   , lookupNSAuth
   , lookupTXT
+  , lookupSOA
   , lookupPTR
   , lookupRDNS
   , lookupSRV
