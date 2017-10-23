@@ -5,6 +5,7 @@
 - Breaking change: the `Encode` and `Decode` modules use strict ByteString instead of lazy one. [#59](https://github.com/kazu-yamamoto/dns/issues/59)
 - Default DNS servers are detected automatically on Windows if `RCFilePath` is used. Use vanilla `defaultResolvConf` on Windows! [#83](https://github.com/kazu-yamamoto/dns/pull/83)
 - Multiple DNS servers are used automatically if found. [#81](https://github.com/kazu-yamamoto/dns/pull/81)
+- `lookupSOA` is defined. [#93](https://github.com/kazu-yamamoto/dns/pull/93)
 - Some constructors such as ANY are added in the `Types` module.
 - Some bug fixes and code clean-up.
 
