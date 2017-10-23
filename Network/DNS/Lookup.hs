@@ -344,7 +344,7 @@ lookupSOA rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError (Domain,Mailbox,Word32,Word32,Word32,Word32,Word32)
-    unTag (RD_SOA mn mr serial refresh retry expire min) = Right (mn, mr, serial, refresh, retry, expire, min)
+    unTag (RD_SOA mn mr serial refresh retry expire mini) = Right (mn, mr, serial, refresh, retry, expire, mini)
     unTag _ = Left UnexpectedRDATA
 
 ----------------------------------------------------------------
