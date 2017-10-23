@@ -43,6 +43,13 @@ spec = describe "lookup" $ do
             -- mew.org has one or more TXT records.
             fmap null addrs `shouldBe` Right False
 
+    it "lookupSOA" $ do
+        rs <- makeResolvSeed defaultResolvConf
+        withResolver rs $ \resolver -> do
+            addrs <- DNS.lookupTXT resolver "mew.org"
+            -- mew.org has a SOA record.
+            fmap null addrs `shouldBe` Right False
+
     it "lookupNS" $ do
         rs <- makeResolvSeed defaultResolvConf
         withResolver rs $ \resolver -> do
