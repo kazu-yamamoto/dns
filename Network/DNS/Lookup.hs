@@ -334,7 +334,7 @@ lookupTXT rlv dom = do
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupSOA resolver domain
 --   Right [("ns1.mew.org.","kazu@mew.org.",201406240,3600,300,3600000,3600)]
--- 
+--
 lookupSOA :: Resolver -> Domain -> IO (Either DNSError [(Domain,Mailbox,Word32,Word32,Word32,Word32,Word32)])
 lookupSOA rlv dom = do
   erds <- DNS.lookup rlv dom SOA
