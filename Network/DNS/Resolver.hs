@@ -171,7 +171,7 @@ makeResolvSeed conf = do
             nss <- getDefaultDnsServers file
             case nss of
               []     -> throwIO BadConfiguration
-              (l:ls) -> (:|) <$> makeAddrInfo l Nothing <*> forM ls (flip makeAddrInfo Nothing)
+              (l:ls) -> (:|) <$> makeAddrInfo l Nothing <*> forM ls (`makeAddrInfo` Nothing)
 
 getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
@@ -390,7 +390,7 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
     loop (ai, ais) = do
       res <- initialise >>= \(query, checkSeqno) ->
         bracket (udpOpen ai)
-                (close)
+                close
                 (\sock -> performLookup ai sock query checkSeqno 0 False)
       case res of
         Left e  -> maybe (return (Left e)) (loop . NE.uncons) ais
