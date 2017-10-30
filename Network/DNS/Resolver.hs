@@ -391,7 +391,7 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
       res <- initialise >>= \(query, checkSeqno) ->
         bracket (udpOpen ai)
                 close
-                (\sock -> performLookup ai sock query checkSeqno 0 False)
+                (performLookup ai query checkSeqno 0 False)
       case res of
         Left e  -> maybe (return (Left e)) (loop . NE.uncons) ais
         Right v -> pure (Right v)
@@ -412,7 +412,7 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
       let checkSeqno = check seqno
       return (query, checkSeqno)
 
-    performLookup ai sock query checkSeqno cnt mismatch
+    performLookup ai query checkSeqno cnt mismatch sock
       | cnt == retry = do
           let ret | mismatch  = SequenceNumberMismatch
                   | otherwise = RetryLimitExceeded
@@ -425,11 +425,11 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
           -- IO exceptions are annotated with the protocol and address.
           response <- timeout tm (tryIOError (sendAll sock query >> rcv sock))
           case response of
-              Nothing  -> performLookup ai sock query checkSeqno (cnt + 1) False
+              Nothing  -> performLookup ai query checkSeqno (cnt + 1) False sock
               Just (Right res) -> do
                   let valid = checkSeqno res
                   case valid of
-                      False  -> performLookup ai sock query checkSeqno (cnt + 1) False
+                      False  -> performLookup ai query checkSeqno (cnt + 1) False sock
                       True | not $ trunCation $ flags $ header res
                              -> return $ Right res
                       _      -> tcpRetry query ai tm
