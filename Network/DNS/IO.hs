@@ -25,13 +25,15 @@ module Network.DNS.IO (
 #define GHC708
 #endif
 
+import qualified Control.Monad.State as ST
 import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
-import Data.Conduit (($$), ($$+), ($$+-), (=$), Source)
+import Data.Conduit (($$), ($$+), ($$+-), (=$), Source, Sink)
+import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit.Network (sourceSocket)
 import Data.IP (IPv4, IPv6)
@@ -53,7 +55,7 @@ import Network.Socket.ByteString (sendAll)
 import Network.DNS.Types
 import Network.DNS.Encode (encode)
 import Network.DNS.Decode.Internal (getResponse)
-import Network.DNS.StateBinary (sinkSGet)
+import Network.DNS.StateBinary (SGet, PState, initialState)
 
 ----------------------------------------------------------------
 
@@ -79,6 +81,11 @@ receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO DNSMessage
 receiveDNSFormat src = fst <$> runResourceT (src $$ sink)
   where
     sink = sinkSGet getResponse
+
+----------------------------------------------------------------
+
+sinkSGet :: SGet a -> Sink ByteString (ResourceT IO) (a, PState)
+sinkSGet parser = sinkParser (ST.runStateT parser initialState)
 
 ----------------------------------------------------------------
 
