@@ -41,7 +41,6 @@ Library
                       , mtl
                       , network >= 2.3
                       , random
-                      , resourcet
                       , safe == 0.3.*
   if os(windows)
     Build-Depends:    split
@@ -83,7 +82,6 @@ Test-Suite spec
                       , network >= 2.3
                       , QuickCheck >= 2.9
                       , random
-                      , resourcet
                       , safe == 0.3.*
                       , word8
 

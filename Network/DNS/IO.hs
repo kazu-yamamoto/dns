@@ -26,13 +26,12 @@ module Network.DNS.IO (
 #endif
 
 import qualified Control.Monad.State as ST
-import Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
-import Data.Conduit (($$), ($$+), ($$+-), (=$), Source, Sink)
+import Data.Conduit (($$), ($$+), ($$+-), (=$), Sink)
 import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit.Network (sourceSocket)
@@ -55,37 +54,28 @@ import Network.Socket.ByteString (sendAll)
 import Network.DNS.Types
 import Network.DNS.Encode (encode)
 import Network.DNS.Decode.Internal (getResponse)
-import Network.DNS.StateBinary (SGet, PState, initialState)
+import Network.DNS.StateBinary (PState, initialState)
 
 ----------------------------------------------------------------
+
+sink :: Sink ByteString IO (DNSMessage, PState)
+sink = sinkParser $ ST.runStateT getResponse initialState
 
 -- | Receiving DNS data from 'Socket' and parse it.
 
 receive :: Socket -> IO DNSMessage
-receive = receiveDNSFormat . sourceSocket
+receive sock = fst <$> (sourceSocket sock $$ sink)
 
 -- | Receive and parse a single virtual-circuit (TCP) query or response.
 --   It is up to the caller to implement any desired timeout.
 
 receiveVC :: Socket -> IO DNSMessage
-receiveVC sock = runResourceT $ do
+receiveVC sock = do
     (src, lenbytes) <- sourceSocket sock $$+ CB.take 2
     let len = case map ord $ LBS.unpack lenbytes of
                 [hi, lo] -> 256 * hi + lo
                 _        -> 0
-    fmap fst (src $$+- CB.isolate len =$ sinkSGet getResponse)
-
-----------------------------------------------------------------
-
-receiveDNSFormat :: Source (ResourceT IO) ByteString -> IO DNSMessage
-receiveDNSFormat src = fst <$> runResourceT (src $$ sink)
-  where
-    sink = sinkSGet getResponse
-
-----------------------------------------------------------------
-
-sinkSGet :: SGet a -> Sink ByteString (ResourceT IO) (a, PState)
-sinkSGet parser = sinkParser (ST.runStateT parser initialState)
+    fst <$> (src $$+- CB.isolate len =$ sink)
 
 ----------------------------------------------------------------
 
@@ -149,7 +139,7 @@ responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
 responseA ident q ips =
   let hd = header defaultResponse
       dom = qname q
-      an = fmap (ResourceRecord dom A classIN 300 . RD_A) ips
+      an = ResourceRecord dom A classIN 300 . RD_A <$> ips
   in  defaultResponse {
           header = hd { identifier=ident }
         , question = [q]
@@ -161,7 +151,7 @@ responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
 responseAAAA ident q ips =
   let hd = header defaultResponse
       dom = qname q
-      an = fmap (ResourceRecord dom AAAA classIN 300 . RD_AAAA) ips
+      an = ResourceRecord dom AAAA classIN 300 . RD_AAAA <$> ips
   in  defaultResponse {
           header = hd { identifier=ident }
         , question = [q]
