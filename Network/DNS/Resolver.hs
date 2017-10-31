@@ -37,11 +37,10 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Maybe (fromMaybe)
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
-import Network.DNS.Decode
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
-import Network.DNS.Encode
 import Network.DNS.Types
+import Network.DNS.IO
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), PortNumber(..), HostName, Socket, SocketType(Stream, Datagram), close, socket, connect, getPeerName, getAddrInfo, defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
 import System.IO.Error (annotateIOError, tryIOError)
@@ -49,14 +48,6 @@ import System.Random (getStdRandom, random)
 import System.Timeout (timeout)
 #ifdef GHC708
 import Control.Applicative ((<$>), (<*>), pure)
-#endif
-
-#if defined(WIN) && defined(GHC708)
-import Network.Socket (send)
-import qualified Data.ByteString.Char8 as BS
-import Control.Monad (when)
-#else
-import Network.Socket.ByteString (sendAll)
 #endif
 
 #if defined(WIN)
@@ -425,7 +416,7 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
           -- connection refused.  Regardless, we simply handle timeouts and
           -- exceptions for the combined write request + read reply operation.
           -- IO exceptions are annotated with the protocol and address.
-          response <- timeout tm (tryIOError (sendAll sock query >> rcv sock))
+          response <- timeout tm (tryIOError (send sock query >> rcv sock))
           case response of
               Nothing  -> performLookup ai query checkSeqno (cnt + 1) False sock
               Just (Right res) -> do
@@ -489,21 +480,13 @@ tcpLookup query peer tm (Just vc) = do
     -- or receive.
     response <- timeout tm $ tryIOError $ do
         connect vc peer
-        sendAll vc $ encodeVC query
+        sendVC vc query
         receiveVC vc
     case response of
         Nothing  -> return $ Left TimeoutExpired
         Just (Right res) -> return $ Right res
         Just (Left e)    -> return $ Left $ NetworkFailure $
             annotateIOError e (show peer) Nothing $ Just "TCP"
-
-#if defined(WIN) && defined(GHC708)
--- Windows does not support sendAll in Network.ByteString for older GHCs.
-sendAll :: Socket -> BS.ByteString -> IO ()
-sendAll sock bs = do
-  sent <- send sock (BS.unpack bs)
-  when (sent < fromIntegral (BS.length bs)) $ sendAll sock (BS.drop (fromIntegral sent) bs)
-#endif
 
 badLength :: Domain -> Bool
 badLength dom
