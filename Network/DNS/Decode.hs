@@ -6,11 +6,11 @@ module Network.DNS.Decode (
     decode
   , decodeMany
     -- * Decoder for Each Part
+  , decodeResourceRecord
+  , decodeDNSHeader
+  , decodeDNSFlags
   , decodeDomain
   , decodeMailbox
-  , decodeDNSFlags
-  , decodeDNSHeader
-  , decodeResourceRecord
     -- * Receiving from socket
   , receive
   , receiveVC

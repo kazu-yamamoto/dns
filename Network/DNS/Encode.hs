@@ -12,11 +12,11 @@ module Network.DNS.Encode (
   , encode
   , encodeVC
     -- * Encoder for Each Part
-  , encodeDNSFlags
+  , encodeResourceRecord
   , encodeDNSHeader
+  , encodeDNSFlags
   , encodeDomain
   , encodeMailbox
-  , encodeResourceRecord
   ) where
 
 import Control.Monad (when)
