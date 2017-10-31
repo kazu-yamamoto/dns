@@ -387,13 +387,15 @@ lookupRawInternal _ _ _   dom _
 lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
   where
     loop :: (AddrInfo, Maybe (NonEmpty AddrInfo)) -> IO (Either DNSError DNSMessage)
-    loop (ai, ais) = do
+    loop (ai, mais) = do
       res <- initialise >>= \(query, checkSeqno) ->
         bracket (udpOpen ai)
                 close
                 (performLookup ai query checkSeqno 0 False)
       case res of
-        Left e  -> maybe (return (Left e)) (loop . NE.uncons) ais
+        Left e  -> case mais of
+          Nothing  -> return $ Left e
+          Just ais -> loop $ NE.uncons ais
         Right v -> pure (Right v)
 
     -- | XXX: Here, and in tcpOpen below, we can encounter uncaught exceptions
@@ -428,11 +430,13 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
               Nothing  -> performLookup ai query checkSeqno (cnt + 1) False sock
               Just (Right res) -> do
                   let valid = checkSeqno res
-                  case valid of
-                      False  -> performLookup ai query checkSeqno (cnt + 1) False sock
-                      True | not $ trunCation $ flags $ header res
-                             -> return $ Right res
-                      _      -> tcpRetry query ai tm
+                  if valid then
+                      if trunCation $ flags $ header res then
+                          tcpRetry query ai tm
+                        else
+                          return $ Right res
+                    else
+                      performLookup ai query checkSeqno (cnt + 1) False sock
               Just (Left e) -> do
                   peer <- getPeerName sock
                   return $ Left $ NetworkFailure $
