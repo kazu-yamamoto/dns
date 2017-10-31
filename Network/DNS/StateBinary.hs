@@ -1,5 +1,35 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, CPP #-}
-module Network.DNS.StateBinary where
+module Network.DNS.StateBinary (
+    SPut
+  , runSPut
+  , put8
+  , put16
+  , put32
+  , putInt8
+  , putInt16
+  , putInt32
+  , putByteString
+  , SGet
+  , runSGet
+  , runSGetWithLeftovers
+  , get8
+  , get16
+  , get32
+  , getInt8
+  , getInt16
+  , getInt32
+  , getNByteString
+  , getPosition
+  , wsPop
+  , wsPush
+  , wsPosition
+  , addPositionW
+  , psDomain
+  , push
+  , pop
+  , getNBytes
+  , sinkSGet
+  ) where
 
 import Control.Monad.State (State, StateT)
 import qualified Control.Monad.State as ST
