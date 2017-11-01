@@ -8,6 +8,7 @@ module Network.DNS.IO (
   , send
   , sendVC
     -- ** Composing Query
+  , query
   , composeQuery
   , composeQueryAD
     -- ** Creating Response
@@ -81,17 +82,17 @@ receiveVC sock = do
 
 -- | Sending composed query or response to 'Socket'.
 send :: Socket -> ByteString -> IO ()
-send sock query = sendAll sock query
+send sock legacyQuery = sendAll sock legacyQuery
 
 -- | Sending composed query or response to a single virtual-circuit (TCP).
 sendVC :: Socket -> ByteString -> IO ()
-sendVC vc query = sendAll vc $ encodeVC query
+sendVC vc legacyQuery = sendAll vc $ encodeVC legacyQuery
 
 -- | Encoding for virtual circuit.
 encodeVC :: ByteString -> ByteString
-encodeVC query =
-    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length query
-    in len <> query
+encodeVC legacyQuery =
+    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length legacyQuery
+    in len <> legacyQuery
 
 #if defined(WIN) && defined(GHC708)
 -- Windows does not support sendAll in Network.ByteString for older GHCs.
@@ -104,6 +105,28 @@ sendAll sock bs = do
 ----------------------------------------------------------------
 
 -- | Composing query.
+query :: Identifier
+      -> [Question]
+      -> Bool       -- ^ EDNS0
+      -> Bool       -- ^ Authentidation
+      -> ByteString
+query idt qs edns0 auth = encode qry
+  where
+      hdr = header defaultQuery
+      flg = flags hdr
+      qry = defaultQuery {
+          header = hdr {
+              identifier = idt,
+              flags = flg {
+                  authenData = auth
+              }
+           }
+        , question = qs
+        , additional = if edns0 then [fromEDNS0 defaultEDNS0] else []
+        }
+
+{-# DEPRECATED composeQuery "Use query instead" #-}
+-- | Composing query without EDNS0.
 composeQuery :: Identifier -> [Question] -> ByteString
 composeQuery idt qs = encode qry
   where
@@ -115,7 +138,8 @@ composeQuery idt qs = encode qry
       , question = qs
       }
 
--- | Composing query with authentic data flag set.
+{-# DEPRECATED composeQueryAD "Use query instead" #-}
+-- | Composing query with authentic data flag set without EDNS0.
 composeQueryAD :: Identifier -> [Question] -> ByteString
 composeQueryAD idt qs = encode qry
   where
@@ -130,7 +154,6 @@ composeQueryAD idt qs = encode qry
            }
         , question = qs
         }
-
 
 ----------------------------------------------------------------
 

@@ -62,20 +62,20 @@ resolve _ _ _   dom _
 resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
   where
     loop (ai, mais) = do
-      (query, checkSeqno) <- initialize
-      eres <- E.try $ udpTcpLookup query ai tm checkSeqno retry rcv
-      case eres of
-        Left e  -> case mais of
-          Nothing  -> return $ Left e
-          Just ais -> loop $ NE.uncons ais
-        Right v -> pure (Right v)
+        (queries, checkSeqno) <- initialize
+        eres <- E.try $ udpTcpLookup queries ai tm checkSeqno retry rcv
+        case eres of
+          Left e  -> case mais of
+            Nothing  -> return $ Left e
+            Just ais -> loop $ NE.uncons ais
+          Right v -> pure (Right v)
 
     initialize = do
       seqno <- genId rlv
-      let compose = if ad then composeQueryAD else composeQuery
-          query = compose seqno [q]
+      let queryLegacy = query seqno [q] False ad
+          queryEdns0  = query seqno [q] True ad
           checkSeqno = check seqno
-      return (query, checkSeqno)
+      return ((queryLegacy, queryEdns0), checkSeqno)
 
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
@@ -84,16 +84,16 @@ resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
 
 ----------------------------------------------------------------
 
-udpTcpLookup :: ByteString
+udpTcpLookup :: (ByteString,ByteString)
              -> AddrInfo
              -> Int
              -> (DNSMessage -> Bool)
              -> Int
              -> (Socket -> IO DNSMessage)
              -> IO DNSMessage
-udpTcpLookup query ai tm checkSeqno retry rcv =
-    udpLookup query ai tm checkSeqno retry rcv `E.catch` \TCPFallback ->
-        tcpLookup query ai tm
+udpTcpLookup queries ai tm checkSeqno retry rcv =
+    udpLookup queries ai tm checkSeqno retry rcv `E.catch` \TCPFallback ->
+        tcpLookup queries ai tm
 
 ----------------------------------------------------------------
 
@@ -111,29 +111,35 @@ udpOpen ai = do
     return sock
 
 -- This throws DNSError or TCPFallback.
-udpLookup :: ByteString
+udpLookup :: (ByteString,ByteString)
           -> AddrInfo
           -> Int
           -> (DNSMessage -> Bool)
           -> Int
           -> (Socket -> IO DNSMessage)
           -> IO DNSMessage
-udpLookup query ai tm checkSeqno retry rcv =
+udpLookup (legacy,edns0) ai tm checkSeqno retry rcv =
     E.handle (ioErrorToDNSError ai "UDP") $
-      bracket (udpOpen ai) close (loop 0 RetryLimitExceeded)
+      bracket (udpOpen ai) close (loop edns0 0 RetryLimitExceeded)
   where
-    loop cnt err sock
+    loop qry cnt err sock
       | cnt == retry = throwIO err
       | otherwise    = do
-          mres <- timeout tm (send sock query >> rcv sock)
+          mres <- timeout tm (send sock qry >> rcv sock)
           case mres of
-              Nothing  -> loop (cnt + 1) RetryLimitExceeded sock
+              Nothing  -> loop qry (cnt + 1) RetryLimitExceeded sock
               Just res
-                | checkSeqno res -> if trunCation $ flags $ header res then
-                                      E.throwIO TCPFallback
-                                    else
-                                      return res
-                | otherwise      -> loop (cnt + 1) SequenceNumberMismatch sock
+                | checkSeqno res -> do
+                      let flgs = flags$ header res
+                          truncated = trunCation flgs
+                          rc = rcode flgs
+                      if truncated then
+                          E.throwIO TCPFallback
+                        else if rc == FormatErr || rc == NotImpl then
+                          loop legacy (cnt + 1) RetryLimitExceeded sock
+                        else
+                          return res
+                | otherwise      -> loop qry (cnt + 1) SequenceNumberMismatch sock
 
 ----------------------------------------------------------------
 
@@ -147,18 +153,18 @@ tcpOpen peer = case peer of
 -- Perform a DNS query over TCP, if we were successful in creating
 -- the TCP socket.
 -- This throws DNSError only.
-tcpLookup :: ByteString
+tcpLookup :: (ByteString, ByteString)
           -> AddrInfo
           -> Int
           -> IO DNSMessage
-tcpLookup query ai tm =
+tcpLookup (legacy,_) ai tm =
     E.handle (ioErrorToDNSError ai "TCP") $ bracket (tcpOpen addr) close perform
   where
     addr = addrAddress ai
     perform vc = do
         mres <- timeout tm $ do
             connect vc addr
-            sendVC vc query
+            sendVC vc legacy
             receiveVC vc
         case mres of
             Nothing  -> E.throwIO TimeoutExpired
