@@ -388,8 +388,9 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
 
     initialize = do
       seqno <- genId rlv
-      let query = (if ad then composeQueryAD else composeQuery) seqno [q]
-      let checkSeqno = check seqno
+      let compose = if ad then composeQueryAD else composeQuery
+          query = compose seqno [q]
+          checkSeqno = check seqno
       return (query, checkSeqno)
 
     performLookup ai query checkSeqno cnt mismatch sock
