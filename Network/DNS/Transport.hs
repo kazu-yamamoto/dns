@@ -119,23 +119,21 @@ udpLookup :: ByteString
           -> (Socket -> IO DNSMessage)
           -> IO DNSMessage
 udpLookup query ai tm checkSeqno retry rcv =
-    E.handle (ioErrorToDNSError ai "UDP") $ bracket (udpOpen ai) close (loop 0 False)
+    E.handle (ioErrorToDNSError ai "UDP") $
+      bracket (udpOpen ai) close (loop 0 RetryLimitExceeded)
   where
-    loop cnt mismatch sock
-      | cnt == retry = if mismatch then
-                         E.throwIO SequenceNumberMismatch
-                       else
-                         E.throwIO RetryLimitExceeded
+    loop cnt err sock
+      | cnt == retry = throwIO err
       | otherwise    = do
           mres <- timeout tm (send sock query >> rcv sock)
           case mres of
-              Nothing  -> loop (cnt + 1) False sock
+              Nothing  -> loop (cnt + 1) RetryLimitExceeded sock
               Just res
                 | checkSeqno res -> if trunCation $ flags $ header res then
                                       E.throwIO TCPFallback
                                     else
                                       return res
-                | otherwise      -> loop (cnt + 1) True sock
+                | otherwise      -> loop (cnt + 1) SequenceNumberMismatch sock
 
 ----------------------------------------------------------------
 
