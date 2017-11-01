@@ -376,7 +376,7 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
   where
     loop :: (AddrInfo, Maybe (NonEmpty AddrInfo)) -> IO (Either DNSError DNSMessage)
     loop (ai, mais) = do
-      res <- initialise >>= \(query, checkSeqno) ->
+      res <- initialize >>= \(query, checkSeqno) ->
         bracket (udpOpen ai)
                 close
                 (performLookup ai query checkSeqno 0 False)
@@ -396,7 +396,7 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
         connect sock (addrAddress ai)
         return sock
 
-    initialise = do
+    initialize = do
       seqno <- genId rlv
       let query = (if ad then composeQueryAD else composeQuery) seqno [q]
       let checkSeqno = check seqno
