@@ -34,7 +34,7 @@ import Control.Exception (bracket, throwIO)
 import Control.Monad (forM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.Maybe (fromMaybe)
+import Data.Maybe (isJust, maybe)
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
 import qualified Data.List.NonEmpty as NE
@@ -188,17 +188,14 @@ getDefaultDnsServers file = toAddresses <$> readFile file
 makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
 makeAddrInfo addr mport = do
     proto <- getProtocolNumber "udp"
-    let hints = defaultHints {
-            addrFlags = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
+    let flags = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
+        hints = defaultHints {
+            addrFlags = if isJust mport then AI_NUMERICSERV : flags else flags
           , addrSocketType = Datagram
           , addrProtocol = proto
           }
-    a:_ <- getAddrInfo (Just hints) (Just addr) (Just "domain")
-    let connectPort = case addrAddress a of
-                        SockAddrInet pn ha -> SockAddrInet (fromMaybe pn mport) ha
-                        SockAddrInet6 pn fi ha sid -> SockAddrInet6 (fromMaybe pn mport) fi ha sid
-                        unixAddr -> unixAddr
-    return $ a { addrAddress = connectPort }
+        serv = maybe "domain" show mport
+    head <$> getAddrInfo (Just hints) (Just addr) (Just serv)
 
 ----------------------------------------------------------------
 
