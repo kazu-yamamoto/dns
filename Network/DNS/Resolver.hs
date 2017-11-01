@@ -1,5 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE CPP, OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -30,7 +32,8 @@ module Network.DNS.Resolver (
 #define GHC708
 #endif
 
-import Control.Exception (bracket, throwIO)
+import Control.Exception as E
+import Data.Typeable
 import Control.Monad (forM)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
@@ -41,11 +44,12 @@ import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import Network.DNS.Types
 import Network.DNS.IO
-import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), PortNumber(..), HostName, Socket, SocketType(Stream, Datagram), close, socket, connect, getPeerName, getAddrInfo, defaultHints, defaultProtocol)
+import Network.Socket (AddrInfoFlag(..), AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), PortNumber(..), HostName, Socket, SocketType(Stream, Datagram), close, socket, connect, getAddrInfo, defaultHints, defaultProtocol)
 import Prelude hiding (lookup)
-import System.IO.Error (annotateIOError, tryIOError)
+import System.IO.Error (annotateIOError)
 import System.Random (getStdRandom, random)
 import System.Timeout (timeout)
+
 #ifdef GHC708
 import Control.Applicative ((<$>), (<*>), pure)
 #endif
@@ -161,7 +165,7 @@ makeResolvSeed conf = do
         RCFilePath file -> do
             nss <- getDefaultDnsServers file
             case nss of
-              []     -> throwIO BadConfiguration
+              []     -> E.throwIO BadConfiguration
               (l:ls) -> (:|) <$> makeAddrInfo l Nothing <*> forM ls (`makeAddrInfo` Nothing)
 
 getDefaultDnsServers :: FilePath -> IO [String]
@@ -272,6 +276,8 @@ fromDNSMessage ans conv = case errcode ans of
 fromDNSFormat :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
 fromDNSFormat = fromDNSMessage
 
+----------------------------------------------------------------
+
 -- | Look up resource records for a domain, collecting the results
 --   from the ANSWER section of the response.
 --
@@ -290,6 +296,7 @@ lookup = lookupSection answer
 lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookupAuth = lookupSection authority
 
+----------------------------------------------------------------
 
 -- | Look up a name and return the entire DNS Response.  If the
 --   initial UDP query elicits a truncated answer, the query is
@@ -336,7 +343,7 @@ lookupAuth = lookupSection authority
 --  @
 --
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRaw = lookupRawInternal receive False
+lookupRaw = resolve receive False
 
 -- | Same as lookupRaw, but the query sets the AD bit, which solicits the
 --   the authentication status in the server reply.  In most applications
@@ -345,7 +352,12 @@ lookupRaw = lookupRawInternal receive False
 --   interface should in most cases only be used with a loopback resolver.
 --
 lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRawAD = lookupRawInternal receive True
+lookupRawAD = resolve receive True
+
+----------------------------------------------------------------
+
+data TCPFallback = TCPFallback deriving (Show, Typeable)
+instance Exception TCPFallback
 
 -- Lookup loop, we try UDP until we get a response.  If the response
 -- is truncated, we try TCP once, with no further UDP retries.
@@ -362,25 +374,20 @@ lookupRawAD = lookupRawInternal receive True
 --
 -- Future improvements might also include support for TCP on the
 -- initial query.
-
-lookupRawInternal ::
-    (Socket -> IO DNSMessage)
-    -> Bool
-    -> Resolver
-    -> Domain
-    -> TYPE
-    -> IO (Either DNSError DNSMessage)
-lookupRawInternal _ _ _   dom _
+resolve :: (Socket -> IO DNSMessage)
+        -> Bool
+        -> Resolver
+        -> Domain
+        -> TYPE
+        -> IO (Either DNSError DNSMessage)
+resolve _ _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
+resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
   where
-    loop :: (AddrInfo, Maybe (NonEmpty AddrInfo)) -> IO (Either DNSError DNSMessage)
     loop (ai, mais) = do
       (query, checkSeqno) <- initialize
-      res <- bracket (udpOpen ai)
-                     close
-                     (performLookup ai query checkSeqno 0 False)
-      case res of
+      eres <- E.try $ udpTcpLookup query ai tm checkSeqno retry rcv
+      case eres of
         Left e  -> case mais of
           Nothing  -> return $ Left e
           Just ais -> loop $ NE.uncons ais
@@ -393,96 +400,96 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
           checkSeqno = check seqno
       return (query, checkSeqno)
 
-    performLookup ai query checkSeqno cnt mismatch sock
-      | cnt == retry = do
-          let ret | mismatch  = SequenceNumberMismatch
-                  | otherwise = RetryLimitExceeded
-          return $ Left ret
-      | otherwise    = do
-          -- We don't expect to block or raise exceptions when writing UDP.
-          -- Reads, can time out, or, since we connect the UDP socket, throw
-          -- connection refused.  Regardless, we simply handle timeouts and
-          -- exceptions for the combined write request + read reply operation.
-          -- IO exceptions are annotated with the protocol and address.
-          response <- timeout tm (tryIOError (send sock query >> rcv sock))
-          case response of
-              Nothing  -> performLookup ai query checkSeqno (cnt + 1) False sock
-              Just (Right res) -> do
-                  let valid = checkSeqno res
-                  if valid then
-                      if trunCation $ flags $ header res then
-                          tcpRetry query ai tm
-                        else
-                          return $ Right res
-                    else
-                      performLookup ai query checkSeqno (cnt + 1) False sock
-              Just (Left e) -> do
-                  peer <- getPeerName sock
-                  return $ Left $ NetworkFailure $
-                      annotateIOError e (show peer) Nothing $ Just "UDP"
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
     q = Question dom typ
     check seqno res = identifier (header res) == seqno
 
--- | XXX: Here, and in tcpOpen below, we can encounter uncaught exceptions
--- if the per-process or system file-descriptor limit is exceeded, or (UDP
--- only) to free ephemeral ports are available.  We should add another
--- DNSError constructor for local errors, that wraps around IOException,
--- and handle these rare, but not impossible, errors.
+----------------------------------------------------------------
+
+udpTcpLookup :: ByteString
+             -> AddrInfo
+             -> Int
+             -> (DNSMessage -> Bool)
+             -> Int
+             -> (Socket -> IO DNSMessage)
+             -> IO DNSMessage
+udpTcpLookup query ai tm checkSeqno retry rcv =
+    udpLookup query ai tm checkSeqno retry rcv `E.catch` \TCPFallback ->
+        tcpLookup query ai tm
+
+----------------------------------------------------------------
+
+ioErrorToDNSError :: AddrInfo -> String -> IOError -> IO DNSMessage
+ioErrorToDNSError ai tag ioe = throwIO $ NetworkFailure aioe
+  where
+    aioe = annotateIOError ioe (show ai) Nothing $ Just tag
+
+----------------------------------------------------------------
+
 udpOpen :: AddrInfo -> IO Socket
 udpOpen ai = do
     sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
     connect sock (addrAddress ai)
     return sock
 
--- Create a TCP socket with the given socket address. XXX: This might raise an
--- I/O Exception if we run out of file descriptors.  See related comment for
--- 'udpOpen'.
-tcpOpen :: SockAddr -> IO (Maybe Socket)
-tcpOpen peer = case peer of
-    SockAddrInet{}  -> Just <$> socket AF_INET  Stream defaultProtocol
-    SockAddrInet6{} -> Just <$> socket AF_INET6 Stream defaultProtocol
-    _ -> return Nothing -- Only IPv4 and IPv6 are possible
+-- This throws DNSError or TCPFallback.
+udpLookup :: ByteString
+          -> AddrInfo
+          -> Int
+          -> (DNSMessage -> Bool)
+          -> Int
+          -> (Socket -> IO DNSMessage)
+          -> IO DNSMessage
+udpLookup query ai tm checkSeqno retry rcv =
+    E.handle (ioErrorToDNSError ai "UDP") $ bracket (udpOpen ai) close (loop 0 False)
+  where
+    loop cnt mismatch sock
+      | cnt == retry = if mismatch then
+                         E.throwIO SequenceNumberMismatch
+                       else
+                         E.throwIO RetryLimitExceeded
+      | otherwise    = do
+          mres <- timeout tm (send sock query >> rcv sock)
+          case mres of
+              Nothing  -> loop (cnt + 1) False sock
+              Just res
+                | checkSeqno res -> if trunCation $ flags $ header res then
+                                      E.throwIO TCPFallback
+                                    else
+                                      return res
+                | otherwise      -> loop (cnt + 1) True sock
 
--- Create a TCP socket `just like` our UDP socket and retry the same
--- query over TCP.  Since TCP is a reliable transport, and we just
--- got a (truncated) reply from the server over UDP (so it has the
--- answer, but it is just too large for UDP), we expect to succeed
--- quickly on the first try.  There will be no further retries.
-tcpRetry :: ByteString
-         -> AddrInfo
-         -> Int
-         -> IO (Either DNSError DNSMessage)
-tcpRetry query ai tm = do
-    let addr = addrAddress ai
-    bracket (tcpOpen addr)
-            (maybe (return ()) close)
-            (tcpLookup query addr tm)
+----------------------------------------------------------------
+
+-- Create a TCP socket with the given socket address.
+tcpOpen :: SockAddr -> IO Socket
+tcpOpen peer = case peer of
+    SockAddrInet{}  -> socket AF_INET  Stream defaultProtocol
+    SockAddrInet6{} -> socket AF_INET6 Stream defaultProtocol
+    _               -> E.throwIO ServerFailure
 
 -- Perform a DNS query over TCP, if we were successful in creating
--- the TCP socket.  The socket creation can only fail if we run out
--- of file descriptors, we're not making connections here.  Failure
--- is reported as "server" failure, though it is really our stub
--- resolver that's failing.  This is likely good enough.
+-- the TCP socket.
+-- This throws DNSError only.
 tcpLookup :: ByteString
-          -> SockAddr
+          -> AddrInfo
           -> Int
-          -> Maybe Socket
-          -> IO (Either DNSError DNSMessage)
-tcpLookup _ _ _ Nothing = return $ Left ServerFailure
-tcpLookup query peer tm (Just vc) = do
-    -- With TCP, we can get fail or time out with any of connect, send
-    -- or receive.
-    response <- timeout tm $ tryIOError $ do
-        connect vc peer
-        sendVC vc query
-        receiveVC vc
-    case response of
-        Nothing          -> return $ Left TimeoutExpired
-        Just (Right res) -> return $ Right res
-        Just (Left e)    -> return $ Left $ NetworkFailure $
-            annotateIOError e (show peer) Nothing $ Just "TCP"
+          -> IO DNSMessage
+tcpLookup query ai tm =
+    E.handle (ioErrorToDNSError ai "TCP") $ bracket (tcpOpen addr) close perform
+  where
+    addr = addrAddress ai
+    perform vc = do
+        mres <- timeout tm $ do
+            connect vc addr
+            sendVC vc query
+            receiveVC vc
+        case mres of
+            Nothing  -> E.throwIO TimeoutExpired
+            Just res -> return res
+
+----------------------------------------------------------------
 
 badLength :: Domain -> Bool
 badLength dom

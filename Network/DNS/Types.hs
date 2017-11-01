@@ -321,7 +321,7 @@ data DNSError =
     SequenceNumberMismatch
     -- | The number of retries for the request was exceeded.
   | RetryLimitExceeded
-    -- | The request simply timed out.
+    -- | TCP fallback request timed out.
   | TimeoutExpired
     -- | The answer has the correct sequence number, but returned an
     --   unexpected RDATA format.
