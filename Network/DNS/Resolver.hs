@@ -376,25 +376,15 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
   where
     loop :: (AddrInfo, Maybe (NonEmpty AddrInfo)) -> IO (Either DNSError DNSMessage)
     loop (ai, mais) = do
-      res <- initialize >>= \(query, checkSeqno) ->
-        bracket (udpOpen ai)
-                close
-                (performLookup ai query checkSeqno 0 False)
+      (query, checkSeqno) <- initialize
+      res <- bracket (udpOpen ai)
+                     close
+                     (performLookup ai query checkSeqno 0 False)
       case res of
         Left e  -> case mais of
           Nothing  -> return $ Left e
           Just ais -> loop $ NE.uncons ais
         Right v -> pure (Right v)
-
-    -- | XXX: Here, and in tcpOpen below, we can encounter uncaught exceptions
-    -- if the per-process or system file-descriptor limit is exceeded, or (UDP
-    -- only) to free ephemeral ports are available.  We should add another
-    -- DNSError constructor for local errors, that wraps around IOException,
-    -- and handle these rare, but not impossible, errors.
-    udpOpen ai = do
-        sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
-        connect sock (addrAddress ai)
-        return sock
 
     initialize = do
       seqno <- genId rlv
@@ -434,12 +424,31 @@ lookupRawInternal rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
     q = Question dom typ
     check seqno res = identifier (header res) == seqno
 
+-- | XXX: Here, and in tcpOpen below, we can encounter uncaught exceptions
+-- if the per-process or system file-descriptor limit is exceeded, or (UDP
+-- only) to free ephemeral ports are available.  We should add another
+-- DNSError constructor for local errors, that wraps around IOException,
+-- and handle these rare, but not impossible, errors.
+udpOpen :: AddrInfo -> IO Socket
+udpOpen ai = do
+    sock <- socket (addrFamily ai) (addrSocketType ai) (addrProtocol ai)
+    connect sock (addrAddress ai)
+    return sock
+
+-- Create a TCP socket with the given socket address. XXX: This might raise an
+-- I/O Exception if we run out of file descriptors.  See related comment for
+-- 'udpOpen'.
+tcpOpen :: SockAddr -> IO (Maybe Socket)
+tcpOpen peer = case peer of
+    SockAddrInet{}  -> Just <$> socket AF_INET  Stream defaultProtocol
+    SockAddrInet6{} -> Just <$> socket AF_INET6 Stream defaultProtocol
+    _ -> return Nothing -- Only IPv4 and IPv6 are possible
+
 -- Create a TCP socket `just like` our UDP socket and retry the same
 -- query over TCP.  Since TCP is a reliable transport, and we just
 -- got a (truncated) reply from the server over UDP (so it has the
 -- answer, but it is just too large for UDP), we expect to succeed
 -- quickly on the first try.  There will be no further retries.
-
 tcpRetry :: ByteString
          -> AddrInfo
          -> Int
@@ -450,22 +459,11 @@ tcpRetry query ai tm = do
             (maybe (return ()) close)
             (tcpLookup query addr tm)
 
--- Create a TCP socket with the given socket address. XXX: This might raise an
--- I/O Exception if we run out of file descriptors.  See related comment for
--- 'udpOpen'.
---
-tcpOpen :: SockAddr -> IO (Maybe Socket)
-tcpOpen peer = case peer of
-    SockAddrInet{}  -> Just <$> socket AF_INET  Stream defaultProtocol
-    SockAddrInet6{} -> Just <$> socket AF_INET6 Stream defaultProtocol
-    _ -> return Nothing -- Only IPv4 and IPv6 are possible
-
 -- Perform a DNS query over TCP, if we were successful in creating
 -- the TCP socket.  The socket creation can only fail if we run out
 -- of file descriptors, we're not making connections here.  Failure
 -- is reported as "server" failure, though it is really our stub
 -- resolver that's failing.  This is likely good enough.
-
 tcpLookup :: ByteString
           -> SockAddr
           -> Int
@@ -480,7 +478,7 @@ tcpLookup query peer tm (Just vc) = do
         sendVC vc query
         receiveVC vc
     case response of
-        Nothing  -> return $ Left TimeoutExpired
+        Nothing          -> return $ Left TimeoutExpired
         Just (Right res) -> return $ Right res
         Just (Left e)    -> return $ Left $ NetworkFailure $
             annotateIOError e (show peer) Nothing $ Just "TCP"
