@@ -27,6 +27,7 @@ Library
                         Network.DNS.IO
   Other-Modules:        Network.DNS.Decode.Internal
                         Network.DNS.StateBinary
+                        Network.DNS.Transport
   if impl(ghc < 8)
     Build-Depends:      semigroups
   Build-Depends:        base >= 4 && < 5
