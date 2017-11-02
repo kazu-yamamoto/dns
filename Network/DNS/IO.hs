@@ -108,7 +108,7 @@ sendAll sock bs = do
 query :: Identifier
       -> [Question]
       -> Bool       -- ^ EDNS0
-      -> Bool       -- ^ Authentidation
+      -> Bool       -- ^ Authentication
       -> ByteString
 query idt qs edns0 auth = encode qry
   where
