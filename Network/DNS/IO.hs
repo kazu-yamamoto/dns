@@ -7,7 +7,8 @@ module Network.DNS.IO (
     -- * Sending to socket
   , send
   , sendVC
-    -- ** Composing Query
+    -- ** Creating Query
+  , encodeQuestions
   , composeQuery
   , composeQueryAD
     -- ** Creating Response
@@ -81,17 +82,17 @@ receiveVC sock = do
 
 -- | Sending composed query or response to 'Socket'.
 send :: Socket -> ByteString -> IO ()
-send sock query = sendAll sock query
+send sock legacyQuery = sendAll sock legacyQuery
 
 -- | Sending composed query or response to a single virtual-circuit (TCP).
 sendVC :: Socket -> ByteString -> IO ()
-sendVC vc query = sendAll vc $ encodeVC query
+sendVC vc legacyQuery = sendAll vc $ encodeVC legacyQuery
 
 -- | Encoding for virtual circuit.
 encodeVC :: ByteString -> ByteString
-encodeVC query =
-    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length query
-    in len <> query
+encodeVC legacyQuery =
+    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length legacyQuery
+    in len <> legacyQuery
 
 #if defined(WIN) && defined(GHC708)
 -- Windows does not support sendAll in Network.ByteString for older GHCs.
@@ -103,21 +104,13 @@ sendAll sock bs = do
 
 ----------------------------------------------------------------
 
--- | Composing query.
-composeQuery :: Identifier -> [Question] -> ByteString
-composeQuery idt qs = encode qry
-  where
-    hdr = header defaultQuery
-    qry = defaultQuery {
-        header = hdr {
-           identifier = idt
-         }
-      , question = qs
-      }
-
--- | Composing query with authentic data flag set.
-composeQueryAD :: Identifier -> [Question] -> ByteString
-composeQueryAD idt qs = encode qry
+-- | Creating query.
+encodeQuestions :: Identifier
+                -> [Question]
+                -> Bool       -- ^ EDNS0
+                -> Bool       -- ^ Authentication
+                -> ByteString
+encodeQuestions idt qs edns0 auth = encode qry
   where
       hdr = header defaultQuery
       flg = flags hdr
@@ -125,12 +118,22 @@ composeQueryAD idt qs = encode qry
           header = hdr {
               identifier = idt,
               flags = flg {
-                  authenData = True
+                  authenData = auth
               }
            }
         , question = qs
+        , additional = if edns0 then [fromEDNS0 defaultEDNS0] else []
         }
 
+{-# DEPRECATED composeQuery "Use encodeQuestions instead" #-}
+-- | Composing query without EDNS0.
+composeQuery :: Identifier -> [Question] -> ByteString
+composeQuery idt qs = encodeQuestions idt qs False False
+
+{-# DEPRECATED composeQueryAD "Use encodeQuestions instead" #-}
+-- | Composing query with authentic data flag set without EDNS0.
+composeQueryAD :: Identifier -> [Question] -> ByteString
+composeQueryAD idt qs = encodeQuestions idt qs False True
 
 ----------------------------------------------------------------
 
