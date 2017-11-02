@@ -7,8 +7,8 @@ module Network.DNS.IO (
     -- * Sending to socket
   , send
   , sendVC
-    -- ** Composing Query
-  , query
+    -- ** Creating Query
+  , encodeQuestions
   , composeQuery
   , composeQueryAD
     -- ** Creating Response
@@ -104,13 +104,13 @@ sendAll sock bs = do
 
 ----------------------------------------------------------------
 
--- | Composing query.
-query :: Identifier
-      -> [Question]
-      -> Bool       -- ^ EDNS0
-      -> Bool       -- ^ Authentication
-      -> ByteString
-query idt qs edns0 auth = encode qry
+-- | Creating query.
+encodeQuestions :: Identifier
+                -> [Question]
+                -> Bool       -- ^ EDNS0
+                -> Bool       -- ^ Authentication
+                -> ByteString
+encodeQuestions idt qs edns0 auth = encode qry
   where
       hdr = header defaultQuery
       flg = flags hdr
@@ -125,15 +125,15 @@ query idt qs edns0 auth = encode qry
         , additional = if edns0 then [fromEDNS0 defaultEDNS0] else []
         }
 
-{-# DEPRECATED composeQuery "Use query instead" #-}
+{-# DEPRECATED composeQuery "Use encodeQuestions instead" #-}
 -- | Composing query without EDNS0.
 composeQuery :: Identifier -> [Question] -> ByteString
-composeQuery idt qs = query idt qs False False
+composeQuery idt qs = encodeQuestions idt qs False False
 
-{-# DEPRECATED composeQueryAD "Use query instead" #-}
+{-# DEPRECATED composeQueryAD "Use encodeQuestions instead" #-}
 -- | Composing query with authentic data flag set without EDNS0.
 composeQueryAD :: Identifier -> [Question] -> ByteString
-composeQueryAD idt qs = query idt qs False True
+composeQueryAD idt qs = encodeQuestions idt qs False True
 
 ----------------------------------------------------------------
 

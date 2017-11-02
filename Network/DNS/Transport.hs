@@ -72,8 +72,8 @@ resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
 
     initialize = do
       seqno <- genId rlv
-      let queryLegacy = query seqno [q] False ad
-          queryEdns0  = query seqno [q] True ad
+      let queryLegacy = encodeQuestions seqno [q] False ad
+          queryEdns0  = encodeQuestions seqno [q] True ad
           checkSeqno = check seqno
       return ((queryLegacy, queryEdns0), checkSeqno)
 
