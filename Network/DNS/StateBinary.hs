@@ -1,9 +1,38 @@
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances, CPP #-}
-module Network.DNS.StateBinary where
+module Network.DNS.StateBinary (
+    PState(..)
+  , initialState
+  , SPut
+  , runSPut
+  , put8
+  , put16
+  , put32
+  , putInt8
+  , putInt16
+  , putInt32
+  , putByteString
+  , SGet
+  , runSGet
+  , runSGetWithLeftovers
+  , get8
+  , get16
+  , get32
+  , getInt8
+  , getInt16
+  , getInt32
+  , getNByteString
+  , getPosition
+  , wsPop
+  , wsPush
+  , wsPosition
+  , addPositionW
+  , push
+  , pop
+  , getNBytes
+  ) where
 
 import Control.Monad.State (State, StateT)
 import qualified Control.Monad.State as ST
-import Control.Monad.Trans.Resource (ResourceT)
 import qualified Data.Attoparsec.ByteString as A
 
 import qualified Data.Attoparsec.Types as T
@@ -12,8 +41,6 @@ import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.Conduit (Sink)
-import Data.Conduit.Attoparsec (sinkParser)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.Map (Map)
@@ -161,9 +188,6 @@ getNByteString n = ST.lift (A.take n) <* addPosition n
 
 initialState :: PState
 initialState = PState IM.empty 0
-
-sinkSGet :: SGet a -> Sink ByteString (ResourceT IO) (a, PState)
-sinkSGet parser = sinkParser (ST.runStateT parser initialState)
 
 runSGet :: SGet a -> ByteString -> Either String (a, PState)
 runSGet parser bs = A.eitherResult $ A.parse (ST.runStateT parser initialState) bs

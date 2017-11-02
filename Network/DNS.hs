@@ -33,7 +33,10 @@ module Network.DNS (
 
   , module Network.DNS.Decode
   -- | Decoding a qurey or response.
-  ) where
+
+  , module Network.DNS.IO
+  -- | Sending and receiving.
+) where
 
 import Network.DNS.Lookup
 import Network.DNS.Resolver
@@ -41,3 +44,4 @@ import Network.DNS.Utils
 import Network.DNS.Types
 import Network.DNS.Decode
 import Network.DNS.Encode
+import Network.DNS.IO

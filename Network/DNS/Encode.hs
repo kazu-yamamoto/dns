@@ -2,16 +2,9 @@
 
 -- | Encoders for DNS.
 module Network.DNS.Encode (
-    -- * Composing Query
-    composeQuery
-  , composeQueryAD
-    -- * Creating Response
-  , responseA
-  , responseAAAA
     -- * Encoder
-  , encode
-  , encodeVC
-    -- * Encoder for Each Part
+    encode
+    -- ** Encoder for Each Part
   , encodeResourceRecord
   , encodeDNSHeader
   , encodeDNSFlags
@@ -27,7 +20,7 @@ import qualified Data.ByteString.Builder as BB
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.IP (IP(..),fromIPv4, fromIPv6b, IPv4, IPv6)
+import Data.IP (IP(..), fromIPv4, fromIPv6b)
 import Data.List (dropWhileEnd)
 import Data.Monoid ((<>))
 import Network.DNS.StateBinary
@@ -39,45 +32,9 @@ import Data.Monoid (mconcat)
 
 ----------------------------------------------------------------
 
--- | Composing query.
-composeQuery :: Identifier -> [Question] -> ByteString
-composeQuery idt qs = encode qry
-  where
-    hdr = header defaultQuery
-    qry = defaultQuery {
-        header = hdr {
-           identifier = idt
-         }
-      , question = qs
-      }
-
--- | Composing query with authentic data flag set.
-composeQueryAD :: Identifier -> [Question] -> ByteString
-composeQueryAD idt qs = encode qry
-  where
-      hdr = header defaultQuery
-      flg = flags hdr
-      qry = defaultQuery {
-          header = hdr {
-              identifier = idt,
-              flags = flg {
-                  authenData = True
-              }
-           }
-        , question = qs
-        }
-
-----------------------------------------------------------------
-
 -- | Encoding DNS query or response.
 encode :: DNSMessage -> ByteString
 encode = runSPut . putDNSMessage
-
--- | Encoding for virtual circuit.
-encodeVC :: ByteString -> ByteString
-encodeVC query =
-    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length query
-    in len <> query
 
 -- | Encoding DNS flags.
 encodeDNSFlags :: DNSFlags -> ByteString
@@ -280,29 +237,3 @@ putPointer pos = putInt16 (pos .|. 0xc000)
 
 putPartialDomain :: Domain -> SPut
 putPartialDomain = putByteStringWithLength
-
-----------------------------------------------------------------
-
--- | Composing a response from IPv4 addresses
-responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
-responseA ident q ips =
-  let hd = header defaultResponse
-      dom = qname q
-      an = fmap (ResourceRecord dom A classIN 300 . RD_A) ips
-  in  defaultResponse {
-          header = hd { identifier=ident }
-        , question = [q]
-        , answer = an
-      }
-
--- | Composing a response from IPv6 addresses
-responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
-responseAAAA ident q ips =
-  let hd = header defaultResponse
-      dom = qname q
-      an = fmap (ResourceRecord dom AAAA classIN 300 . RD_AAAA) ips
-  in  defaultResponse {
-          header = hd { identifier=ident }
-        , question = [q]
-        , answer = an
-      }
