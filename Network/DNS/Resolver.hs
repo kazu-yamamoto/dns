@@ -88,6 +88,8 @@ data ResolvConf = ResolvConf {
   , resolvRetry :: Int
    -- | This field was obsoleted.
   , resolvBufsize :: Integer
+   -- | Enabling EDNS0 for UDP queries with 4,096-bytes buffer.
+  , resolvEDNS0   :: Bool
 }
 
 
@@ -98,6 +100,8 @@ data ResolvConf = ResolvConf {
 --     * 'resolvTimeout' is 3,000,000 micro seconds.
 --
 --     * 'resolvRetry' is 3.
+--
+--     * 'resolvEDNS0' is 'True'.
 --
 --     * 'resolvBufsize' is 512. (obsoleted)
 --
@@ -112,6 +116,7 @@ defaultResolvConf = ResolvConf {
   , resolvTimeout = 3 * 1000 * 1000
   , resolvRetry = 3
   , resolvBufsize = 512
+  , resolvEDNS0 = True
 }
 
 ----------------------------------------------------------------
@@ -123,6 +128,7 @@ data ResolvSeed = ResolvSeed {
   , rsTimeout   :: Int
   , rsRetry     :: Int
   , rsBufsize   :: Integer
+  , rsEDNS0     :: Bool
 }
 
 ----------------------------------------------------------------
@@ -137,10 +143,11 @@ data ResolvSeed = ResolvSeed {
 makeResolvSeed :: ResolvConf -> IO ResolvSeed
 makeResolvSeed conf = do
   let tm      = resolvTimeout conf
-  let retry   = resolvRetry conf
-  let bufSize = resolvBufsize conf
+      retry   = resolvRetry conf
+      bufSize = resolvBufsize conf
+      edns0   = resolvEDNS0 conf
   nameservers <- findAddresses
-  return $ ResolvSeed nameservers tm retry bufSize
+  return $ ResolvSeed nameservers tm retry bufSize edns0
   where
     findAddresses :: IO (NonEmpty AddrInfo)
     findAddresses = case resolvInfo conf of
@@ -209,6 +216,7 @@ makeResolver seed = Resolver {
   , dnsTimeout = rsTimeout seed
   , dnsRetry = rsRetry seed
   , dnsBufsize = rsBufsize seed
+  , dnsEDNS0 = rsEDNS0 seed
   }
 
 -- | XXX: This is unlikely to be cryptographically strong.  We should use a

@@ -29,6 +29,7 @@ data Resolver = Resolver {
   , dnsTimeout :: Int
   , dnsRetry   :: Int
   , dnsBufsize :: Integer
+  , dnsEDNS0   :: Bool
 }
 
 ----------------------------------------------------------------
@@ -73,12 +74,13 @@ resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
     initialize = do
       seqno <- genId rlv
       let queryLegacy = encodeQuestions seqno [q] False ad
-          queryEdns0  = encodeQuestions seqno [q] True ad
+          queryEdns0  = encodeQuestions seqno [q] edns0 ad
           checkSeqno = check seqno
       return ((queryLegacy, queryEdns0), checkSeqno)
 
     tm = dnsTimeout rlv
     retry = dnsRetry rlv
+    edns0 = dnsEDNS0 rlv
     q = Question dom typ
     check seqno res = identifier (header res) == seqno
 
