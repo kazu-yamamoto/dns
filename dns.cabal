@@ -38,10 +38,10 @@ Library
                       , conduit >= 1.1
                       , conduit-extra >= 1.1
                       , containers
+                      , cryptonite
                       , iproute >= 1.3.2
                       , mtl
                       , network >= 2.3
-                      , random
                       , safe == 0.3.*
   if os(windows)
     Build-Depends:    split
