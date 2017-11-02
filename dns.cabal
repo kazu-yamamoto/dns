@@ -69,21 +69,12 @@ Test-Suite spec
   Other-Modules:        EncodeSpec
                         DecodeSpec
                         RoundTripSpec
-  Build-Depends:        base
-                      , attoparsec
-                      , binary
+  Build-Depends:        dns
+                      , QuickCheck >= 2.9
+                      , base
                       , bytestring
-                      , conduit >= 1.1
-                      , conduit-extra >= 1.1
-                      , containers
-                      , dns
                       , hspec
                       , iproute >= 1.2.4
-                      , mtl
-                      , network >= 2.3
-                      , QuickCheck >= 2.9
-                      , random
-                      , safe == 0.3.*
                       , word8
 
 Test-Suite doctest
