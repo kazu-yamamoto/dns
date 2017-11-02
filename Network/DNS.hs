@@ -4,7 +4,7 @@
 --   convenience.
 --   Applications will most likely use the high-level interface, while
 --   library/daemon authors may need to use the lower-level one.
---   EDNS0 and TCP fallback are not supported yet.
+--   EDNS0 and TCP fallback are supported.
 --
 module Network.DNS (
   -- * High level
