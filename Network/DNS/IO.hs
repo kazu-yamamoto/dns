@@ -128,32 +128,12 @@ query idt qs edns0 auth = encode qry
 {-# DEPRECATED composeQuery "Use query instead" #-}
 -- | Composing query without EDNS0.
 composeQuery :: Identifier -> [Question] -> ByteString
-composeQuery idt qs = encode qry
-  where
-    hdr = header defaultQuery
-    qry = defaultQuery {
-        header = hdr {
-           identifier = idt
-         }
-      , question = qs
-      }
+composeQuery idt qs = query idt qs False False
 
 {-# DEPRECATED composeQueryAD "Use query instead" #-}
 -- | Composing query with authentic data flag set without EDNS0.
 composeQueryAD :: Identifier -> [Question] -> ByteString
-composeQueryAD idt qs = encode qry
-  where
-      hdr = header defaultQuery
-      flg = flags hdr
-      qry = defaultQuery {
-          header = hdr {
-              identifier = idt,
-              flags = flg {
-                  authenData = True
-              }
-           }
-        , question = qs
-        }
+composeQueryAD idt qs = query idt qs False True
 
 ----------------------------------------------------------------
 
