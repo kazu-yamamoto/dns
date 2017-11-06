@@ -9,7 +9,7 @@ module Network.DNS.Resolver (
   -- * Intermediate data type for resolver
   , ResolvSeed, makeResolvSeed
   -- * Type and function for resolver
-  , Resolver(..), withResolver, withResolvers
+  , Resolver, withResolver, withResolvers
   -- * Looking up functions
   , lookup
   , lookupAuth
