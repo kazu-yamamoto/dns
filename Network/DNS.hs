@@ -9,23 +9,22 @@
 module Network.DNS (
   -- * High level
     module Network.DNS.Lookup
-  -- | The "Network.DNS.Lookup" module contains simple functions to
+  -- | This module contains simple functions to
   --   perform various DNS lookups. If you simply want to resolve a
   --   hostname ('lookupA'), or find a domain's MX record
   --   ('lookupMX'), this is the easiest way to do it.
-
-  , module Network.DNS.Resolver
-  -- | The "Network.DNS.Resolver" module is slightly more low-level
-  --   than "Network.DNS.Lookup". If you need to do something unusual,
-  --   you may need to use the 'lookup', 'lookupAuth', or 'lookupRaw'
-  --   functions.
 
   , module Network.DNS.Types
   -- | All of the types that the other modules use.
 
   , module Network.DNS.Utils
-  -- | The "Network.DNS.Utils" module contains utility functions used
+  -- | This module contains utility functions used
   --   for processing DNS data.
+
+  -- * Middle level
+  , module Network.DNS.Resolver
+  -- | This provides 'lookup', 'lookupAuth', or 'lookupRaw' functions
+  --   for any resource records.
 
   -- * Low level
   , module Network.DNS.Encode
