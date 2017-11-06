@@ -30,8 +30,6 @@ data ResolvConf = ResolvConf {
   , resolvTimeout :: Int
    -- | The number of retries including the first try.
   , resolvRetry :: Int
-   -- | This field was obsoleted.
-  , resolvBufsize :: Integer
    -- | Enabling EDNS0 for UDP queries with 4,096-bytes buffer.
   , resolvEDNS0   :: Bool
 } deriving Show
@@ -50,7 +48,6 @@ defaultResolvConf = ResolvConf {
     resolvInfo = RCFilePath "/etc/resolv.conf"
   , resolvTimeout = 3 * 1000 * 1000
   , resolvRetry = 3
-  , resolvBufsize = 512
   , resolvEDNS0 = True
 }
 
