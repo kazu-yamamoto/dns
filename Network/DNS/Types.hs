@@ -79,11 +79,13 @@ module Network.DNS.Types (
   , DNSError (..)
   -- * EDNS0
   , EDNS0
+  , defaultEDNS0
+  -- ** Accessors
   , udpSize
   , extRCODE
   , dnssecOk
   , options
-  , defaultEDNS0
+  -- ** Converters
   , fromEDNS0
   , toEDNS0
   -- * EDNS0 option data
@@ -738,6 +740,9 @@ data EDNS0 = EDNS0 {
   } deriving (Eq, Show)
 
 -- | Default information for EDNS0.
+--
+-- >>> defaultEDNS0
+-- EDNS0 {udpSize = 4096, extRCODE = NoError, dnssecOk = False, options = []}
 defaultEDNS0 :: EDNS0
 defaultEDNS0 = EDNS0 4096 NoErr False []
 

@@ -9,28 +9,14 @@ module Network.DNS.Transport (
 import Control.Exception as E
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
-import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Typeable
-import Data.Word (Word16)
 import Network.DNS.IO
 import Network.DNS.Types
+import Network.DNS.Types.Internal
 import Network.Socket (AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), Socket, SocketType(Stream), close, socket, connect, defaultProtocol)
 import System.IO.Error (annotateIOError)
 import System.Timeout (timeout)
-
-----------------------------------------------------------------
-
--- | Abstract data type of DNS Resolver
---   When implementing a DNS cache, this MUST NOT be re-used.
-data Resolver = Resolver {
-    genId      :: IO Word16
-  , dnsServers :: NonEmpty AddrInfo
-  , dnsTimeout :: Int
-  , dnsRetry   :: Int
-  , dnsBufsize :: Integer
-  , dnsEDNS0   :: Bool
-}
 
 ----------------------------------------------------------------
 
@@ -60,7 +46,7 @@ resolve :: (Socket -> IO DNSMessage)
         -> IO (Either DNSError DNSMessage)
 resolve _ _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
+resolve rcv ad rlv dom typ = loop $ NE.uncons nss
   where
     loop (ai, mais) = do
         (queries, checkSeqno) <- initialize
@@ -73,14 +59,17 @@ resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
 
     initialize = do
       seqno <- genId rlv
-      let queryLegacy = encodeQuestions seqno [q] False ad
+      let queryLegacy = encodeQuestions seqno [q] [] ad
           queryEdns0  = encodeQuestions seqno [q] edns0 ad
           checkSeqno = check seqno
       return ((queryLegacy, queryEdns0), checkSeqno)
 
-    tm = dnsTimeout rlv
-    retry = dnsRetry rlv
-    edns0 = dnsEDNS0 rlv
+    seed  = resolvseed rlv
+    nss   = nameservers seed
+    conf  = resolvconf seed
+    tm    = resolvTimeout conf
+    retry = resolvRetry conf
+    edns0  = resolvEDNS conf
     q = Question dom typ
     check seqno res = identifier (header res) == seqno
 
