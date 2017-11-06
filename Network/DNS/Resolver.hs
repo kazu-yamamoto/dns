@@ -142,7 +142,6 @@ rotate xs = init $ zipWith (++) (tails xs) (inits xs)
 
 ----------------------------------------------------------------
 
-
 -- | Giving a thread-safe 'Resolver' to the function of the second
 --   argument.  Multiple 'withResolver's can be used concurrently.
 --   Multiple lookups must be done sequentially with a given
