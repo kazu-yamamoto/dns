@@ -64,7 +64,11 @@ defaultResolvConf = ResolvConf {
 ----------------------------------------------------------------
 
 -- | Abstract data type of DNS Resolver seed.
---   When implementing a DNS cache, this should be re-used.
+--   IP address information of DNS servers is generated
+--   according to 'resolvInfo' internally.
+--   This value can be safely reused for 'withResolver'.
+--
+--   The naming is confusing for historical reasons.
 data ResolvSeed = ResolvSeed {
     resolvconf  :: ResolvConf
   , nameservers :: NonEmpty AddrInfo
@@ -72,8 +76,8 @@ data ResolvSeed = ResolvSeed {
 
 ----------------------------------------------------------------
 
--- | Abstract data type of DNS Resolver
---   When implementing a DNS cache, this MUST NOT be re-used.
+-- | Abstract data type of DNS Resolver.
+--   This includes a newly seeded random generator for DNS packet identifiers.
 data Resolver = Resolver {
     resolvseed :: ResolvSeed
   , genId      :: IO Word16
