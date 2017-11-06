@@ -40,7 +40,7 @@ data ResolvConf = ResolvConf {
   , resolvTimeout :: Int
    -- | The number of retries including the first try.
   , resolvRetry   :: Int
-   -- | Enabling EDNS0 for UDP queries with 4,096-bytes buffer.
+   -- | Additional resource records to specify EDNS.
   , resolvEDNS    :: [ResourceRecord]
 } deriving Show
 
