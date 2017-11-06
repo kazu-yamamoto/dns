@@ -6,9 +6,9 @@
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
   -- * Configuration for resolver
-    FileOrNumericHost(..)
-  , ResolvConf
+    ResolvConf
   , defaultResolvConf
+  , FileOrNumericHost(..)
   -- ** Accessors
   , resolvInfo
   , resolvTimeout
@@ -74,26 +74,23 @@ import Data.List (isPrefixOf)
 ----------------------------------------------------------------
 
 
--- | Union type for 'FilePath' and 'HostName'. Specify 'FilePath' to
---   \"resolv.conf\" or numeric IP address in 'String' form.
---
---   /Warning/: Only numeric IP addresses are valid @RCHostName@s.
---
---   Example (using Google's public DNS cache):
---
---   >>> let cache = RCHostName "8.8.8.8"
---
+-- | The type to specify a cache server.
 data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
                                              -- on Unix.
                                              -- A default DNS server is
                                              -- automatically detected
                                              -- on Windows.
-                       | RCHostName HostName -- ^ A numeric IP address
-                       | RCHostPort HostName PortNumber -- ^ A numeric IP address and port number
+                       | RCHostName HostName -- ^ A numeric IP address. /Warning/: host names are invalid.
+                       | RCHostPort HostName PortNumber -- ^ A numeric IP address and port number. /Warning/: host names are invalid.
                        deriving Show
 
--- | Type for resolver configuration. The easiest way to construct a
---   @ResolvConf@ object is to modify the 'defaultResolvConf'.
+-- | Type for resolver configuration.
+--
+--  Use 'defaultResolvConf' to create a new value.
+--  An example to use Google's public DNS cache instead of resolv.conf:
+--
+--   >>> let rc = defaultResolvConf { resolvInfo = RCHostName "8.8.8.8" }
+--
 data ResolvConf = ResolvConf {
    -- | Server information.
     resolvInfo :: FileOrNumericHost
@@ -117,14 +114,6 @@ data ResolvConf = ResolvConf {
 --     * 'resolvRetry' is 3.
 --
 --     * 'resolvEDNS0' is 'True'.
---
---     * 'resolvBufsize' is 512. (obsoleted)
---
---  Example (use Google's public DNS cache instead of resolv.conf):
---
---   >>> let cache = RCHostName "8.8.8.8"
---   >>> let rc = defaultResolvConf { resolvInfo = cache }
---
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo = RCFilePath "/etc/resolv.conf"
