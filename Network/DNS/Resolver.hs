@@ -81,13 +81,7 @@ import Data.List (isPrefixOf)
 --    >>> rs <- makeResolvSeed defaultResolvConf
 --
 makeResolvSeed :: ResolvConf -> IO ResolvSeed
-makeResolvSeed conf = do
-  let tm      = resolvTimeout conf
-      retry   = resolvRetry conf
-      bufSize = resolvBufsize conf
-      edns0   = resolvEDNS0 conf
-  nameservers <- findAddresses
-  return $ ResolvSeed nameservers tm retry bufSize edns0
+makeResolvSeed conf = ResolvSeed conf <$> findAddresses
   where
     findAddresses :: IO (NonEmpty AddrInfo)
     findAddresses = case resolvInfo conf of
@@ -151,15 +145,8 @@ withResolvers seeds f = mapM makeResolver seeds >>= f
 
 makeResolver :: ResolvSeed -> IO Resolver
 makeResolver seed = do
-    ref <- C.drgNew >>= I.newIORef
-    return $ Resolver {
-        genId = getRandom ref
-      , dnsServers = nameservers seed
-      , dnsTimeout = rsTimeout seed
-      , dnsRetry = rsRetry seed
-      , dnsBufsize = rsBufsize seed
-      , dnsEDNS0 = rsEDNS0 seed
-      }
+  ref <- C.drgNew >>= I.newIORef
+  return $ Resolver seed (getRandom ref)
 
 getRandom :: IORef C.ChaChaDRG -> IO Word16
 getRandom ref = I.atomicModifyIORef' ref $ \gen ->

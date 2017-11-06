@@ -59,11 +59,8 @@ defaultResolvConf = ResolvConf {
 -- | Abstract data type of DNS Resolver seed.
 --   When implementing a DNS cache, this should be re-used.
 data ResolvSeed = ResolvSeed {
-    nameservers :: NonEmpty AddrInfo
-  , rsTimeout   :: Int
-  , rsRetry     :: Int
-  , rsBufsize   :: Integer
-  , rsEDNS0     :: Bool
+    resolvconf  :: ResolvConf
+  , nameservers :: NonEmpty AddrInfo
 }
 
 ----------------------------------------------------------------
@@ -71,10 +68,6 @@ data ResolvSeed = ResolvSeed {
 -- | Abstract data type of DNS Resolver
 --   When implementing a DNS cache, this MUST NOT be re-used.
 data Resolver = Resolver {
-    genId      :: IO Word16
-  , dnsServers :: NonEmpty AddrInfo
-  , dnsTimeout :: Int
-  , dnsRetry   :: Int
-  , dnsBufsize :: Integer
-  , dnsEDNS0   :: Bool
+    resolvseed :: ResolvSeed
+  , genId      :: IO Word16
 }

@@ -46,7 +46,7 @@ resolve :: (Socket -> IO DNSMessage)
         -> IO (Either DNSError DNSMessage)
 resolve _ _ _   dom _
   | isIllegal dom     = return $ Left IllegalDomain
-resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
+resolve rcv ad rlv dom typ = loop $ NE.uncons nss
   where
     loop (ai, mais) = do
         (queries, checkSeqno) <- initialize
@@ -64,9 +64,12 @@ resolve rcv ad rlv dom typ = loop (NE.uncons (dnsServers rlv))
           checkSeqno = check seqno
       return ((queryLegacy, queryEdns0), checkSeqno)
 
-    tm = dnsTimeout rlv
-    retry = dnsRetry rlv
-    edns0 = dnsEDNS0 rlv
+    seed  = resolvseed rlv
+    nss   = nameservers seed
+    conf  = resolvconf seed
+    tm    = resolvTimeout conf
+    retry = resolvRetry conf
+    edns0 = resolvEDNS0 conf
     q = Question dom typ
     check seqno res = identifier (header res) == seqno
 
