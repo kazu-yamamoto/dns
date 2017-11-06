@@ -221,20 +221,19 @@ lookupAuth = lookupSection authority
 
 ----------------------------------------------------------------
 
--- | Look up a name and return the entire DNS Response.  If the
---   initial UDP query elicits a truncated answer, the query is
---   retried over TCP.  The TCP retry may extend the total time
---   taken by one more timeout beyond timeout * tries.
+-- | Look up a name and return the entire DNS Response
 --
---   Sample output is included below, however it is /not/ tested
---   the sequence number is unpredictable (it has to be!).
+--  For each IP address of the DNS server:
+--
+--  * Try UDP queries with the limitation of 'resolvRetry'.
+--  * If the response is truncated, try a TCP query only once.
 --
 --   The example code:
 --
 --   @
 --   let hostname = Data.ByteString.Char8.pack \"www.example.com\"
 --   rs <- makeResolvSeed defaultResolvConf
---   withResolver rs $ \resolver -> lookupRaw resolver hostname A
+--   withResolver rs $ \\resolver -> lookupRaw resolver hostname A
 --   @
 --
 --   And the (formatted) expected output:
@@ -276,4 +275,3 @@ lookupRaw = resolve receive False
 --
 lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
 lookupRawAD = resolve receive True
-

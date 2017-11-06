@@ -23,7 +23,7 @@ import System.Timeout (timeout)
 data TCPFallback = TCPFallback deriving (Show, Typeable)
 instance Exception TCPFallback
 
--- Lookup loop, we try UDP until we get a response.  If the response
+-- In lookup loop, we try UDP until we get a response.  If the response
 -- is truncated, we try TCP once, with no further UDP retries.
 -- EDNS0 support would significantly reduce the need for TCP retries.
 --
