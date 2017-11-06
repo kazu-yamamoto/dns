@@ -25,11 +25,11 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
 --
 data ResolvConf = ResolvConf {
    -- | Server information.
-    resolvInfo :: FileOrNumericHost
+    resolvInfo    :: FileOrNumericHost
    -- | Timeout in micro seconds.
   , resolvTimeout :: Int
    -- | The number of retries including the first try.
-  , resolvRetry :: Int
+  , resolvRetry   :: Int
    -- | Enabling EDNS0 for UDP queries with 4,096-bytes buffer.
   , resolvEDNS0   :: Bool
 } deriving Show
@@ -45,10 +45,10 @@ data ResolvConf = ResolvConf {
 --     * 'resolvEDNS0' is 'True'.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
-    resolvInfo = RCFilePath "/etc/resolv.conf"
+    resolvInfo    = RCFilePath "/etc/resolv.conf"
   , resolvTimeout = 3 * 1000 * 1000
-  , resolvRetry = 3
-  , resolvEDNS0 = True
+  , resolvRetry   = 3
+  , resolvEDNS0   = True
 }
 
 ----------------------------------------------------------------
