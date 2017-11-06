@@ -8,12 +8,13 @@ module Network.DNS.Resolver (
   -- * Configuration for resolver
     ResolvConf
   , defaultResolvConf
-  , FileOrNumericHost(..)
   -- ** Accessors
   , resolvInfo
   , resolvTimeout
   , resolvRetry
   , resolvEDNS
+  -- ** Related types
+  , FileOrNumericHost(..)
   -- * Intermediate data type for resolver
   , ResolvSeed
   , makeResolvSeed
