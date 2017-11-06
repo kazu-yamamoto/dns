@@ -10,8 +10,10 @@ import Network.DNS.Types
 
 -- | The type to specify a cache server.
 data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
+                                             -- where one or more IP addresses
+                                             -- of DNS servers should be found
                                              -- on Unix.
-                                             -- A default DNS server is
+                                             -- Default DNS servers are
                                              -- automatically detected
                                              -- on Windows regardless of
                                              -- the value of the file name.
