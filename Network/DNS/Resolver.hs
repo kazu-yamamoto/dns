@@ -87,11 +87,10 @@ makeResolvSeed conf = ResolvSeed conf <$> findAddresses
     findAddresses = case resolvInfo conf of
         RCHostName numhost       -> (:| []) <$> makeAddrInfo numhost Nothing
         RCHostPort numhost mport -> (:| []) <$> makeAddrInfo numhost (Just mport)
-        RCFilePath file -> do
-            nss <- getDefaultDnsServers file
-            case nss of
-              []     -> E.throwIO BadConfiguration
-              (l:ls) -> (:|) <$> makeAddrInfo l Nothing <*> forM ls (`makeAddrInfo` Nothing)
+        RCHostNames nss          -> mkAddrs nss
+        RCFilePath file          -> getDefaultDnsServers file >>= mkAddrs
+    mkAddrs []     = E.throwIO BadConfiguration
+    mkAddrs (l:ls) = (:|) <$> makeAddrInfo l Nothing <*> forM ls (`makeAddrInfo` Nothing)
 
 getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
