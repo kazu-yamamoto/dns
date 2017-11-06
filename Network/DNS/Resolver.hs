@@ -5,11 +5,21 @@
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
   -- * Configuration for resolver
-    FileOrNumericHost(..), ResolvConf(..), defaultResolvConf
+    FileOrNumericHost(..)
+  , ResolvConf
+  , defaultResolvConf
+  -- ** Accessors
+  , resolvInfo
+  , resolvTimeout
+  , resolvRetry
+  , resolvEDNS0
   -- * Intermediate data type for resolver
-  , ResolvSeed, makeResolvSeed
+  , ResolvSeed
+  , makeResolvSeed
   -- * Type and function for resolver
-  , Resolver(..), withResolver, withResolvers
+  , Resolver
+  , withResolver
+  , withResolvers
   -- * Looking up functions
   , lookup
   , lookupAuth
@@ -80,6 +90,7 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
 -- | Type for resolver configuration. The easiest way to construct a
 --   @ResolvConf@ object is to modify the 'defaultResolvConf'.
 data ResolvConf = ResolvConf {
+   -- | Server information.
     resolvInfo :: FileOrNumericHost
    -- | Timeout in micro seconds.
   , resolvTimeout :: Int
