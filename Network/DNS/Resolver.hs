@@ -14,9 +14,12 @@ module Network.DNS.Resolver (
   , resolvRetry
   , resolvEDNS0
   -- * Intermediate data type for resolver
-  , ResolvSeed, makeResolvSeed
+  , ResolvSeed
+  , makeResolvSeed
   -- * Type and function for resolver
-  , Resolver, withResolver, withResolvers
+  , Resolver
+  , withResolver
+  , withResolvers
   -- * Looking up functions
   , lookup
   , lookupAuth
