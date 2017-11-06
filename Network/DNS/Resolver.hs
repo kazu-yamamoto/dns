@@ -1,6 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
@@ -40,18 +41,21 @@ module Network.DNS.Resolver (
 #define GHC708
 #endif
 
+import qualified Data.ByteString as BS
 import Control.Exception as E
 import Control.Monad (forM)
 import Data.Maybe (isJust, maybe)
+import qualified Crypto.Random as C
+import Data.IORef (IORef)
+import qualified Data.IORef as I
+import Data.List.NonEmpty (NonEmpty(..))
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
-import Data.List.NonEmpty (NonEmpty(..))
-import Network.DNS.Types
 import Network.DNS.IO
 import Network.DNS.Transport
+import Network.DNS.Types
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), PortNumber(..), HostName, SocketType(Datagram), getAddrInfo, defaultHints)
 import Prelude hiding (lookup)
-import System.Random (getStdRandom, random)
 
 #ifdef GHC708
 import Control.Applicative ((<$>), (<*>), pure)
@@ -211,28 +215,32 @@ makeAddrInfo addr mport = do
 --   'Resolver'. If multiple 'Resolver's are needed concurrently,
 --   use 'withResolvers'.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
-withResolver seed f = f $ makeResolver seed
+withResolver seed f = makeResolver seed >>= f
 
 -- | Giving thread-safe 'Resolver's to the function of the second
 --   argument.  For each 'Resolver', multiple lookups must be done
 --   sequentially.  'Resolver's can be used concurrently.
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
-withResolvers seeds f = f $ map makeResolver seeds
+withResolvers seeds f = mapM makeResolver seeds >>= f
 
-makeResolver :: ResolvSeed -> Resolver
-makeResolver seed = Resolver {
-    genId = getRandom
-  , dnsServers = nameservers seed
-  , dnsTimeout = rsTimeout seed
-  , dnsRetry = rsRetry seed
-  , dnsBufsize = rsBufsize seed
-  , dnsEDNS0 = rsEDNS0 seed
-  }
+makeResolver :: ResolvSeed -> IO Resolver
+makeResolver seed = do
+    ref <- C.drgNew >>= I.newIORef
+    return $ Resolver {
+        genId = getRandom ref
+      , dnsServers = nameservers seed
+      , dnsTimeout = rsTimeout seed
+      , dnsRetry = rsRetry seed
+      , dnsBufsize = rsBufsize seed
+      , dnsEDNS0 = rsEDNS0 seed
+      }
 
--- | XXX: This is unlikely to be cryptographically strong.  We should use a
--- generator that resists cryptanalysis.
-getRandom :: IO Word16
-getRandom = getStdRandom random
+getRandom :: IORef C.ChaChaDRG -> IO Word16
+getRandom ref = I.atomicModifyIORef' ref $ \gen ->
+  let (bs, gen') = C.randomBytesGenerate 2 gen
+      [u,l] = map fromIntegral $ BS.unpack bs
+      !seqno = u * 256 + l
+  in (gen', seqno)
 
 ----------------------------------------------------------------
 
