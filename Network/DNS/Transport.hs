@@ -7,16 +7,22 @@ module Network.DNS.Transport (
   ) where
 
 import Control.Exception as E
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.List.NonEmpty as NE
 import Data.Typeable
+import Data.Word (Word16)
 import Network.DNS.IO
 import Network.DNS.Types
 import Network.DNS.Types.Internal
 import Network.Socket (AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), Socket, SocketType(Stream), close, socket, connect, defaultProtocol)
 import System.IO.Error (annotateIOError)
 import System.Timeout (timeout)
+
+-- | Check response for a matching identifier.  If we ever do pipelined TCP,
+-- we'll also need to match the QNAME, CLASS and QTYPE.  See:
+-- https://tools.ietf.org/html/rfc7766#section-7
+checkResp :: Question -> Word16 -> DNSMessage -> Bool
+checkResp _ seqno resp = identifier (header resp) == seqno
 
 ----------------------------------------------------------------
 
@@ -25,7 +31,6 @@ instance Exception TCPFallback
 
 -- Lookup loop, we try UDP until we get a response.  If the response
 -- is truncated, we try TCP once, with no further UDP retries.
--- EDNS0 support would significantly reduce the need for TCP retries.
 --
 -- For now, we optimize for low latency high-availability caches
 -- (e.g.  running on a loopback interface), where TCP is cheap
@@ -49,20 +54,13 @@ resolve _ _ _   dom _
 resolve rcv ad rlv dom typ = loop $ NE.uncons nss
   where
     loop (ai, mais) = do
-        (queries, checkSeqno) <- initialize
-        eres <- E.try $ udpTcpLookup queries ai tm checkSeqno retry rcv
+        seqno <- genId rlv
+        eres <- E.try $ udpTcpLookup q seqno edns0 ad ai tm retry rcv
         case eres of
           Left e  -> case mais of
             Nothing  -> return $ Left e
             Just ais -> loop $ NE.uncons ais
           Right v -> pure (Right v)
-
-    initialize = do
-      seqno <- genId rlv
-      let queryLegacy = encodeQuestions seqno [q] [] ad
-          queryEdns0  = encodeQuestions seqno [q] edns0 ad
-          checkSeqno = check seqno
-      return ((queryLegacy, queryEdns0), checkSeqno)
 
     seed  = resolvseed rlv
     nss   = nameservers seed
@@ -71,20 +69,22 @@ resolve rcv ad rlv dom typ = loop $ NE.uncons nss
     retry = resolvRetry conf
     edns0  = resolvEDNS conf
     q = Question dom typ
-    check seqno res = identifier (header res) == seqno
+
 
 ----------------------------------------------------------------
 
-udpTcpLookup :: (ByteString,ByteString)
+udpTcpLookup :: Question
+             -> Word16
+             -> [ResourceRecord]
+             -> Bool
              -> AddrInfo
              -> Int
-             -> (DNSMessage -> Bool)
              -> Int
              -> (Socket -> IO DNSMessage)
              -> IO DNSMessage
-udpTcpLookup queries ai tm checkSeqno retry rcv =
-    udpLookup queries ai tm checkSeqno retry rcv `E.catch` \TCPFallback ->
-        tcpLookup queries ai tm
+udpTcpLookup q seqno edns0 ad ai tm retry rcv =
+    udpLookup q seqno edns0 ad ai tm retry rcv `E.catch` \TCPFallback ->
+        tcpLookup q seqno ad ai tm
 
 ----------------------------------------------------------------
 
@@ -102,35 +102,50 @@ udpOpen ai = do
     return sock
 
 -- This throws DNSError or TCPFallback.
-udpLookup :: (ByteString,ByteString)
+udpLookup :: Question
+          -> Word16
+          -> [ResourceRecord]
+          -> Bool
           -> AddrInfo
           -> Int
-          -> (DNSMessage -> Bool)
           -> Int
           -> (Socket -> IO DNSMessage)
           -> IO DNSMessage
-udpLookup (legacy,edns0) ai tm checkSeqno retry rcv =
+udpLookup q seqno edns0 ad ai tm retry rcv = do
+    let qry = encodeQuestions seqno [q] edns0 ad
+        ednsRetry = not $ null edns0
     E.handle (ioErrorToDNSError ai "UDP") $
-      bracket (udpOpen ai) close (loop edns0 0 RetryLimitExceeded)
+      bracket (udpOpen ai) close (loop qry ednsRetry 0 RetryLimitExceeded)
   where
-    loop qry cnt err sock
-      | cnt == retry = throwIO err
+    loop qry ednsRetry cnt err sock
+      | cnt == retry = E.throwIO err
       | otherwise    = do
           mres <- timeout tm (send sock qry >> rcv sock)
           case mres of
-              Nothing  -> loop qry (cnt + 1) RetryLimitExceeded sock
+              Nothing  -> loop qry ednsRetry (cnt + 1) RetryLimitExceeded sock
               Just res
-                | checkSeqno res -> do
+                | checkResp q seqno res -> do
                       let flgs = flags$ header res
                           truncated = trunCation flgs
                           rc = rcode flgs
                       if truncated then
                           E.throwIO TCPFallback
-                        else if rc == FormatErr || rc == NotImpl then
-                          loop legacy (cnt + 1) RetryLimitExceeded sock
-                        else
+                      else if ednsRetry && (rc == FormatErr || rc == NotImpl)
+                      then
+                          -- XXX: work-around, NotImpl is NOT a valid response
+                          -- to unsupported EDNS requests, but some broken
+                          -- nameserveers do it anyway.  The 'NotImpl' case
+                          -- should be removed when the bad practice is no
+                          -- longer an issue.  Note, we are doing recursive
+                          -- queries, and the known bad servers are believed
+                          -- authoritative.  It is not clear whether the
+                          -- problem is in fact still an issue for any
+                          -- recursive servers.
+                          let nonednsQuery = encodeQuestions seqno [q] [] ad
+                          in loop nonednsQuery False cnt RetryLimitExceeded sock
+                      else
                           return res
-                | otherwise      -> loop qry (cnt + 1) SequenceNumberMismatch sock
+                | otherwise -> loop qry ednsRetry (cnt + 1) SequenceNumberMismatch sock
 
 ----------------------------------------------------------------
 
@@ -144,22 +159,27 @@ tcpOpen peer = case peer of
 -- Perform a DNS query over TCP, if we were successful in creating
 -- the TCP socket.
 -- This throws DNSError only.
-tcpLookup :: (ByteString, ByteString)
+tcpLookup :: Question
+          -> Word16
+          -> Bool
           -> AddrInfo
           -> Int
           -> IO DNSMessage
-tcpLookup (legacy,_) ai tm =
+tcpLookup q seqno ad ai tm =
     E.handle (ioErrorToDNSError ai "TCP") $ bracket (tcpOpen addr) close perform
   where
     addr = addrAddress ai
     perform vc = do
+        let qry = encodeQuestions seqno [q] [] ad
         mres <- timeout tm $ do
             connect vc addr
-            sendVC vc legacy
+            sendVC vc qry
             receiveVC vc
         case mres of
             Nothing  -> E.throwIO TimeoutExpired
-            Just res -> return res
+            Just res
+                | checkResp q seqno res -> return res
+                | otherwise -> E.throwIO SequenceNumberMismatch
 
 ----------------------------------------------------------------
 
