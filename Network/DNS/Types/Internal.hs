@@ -13,7 +13,8 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
                                              -- on Unix.
                                              -- A default DNS server is
                                              -- automatically detected
-                                             -- on Windows.
+                                             -- on Windows regardless of
+                                             -- the value of the file name.
                        | RCHostName HostName -- ^ A numeric IP address. /Warning/: host names are invalid.
                        | RCHostPort HostName PortNumber -- ^ A numeric IP address and port number. /Warning/: host names are invalid.
                        deriving Show
