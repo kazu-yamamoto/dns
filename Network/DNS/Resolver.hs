@@ -4,17 +4,16 @@
 
 -- | DNS Resolver and generic (lower-level) lookup functions.
 module Network.DNS.Resolver (
-  -- * Documentation
-  -- ** Configuration for resolver
+  -- * Configuration for resolver
     FileOrNumericHost(..), ResolvConf(..), defaultResolvConf
-  -- ** Intermediate data type for resolver
+  -- * Intermediate data type for resolver
   , ResolvSeed, makeResolvSeed
-  -- ** Type and function for resolver
+  -- * Type and function for resolver
   , Resolver(..), withResolver, withResolvers
-  -- ** Looking up functions
+  -- * Looking up functions
   , lookup
   , lookupAuth
-  -- ** Raw looking up function
+  -- * Raw looking up function
   , lookupRaw
   , lookupRawAD
   , fromDNSMessage
