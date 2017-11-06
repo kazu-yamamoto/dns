@@ -4,6 +4,8 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Network.Socket (AddrInfo(..), PortNumber(..), HostName)
 import Data.Word (Word16)
 
+import Network.DNS.Types
+
 ----------------------------------------------------------------
 
 -- | The type to specify a cache server.
@@ -31,7 +33,7 @@ data ResolvConf = ResolvConf {
    -- | The number of retries including the first try.
   , resolvRetry   :: Int
    -- | Enabling EDNS0 for UDP queries with 4,096-bytes buffer.
-  , resolvEDNS0   :: Bool
+  , resolvEDNS    :: [ResourceRecord]
 } deriving Show
 
 -- | Return a default 'ResolvConf':
@@ -42,13 +44,13 @@ data ResolvConf = ResolvConf {
 --
 --     * 'resolvRetry' is 3.
 --
---     * 'resolvEDNS0' is 'True'.
+--     * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo    = RCFilePath "/etc/resolv.conf"
   , resolvTimeout = 3 * 1000 * 1000
   , resolvRetry   = 3
-  , resolvEDNS0   = True
+  , resolvEDNS    = [fromEDNS0 defaultEDNS0]
 }
 
 ----------------------------------------------------------------

@@ -59,7 +59,7 @@ resolve rcv ad rlv dom typ = loop $ NE.uncons nss
 
     initialize = do
       seqno <- genId rlv
-      let queryLegacy = encodeQuestions seqno [q] False ad
+      let queryLegacy = encodeQuestions seqno [q] [] ad
           queryEdns0  = encodeQuestions seqno [q] edns0 ad
           checkSeqno = check seqno
       return ((queryLegacy, queryEdns0), checkSeqno)
@@ -69,7 +69,7 @@ resolve rcv ad rlv dom typ = loop $ NE.uncons nss
     conf  = resolvconf seed
     tm    = resolvTimeout conf
     retry = resolvRetry conf
-    edns0 = resolvEDNS0 conf
+    edns0  = resolvEDNS conf
     q = Question dom typ
     check seqno res = identifier (header res) == seqno
 

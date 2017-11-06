@@ -13,7 +13,7 @@ module Network.DNS.Resolver (
   , resolvInfo
   , resolvTimeout
   , resolvRetry
-  , resolvEDNS0
+  , resolvEDNS
   -- * Intermediate data type for resolver
   , ResolvSeed
   , makeResolvSeed

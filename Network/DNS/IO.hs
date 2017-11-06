@@ -107,10 +107,10 @@ sendAll sock bs = do
 -- | Creating query.
 encodeQuestions :: Identifier
                 -> [Question]
-                -> Bool       -- ^ EDNS0
-                -> Bool       -- ^ Authentication
+                -> [ResourceRecord] -- ^ Additional RRs for EDNS.
+                -> Bool             -- ^ Authentication
                 -> ByteString
-encodeQuestions idt qs edns0 auth = encode qry
+encodeQuestions idt qs adds auth = encode qry
   where
       hdr = header defaultQuery
       flg = flags hdr
@@ -122,18 +122,18 @@ encodeQuestions idt qs edns0 auth = encode qry
               }
            }
         , question = qs
-        , additional = if edns0 then [fromEDNS0 defaultEDNS0] else []
+        , additional = adds
         }
 
 {-# DEPRECATED composeQuery "Use encodeQuestions instead" #-}
 -- | Composing query without EDNS0.
 composeQuery :: Identifier -> [Question] -> ByteString
-composeQuery idt qs = encodeQuestions idt qs False False
+composeQuery idt qs = encodeQuestions idt qs [] False
 
 {-# DEPRECATED composeQueryAD "Use encodeQuestions instead" #-}
 -- | Composing query with authentic data flag set without EDNS0.
 composeQueryAD :: Identifier -> [Question] -> ByteString
-composeQueryAD idt qs = encodeQuestions idt qs False True
+composeQueryAD idt qs = encodeQuestions idt qs [] True
 
 ----------------------------------------------------------------
 
