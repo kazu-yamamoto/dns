@@ -90,6 +90,7 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
                                              -- on Windows.
                        | RCHostName HostName -- ^ A numeric IP address
                        | RCHostPort HostName PortNumber -- ^ A numeric IP address and port number
+                       deriving Show
 
 -- | Type for resolver configuration. The easiest way to construct a
 --   @ResolvConf@ object is to modify the 'defaultResolvConf'.
@@ -104,7 +105,7 @@ data ResolvConf = ResolvConf {
   , resolvBufsize :: Integer
    -- | Enabling EDNS0 for UDP queries with 4,096-bytes buffer.
   , resolvEDNS0   :: Bool
-}
+} deriving Show
 
 
 -- | Return a default 'ResolvConf':
