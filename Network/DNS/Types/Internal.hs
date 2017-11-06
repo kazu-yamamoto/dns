@@ -19,12 +19,19 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
                        deriving Show
 
 -- | Type for resolver configuration.
---
 --  Use 'defaultResolvConf' to create a new value.
+--
 --  An example to use Google's public DNS cache instead of resolv.conf:
 --
---   >>> let rc = defaultResolvConf { resolvInfo = RCHostName "8.8.8.8" }
+--  >>> let conf = defaultResolvConf { resolvInfo = RCHostName "8.8.8.8" }
 --
+--  An example to disable EDNS0:
+--
+--  >>> let conf = defaultResolvConf { resolvEDNS = [] }
+--
+--  An example to disable EDNS0 with a 1,280-bytes buffer:
+--
+--  >>> let conf = defaultResolvConf { resolvEDNS = [fromEDNS0 defaultEDNS0 { udpSize = 1280 }] }
 data ResolvConf = ResolvConf {
    -- | Server information.
     resolvInfo    :: FileOrNumericHost
