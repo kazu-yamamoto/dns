@@ -13,6 +13,7 @@ module Network.DNS.Resolver (
   , resolvTimeout
   , resolvRetry
   , resolvEDNS
+  , resolvParallel
   -- ** Related types
   , FileOrNumericHost(..)
   -- * Intermediate data type for resolver

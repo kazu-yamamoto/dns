@@ -51,13 +51,11 @@ data ResolvConf = ResolvConf {
 
 -- | Return a default 'ResolvConf':
 --
---     * 'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
---
---     * 'resolvTimeout' is 3,000,000 micro seconds.
---
---     * 'resolvRetry' is 3.
---
---     * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
+-- * 'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
+-- * 'resolvTimeout' is 3,000,000 micro seconds.
+-- * 'resolvRetry' is 3.
+-- * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
+-- * 'resolvParallel' is False.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo     = RCFilePath "/etc/resolv.conf"
