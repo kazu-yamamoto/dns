@@ -739,10 +739,17 @@ data EDNS0 = EDNS0 {
   , options  :: [OData]
   } deriving (Eq, Show)
 
+#if __GLASGOW_HASKELL__ >= 800
 -- | Default information for EDNS0.
 --
 -- >>> defaultEDNS0
 -- EDNS0 {udpSize = 4096, extRCODE = NoError, dnssecOk = False, options = []}
+#else
+-- | Default information for EDNS0.
+--
+-- >>> defaultEDNS0
+-- EDNS0 {udpSize = 4096, extRCODE = NoErr, dnssecOk = False, options = []}
+#endif
 defaultEDNS0 :: EDNS0
 defaultEDNS0 = EDNS0 4096 NoErr False []
 
