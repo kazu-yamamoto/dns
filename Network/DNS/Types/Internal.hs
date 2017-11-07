@@ -29,6 +29,10 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
 --
 --  >>> let conf = defaultResolvConf { resolvInfo = RCHostName "8.8.8.8" }
 --
+--  An example to use multiple Google's public DNS cache in parallel:
+--
+--  >>> let conf = defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"], resolvParallel = True }
+--
 --  An example to disable EDNS0:
 --
 --  >>> let conf = defaultResolvConf { resolvEDNS = [] }
