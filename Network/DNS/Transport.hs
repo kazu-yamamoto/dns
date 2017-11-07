@@ -10,7 +10,6 @@ import Control.Exception as E
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.List.NonEmpty as NE
 import Data.Typeable
-import Data.Word (Word16)
 import Network.DNS.IO
 import Network.DNS.Types
 import Network.DNS.Types.Internal
@@ -21,7 +20,7 @@ import System.Timeout (timeout)
 -- | Check response for a matching identifier.  If we ever do pipelined TCP,
 -- we'll also need to match the QNAME, CLASS and QTYPE.  See:
 -- https://tools.ietf.org/html/rfc7766#section-7
-checkResp :: Question -> Word16 -> DNSMessage -> Bool
+checkResp :: Question -> Identifier -> DNSMessage -> Bool
 checkResp _ seqno resp = identifier (header resp) == seqno
 
 ----------------------------------------------------------------
@@ -73,7 +72,7 @@ resolve rcv ad rlv dom typ = loop $ NE.uncons nss
 ----------------------------------------------------------------
 
 udpTcpLookup :: Question
-             -> Word16
+             -> Identifier
              -> [ResourceRecord]
              -> Bool
              -> AddrInfo
@@ -102,7 +101,7 @@ udpOpen ai = do
 
 -- This throws DNSError or TCPFallback.
 udpLookup :: Question
-          -> Word16
+          -> Identifier
           -> [ResourceRecord]
           -> Bool
           -> AddrInfo
@@ -149,7 +148,7 @@ tcpOpen peer = case peer of
 -- the TCP socket.
 -- This throws DNSError only.
 tcpLookup :: Question
-          -> Word16
+          -> Identifier
           -> Bool
           -> AddrInfo
           -> Int
