@@ -13,7 +13,7 @@ module Network.DNS.Resolver (
   , resolvTimeout
   , resolvRetry
   , resolvEDNS
-  , resolvParallel
+  , resolvConcurrent
   -- ** Related types
   , FileOrNumericHost(..)
   -- * Intermediate data type for resolver
@@ -135,7 +135,7 @@ makeAddrInfo addr mport = do
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed f = makeResolver seed >>= f
 
-{-# DEPRECATED withResolvers "Use withResolver with resolvParallel set to True" #-}
+{-# DEPRECATED withResolvers "Use withResolver with resolvConcurrent set to True" #-}
 -- | Giving thread-safe 'Resolver's to the function of the second
 --   argument.  For each 'Resolver', multiple lookups must be done
 --   sequentially.  'Resolver's can be used concurrently.
@@ -225,13 +225,13 @@ lookupAuth = lookupSection authority
 -- | Look up a name and return the entire DNS Response
 --
 --  For given DNS servers, the following is done either sequentially or
---  in parallel (see 'resolvParallel'):
+--  concurrently. (see 'resolvConcurrent'):
 --
 --  * Try UDP queries with the limitation of 'resolvRetry' (use EDNS0 if specifiecd).
 --  * If the response is truncated, try a TCP query only once.
 --
 --
---  In parallel lookup, the first received answer is accepted even if
+--  In concurrent lookup, the first received answer is accepted even if
 --  it is an error.
 --
 --   The example code:

@@ -29,9 +29,9 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
 --
 --  >>> let conf = defaultResolvConf { resolvInfo = RCHostName "8.8.8.8" }
 --
---  An example to use multiple Google's public DNS cache in parallel:
+--  An example to use multiple Google's public DNS cache concurrently:
 --
---  >>> let conf = defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"], resolvParallel = True }
+--  >>> let conf = defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"], resolvConcurrent = True }
 --
 --  An example to disable EDNS0:
 --
@@ -42,15 +42,15 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
 --  >>> let conf = defaultResolvConf { resolvEDNS = [fromEDNS0 defaultEDNS0 { udpSize = 1280 }] }
 data ResolvConf = ResolvConf {
    -- | Server information.
-    resolvInfo     :: FileOrNumericHost
+    resolvInfo       :: FileOrNumericHost
    -- | Timeout in micro seconds.
-  , resolvTimeout  :: Int
+  , resolvTimeout    :: Int
    -- | The number of retries including the first try.
-  , resolvRetry    :: Int
+  , resolvRetry      :: Int
    -- | Additional resource records to specify EDNS.
-  , resolvEDNS     :: [ResourceRecord]
-   -- | Parallel queries if multiple DNS servers are specified.
-  , resolvParallel :: Bool
+  , resolvEDNS       :: [ResourceRecord]
+   -- | Concurrent queries if multiple DNS servers are specified.
+  , resolvConcurrent :: Bool
 } deriving Show
 
 -- | Return a default 'ResolvConf':
@@ -59,14 +59,14 @@ data ResolvConf = ResolvConf {
 -- * 'resolvTimeout' is 3,000,000 micro seconds.
 -- * 'resolvRetry' is 3.
 -- * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
--- * 'resolvParallel' is False.
+-- * 'resolvConcurrent' is False.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
-    resolvInfo     = RCFilePath "/etc/resolv.conf"
-  , resolvTimeout  = 3 * 1000 * 1000
-  , resolvRetry    = 3
-  , resolvEDNS     = [fromEDNS0 defaultEDNS0]
-  , resolvParallel = False
+    resolvInfo       = RCFilePath "/etc/resolv.conf"
+  , resolvTimeout    = 3 * 1000 * 1000
+  , resolvRetry      = 3
+  , resolvEDNS       = [fromEDNS0 defaultEDNS0]
+  , resolvConcurrent = False
 }
 
 ----------------------------------------------------------------

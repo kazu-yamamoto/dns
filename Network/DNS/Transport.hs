@@ -62,7 +62,7 @@ resolve :: Domain -> TYPE -> Resolver -> Rslv0
 resolve dom typ rlv ad rcv
   | isIllegal dom = return $ Left IllegalDomain
   | onlyOne       = resolveOne        (head nss) (head gens) q edns tm retry ad rcv
-  | parallel      = resolveParallel   nss        gens        q edns tm retry ad rcv
+  | concurrent    = resolveConcurrent nss        gens        q edns tm retry ad rcv
   | otherwise     = resolveSequential nss        gens        q edns tm retry ad rcv
   where
     q = Question dom typ
@@ -73,11 +73,11 @@ resolve dom typ rlv ad rcv
     nss     = NE.toList $ nameservers seed
     onlyOne = length nss == 1
 
-    conf     = resolvconf seed
-    parallel = resolvParallel conf
-    tm       = resolvTimeout conf
-    retry    = resolvRetry conf
-    edns     = resolvEDNS conf
+    conf       = resolvconf seed
+    concurrent = resolvConcurrent conf
+    tm         = resolvTimeout conf
+    retry      = resolvRetry conf
+    edns       = resolvEDNS conf
 
 resolveSequential :: [AddrInfo] -> [IO Identifier] -> Rslv1
 resolveSequential nss gs q edns tm retry ad rcv = loop nss gs
@@ -90,8 +90,8 @@ resolveSequential nss gs q edns tm retry ad rcv = loop nss gs
           res     -> return res
     loop _  _     = error "resolveSequential:loop"
 
-resolveParallel :: [AddrInfo] -> [IO Identifier] -> Rslv1
-resolveParallel nss gens q edns tm retry ad rcv = do
+resolveConcurrent :: [AddrInfo] -> [IO Identifier] -> Rslv1
+resolveConcurrent nss gens q edns tm retry ad rcv = do
     asyncs <- mapM mkAsync $ zip nss gens
     snd <$> waitAnyCancel asyncs
   where
