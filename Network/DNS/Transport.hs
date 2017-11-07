@@ -130,17 +130,7 @@ udpLookup q seqno edns0 ad ai tm retry rcv = do
                           rc = rcode flgs
                       if truncated then
                           E.throwIO TCPFallback
-                      else if ednsRetry && (rc == FormatErr || rc == NotImpl)
-                      then
-                          -- XXX: work-around, NotImpl is NOT a valid response
-                          -- to unsupported EDNS requests, but some broken
-                          -- nameserveers do it anyway.  The 'NotImpl' case
-                          -- should be removed when the bad practice is no
-                          -- longer an issue.  Note, we are doing recursive
-                          -- queries, and the known bad servers are believed
-                          -- authoritative.  It is not clear whether the
-                          -- problem is in fact still an issue for any
-                          -- recursive servers.
+                      else if ednsRetry && rc == FormatErr then
                           let nonednsQuery = encodeQuestions seqno [q] [] ad
                           in loop nonednsQuery False cnt RetryLimitExceeded sock
                       else
