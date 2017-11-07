@@ -137,6 +137,7 @@ makeAddrInfo addr mport = do
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed f = makeResolver seed >>= f
 
+{-# DEPRECATED withResolvers "Use withResolver with resolvParallel set to True" #-}
 -- | Giving thread-safe 'Resolver's to the function of the second
 --   argument.  For each 'Resolver', multiple lookups must be done
 --   sequentially.  'Resolver's can be used concurrently.
