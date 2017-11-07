@@ -86,5 +86,5 @@ data ResolvSeed = ResolvSeed {
 --   This includes a newly seeded random generator for DNS packet identifiers.
 data Resolver = Resolver {
     resolvseed :: ResolvSeed
-  , genId      :: IO Word16
+  , genIds     :: NonEmpty (IO Word16)
 }

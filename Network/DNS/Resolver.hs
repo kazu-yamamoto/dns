@@ -44,12 +44,13 @@ module Network.DNS.Resolver (
 
 import qualified Data.ByteString as BS
 import Control.Exception as E
-import Control.Monad (forM)
+import Control.Monad (forM, replicateM)
 import Data.Maybe (isJust, maybe)
 import qualified Crypto.Random as C
 import Data.IORef (IORef)
 import qualified Data.IORef as I
 import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
 import Network.DNS.IO
@@ -144,8 +145,10 @@ withResolvers seeds f = mapM makeResolver seeds >>= f
 
 makeResolver :: ResolvSeed -> IO Resolver
 makeResolver seed = do
-  ref <- C.drgNew >>= I.newIORef
-  return $ Resolver seed (getRandom ref)
+  let n = NE.length $ nameservers seed
+  refs <- replicateM n (C.drgNew >>= I.newIORef)
+  let gens = NE.fromList $ map getRandom refs
+  return $ Resolver seed gens
 
 getRandom :: IORef C.ChaChaDRG -> IO Word16
 getRandom ref = I.atomicModifyIORef' ref $ \gen ->

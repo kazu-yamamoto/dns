@@ -36,7 +36,6 @@ type Rslv1 = Question
           -> [ResourceRecord]
           -> Int -- Timeout
           -> Int -- Retry
-          -> IO Identifier
           -> Rslv0
 
 type TcpRslv = Identifier -> AddrInfo -> Question -> Int -- Timeout
@@ -62,13 +61,13 @@ type UdpRslv = [ResourceRecord] -> Int -- Retry
 resolve :: Domain -> TYPE -> Resolver -> Rslv0
 resolve dom typ rlv ad rcv
   | isIllegal dom = return $ Left IllegalDomain
-  | onlyOne       = resolveOne        (head nss) q edns tm retry gen ad rcv
-  | parallel      = resolveParallel   nss        q edns tm retry gen ad rcv
-  | otherwise     = resolveSequential nss        q edns tm retry gen ad rcv
+  | onlyOne       = resolveOne        (head nss) (head gens) q edns tm retry ad rcv
+  | parallel      = resolveParallel   nss        gens        q edns tm retry ad rcv
+  | otherwise     = resolveSequential nss        gens        q edns tm retry ad rcv
   where
     q = Question dom typ
 
-    gen = genId rlv
+    gens = NE.toList $ genIds rlv
 
     seed    = resolvseed rlv
     nss     = NE.toList $ nameservers seed
@@ -80,27 +79,26 @@ resolve dom typ rlv ad rcv
     retry    = resolvRetry conf
     edns     = resolvEDNS conf
 
-resolveSequential :: [AddrInfo] -> Rslv1
-resolveSequential nss q edns tm retry gen ad rcv = loop nss
+resolveSequential :: [AddrInfo] -> [IO Identifier] -> Rslv1
+resolveSequential nss gs q edns tm retry ad rcv = loop nss gs
   where
-    loop []       = error "resolveSequential:loop"
-    loop [ai]     = resolveOne ai q edns tm retry gen ad rcv
-    loop (ai:ais) = do
-        eres <- resolveOne ai q edns tm retry gen ad rcv
+    loop [ai]     [gen] = resolveOne ai gen q edns tm retry ad rcv
+    loop (ai:ais) (gen:gens) = do
+        eres <- resolveOne ai gen q edns tm retry ad rcv
         case eres of
-          Left  _ -> loop ais
+          Left  _ -> loop ais gens
           res     -> return res
+    loop _  _     = error "resolveSequential:loop"
 
-resolveParallel :: [AddrInfo] -> Rslv1
-resolveParallel nss q edns tm retry gen ad rcv = do
-    -- split resolver
-    asyncs <- mapM mkAsync nss
+resolveParallel :: [AddrInfo] -> [IO Identifier] -> Rslv1
+resolveParallel nss gens q edns tm retry ad rcv = do
+    asyncs <- mapM mkAsync $ zip nss gens
     snd <$> waitAnyCancel asyncs
   where
-    mkAsync ai = async $ resolveOne ai q edns tm retry gen ad rcv
+    mkAsync (ai,gen) = async $ resolveOne ai gen q edns tm retry ad rcv
 
-resolveOne :: AddrInfo -> Rslv1
-resolveOne ai q edns tm retry gen ad rcv = do
+resolveOne :: AddrInfo -> IO Identifier -> Rslv1
+resolveOne ai gen q edns tm retry ad rcv = do
     ident <- gen
     E.try $ udpTcpLookup edns retry rcv ident ai q tm ad
 
