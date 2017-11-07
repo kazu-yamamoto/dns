@@ -18,7 +18,6 @@ module Network.DNS.Resolver (
   -- * Intermediate data type for resolver
   , ResolvSeed
   , makeResolvSeed
-  , splitResolvSeed
   -- * Type and function for resolver
   , Resolver
   , withResolver
@@ -50,9 +49,7 @@ import Data.Maybe (isJust, maybe)
 import qualified Crypto.Random as C
 import Data.IORef (IORef)
 import qualified Data.IORef as I
-import Data.List (inits, tails)
 import Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as NE
 import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
 import Network.DNS.IO
@@ -131,18 +128,6 @@ makeAddrInfo addr mport = do
 
 ----------------------------------------------------------------
 
--- | Splitting 'ResolvSeed' by rotating IP address information.
-splitResolvSeed :: ResolvSeed -> [ResolvSeed]
-splitResolvSeed rs = map toResolvSeed nss
-  where
-    nss = rotate $ NE.toList $ nameservers rs
-    toResolvSeed ns = rs { nameservers = NE.fromList ns }
-
-rotate :: [a] -> [[a]]
-rotate xs = init $ zipWith (++) (tails xs) (inits xs)
-
-----------------------------------------------------------------
-
 -- | Giving a thread-safe 'Resolver' to the function of the second
 --   argument.  Multiple 'withResolver's can be used concurrently.
 --   Multiple lookups must be done sequentially with a given
@@ -154,13 +139,6 @@ withResolver seed f = makeResolver seed >>= f
 -- | Giving thread-safe 'Resolver's to the function of the second
 --   argument.  For each 'Resolver', multiple lookups must be done
 --   sequentially.  'Resolver's can be used concurrently.
---
---   @
---   let conf = defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8", "8.8.4.4"] }
---   rs <- makeResolvSeed conf
---   let rss = splitResolvSeed rs
---   withResolvers rrs $ \\resolvers -> ...
---   @
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
 withResolvers seeds f = mapM makeResolver seeds >>= f
 
