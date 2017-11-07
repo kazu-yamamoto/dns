@@ -6,6 +6,7 @@ module Network.DNS.Transport (
   , resolve
   ) where
 
+import Control.Concurrent.Async (async, waitAnyCancel)
 import Control.Exception as E
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.List.NonEmpty as NE
@@ -28,6 +29,21 @@ checkResp _ seqno resp = identifier (header resp) == seqno
 data TCPFallback = TCPFallback deriving (Show, Typeable)
 instance Exception TCPFallback
 
+type Rslv0 = Resolver -> Bool -> (Socket -> IO DNSMessage)
+           -> IO (Either DNSError DNSMessage)
+
+type Rslv1 = Question
+          -> [ResourceRecord]
+          -> Int -- Timeout
+          -> Int -- Retry
+          -> Rslv0
+
+type TcpRslv = Identifier -> AddrInfo -> Question -> Int -- Timeout
+            -> Bool -> IO DNSMessage
+
+type UdpRslv = [ResourceRecord] -> Int -- Retry
+            -> (Socket -> IO DNSMessage) -> TcpRslv
+
 -- In lookup loop, we try UDP until we get a response.  If the response
 -- is truncated, we try TCP once, with no further UDP retries.
 --
@@ -42,47 +58,55 @@ instance Exception TCPFallback
 --
 -- Future improvements might also include support for TCP on the
 -- initial query.
-resolve :: (Socket -> IO DNSMessage)
-        -> Bool
-        -> Resolver
-        -> Domain
-        -> TYPE
-        -> IO (Either DNSError DNSMessage)
-resolve _ _ _   dom _
-  | isIllegal dom     = return $ Left IllegalDomain
-resolve rcv ad rlv dom typ = loop $ NE.uncons nss
+resolve :: Domain -> TYPE -> Rslv0
+resolve dom typ rlv ad rcv
+  | isIllegal dom = return $ Left IllegalDomain
+  | onlyOne       = resolveOne        (head nss) q edns tm retry rlv ad rcv
+  | parallel      = resolveParallel   nss        q edns tm retry rlv ad rcv
+  | otherwise     = resolveSequential nss        q edns tm retry rlv ad rcv
   where
-    loop (ai, mais) = do
-        seqno <- genId rlv
-        eres <- E.try $ udpTcpLookup q seqno edns0 ad ai tm retry rcv
-        case eres of
-          Left e  -> case mais of
-            Nothing  -> return $ Left e
-            Just ais -> loop $ NE.uncons ais
-          Right v -> pure (Right v)
-
-    seed  = resolvseed rlv
-    nss   = nameservers seed
-    conf  = resolvconf seed
-    tm    = resolvTimeout conf
-    retry = resolvRetry conf
-    edns0  = resolvEDNS conf
     q = Question dom typ
+
+    seed    = resolvseed rlv
+    nss     = NE.toList $ nameservers seed
+    onlyOne = length nss == 1
+
+    conf     = resolvconf seed
+    parallel = resolvParallel conf
+    tm       = resolvTimeout conf
+    retry    = resolvRetry conf
+    edns    = resolvEDNS conf
+
+resolveSequential :: [AddrInfo] -> Rslv1
+resolveSequential nss q edns tm retry rlv ad rcv = loop nss
+  where
+    loop []       = error "resolveSequential:loop"
+    loop [ai]     = resolveOne ai q edns tm retry rlv ad rcv
+    loop (ai:ais) = do
+        eres <- resolveOne ai q edns tm retry rlv ad rcv
+        case eres of
+          Left  _ -> loop ais
+          res     -> return res
+
+resolveParallel :: [AddrInfo] -> Rslv1
+resolveParallel nss q edns tm retry rlv ad rcv = do
+    -- split resolver
+    asyncs <- mapM mkAsync nss
+    snd <$> waitAnyCancel asyncs
+  where
+    mkAsync ai = async $ resolveOne ai q edns tm retry rlv ad rcv
+
+resolveOne :: AddrInfo -> Rslv1
+resolveOne ai q edns tm retry rlv ad rcv = do
+    ident <- genId rlv
+    E.try $ udpTcpLookup edns retry rcv ident ai q tm ad
 
 ----------------------------------------------------------------
 
-udpTcpLookup :: Question
-             -> Identifier
-             -> [ResourceRecord]
-             -> Bool
-             -> AddrInfo
-             -> Int
-             -> Int
-             -> (Socket -> IO DNSMessage)
-             -> IO DNSMessage
-udpTcpLookup q seqno edns0 ad ai tm retry rcv =
-    udpLookup q seqno edns0 ad ai tm retry rcv `E.catch` \TCPFallback ->
-        tcpLookup q seqno ad ai tm
+udpTcpLookup :: UdpRslv
+udpTcpLookup edns retry rcv ident ai q tm ad =
+    udpLookup edns retry rcv ident ai q tm ad `E.catch` \TCPFallback ->
+        tcpLookup ident ai q tm ad
 
 ----------------------------------------------------------------
 
@@ -100,18 +124,10 @@ udpOpen ai = do
     return sock
 
 -- This throws DNSError or TCPFallback.
-udpLookup :: Question
-          -> Identifier
-          -> [ResourceRecord]
-          -> Bool
-          -> AddrInfo
-          -> Int
-          -> Int
-          -> (Socket -> IO DNSMessage)
-          -> IO DNSMessage
-udpLookup q seqno edns0 ad ai tm retry rcv = do
-    let qry = encodeQuestions seqno [q] edns0 ad
-        ednsRetry = not $ null edns0
+udpLookup :: UdpRslv
+udpLookup edns retry rcv ident ai q tm ad = do
+    let qry = encodeQuestions ident [q] edns ad
+        ednsRetry = not $ null edns
     E.handle (ioErrorToDNSError ai "UDP") $
       bracket (udpOpen ai) close (loop qry ednsRetry 0 RetryLimitExceeded)
   where
@@ -122,14 +138,14 @@ udpLookup q seqno edns0 ad ai tm retry rcv = do
           case mres of
               Nothing  -> loop qry ednsRetry (cnt + 1) RetryLimitExceeded sock
               Just res
-                | checkResp q seqno res -> do
+                | checkResp q ident res -> do
                       let flgs = flags$ header res
                           truncated = trunCation flgs
                           rc = rcode flgs
                       if truncated then
                           E.throwIO TCPFallback
                       else if ednsRetry && rc == FormatErr then
-                          let nonednsQuery = encodeQuestions seqno [q] [] ad
+                          let nonednsQuery = encodeQuestions ident [q] [] ad
                           in loop nonednsQuery False cnt RetryLimitExceeded sock
                       else
                           return res
@@ -147,18 +163,13 @@ tcpOpen peer = case peer of
 -- Perform a DNS query over TCP, if we were successful in creating
 -- the TCP socket.
 -- This throws DNSError only.
-tcpLookup :: Question
-          -> Identifier
-          -> Bool
-          -> AddrInfo
-          -> Int
-          -> IO DNSMessage
-tcpLookup q seqno ad ai tm =
+tcpLookup :: TcpRslv
+tcpLookup ident ai q tm ad =
     E.handle (ioErrorToDNSError ai "TCP") $ bracket (tcpOpen addr) close perform
   where
     addr = addrAddress ai
     perform vc = do
-        let qry = encodeQuestions seqno [q] [] ad
+        let qry = encodeQuestions ident [q] [] ad
         mres <- timeout tm $ do
             connect vc addr
             sendVC vc qry
@@ -166,7 +177,7 @@ tcpLookup q seqno ad ai tm =
         case mres of
             Nothing  -> E.throwIO TimeoutExpired
             Just res
-                | checkResp q seqno res -> return res
+                | checkResp q ident res -> return res
                 | otherwise -> E.throwIO SequenceNumberMismatch
 
 ----------------------------------------------------------------

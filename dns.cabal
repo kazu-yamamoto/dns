@@ -33,6 +33,7 @@ Library
     Build-Depends:      semigroups
   Build-Depends:        base >= 4 && < 5
                       , attoparsec
+                      , async
                       , base64-bytestring
                       , binary
                       , bytestring

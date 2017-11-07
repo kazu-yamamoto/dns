@@ -264,7 +264,7 @@ lookupAuth = lookupSection authority
 --  @
 --
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRaw = resolve receive False
+lookupRaw rslv dom typ = resolve dom typ rslv False receive
 
 -- | Same as lookupRaw, but the query sets the AD bit, which solicits the
 --   the authentication status in the server reply.  In most applications
@@ -273,4 +273,4 @@ lookupRaw = resolve receive False
 --   interface should in most cases only be used with a loopback resolver.
 --
 lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRawAD = resolve receive True
+lookupRawAD rslv dom typ = resolve dom typ rslv True receive
