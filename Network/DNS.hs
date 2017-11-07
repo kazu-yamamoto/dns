@@ -14,6 +14,9 @@ module Network.DNS (
   --   hostname ('lookupA'), or find a domain's MX record
   --   ('lookupMX'), this is the easiest way to do it.
 
+  , module Network.DNS.Resolver
+  -- | Resolver related data types.
+
   , module Network.DNS.Types
   -- | All of the types that the other modules use.
 
@@ -22,7 +25,7 @@ module Network.DNS (
   --   for processing DNS data.
 
   -- * Middle level
-  , module Network.DNS.Resolver
+  , module Network.DNS.LookupRaw
   -- | This provides 'lookup', 'lookupAuth', or 'lookupRaw' functions
   --   for any resource records.
 
@@ -37,10 +40,11 @@ module Network.DNS (
   -- | Sending and receiving.
 ) where
 
-import Network.DNS.Lookup
-import Network.DNS.Resolver
-import Network.DNS.Utils
-import Network.DNS.Types
 import Network.DNS.Decode
 import Network.DNS.Encode
 import Network.DNS.IO
+import Network.DNS.Lookup
+import Network.DNS.LookupRaw
+import Network.DNS.Resolver
+import Network.DNS.Types
+import Network.DNS.Utils

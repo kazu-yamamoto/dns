@@ -19,6 +19,7 @@ Library
   GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
                         Network.DNS.Lookup
+                        Network.DNS.LookupRaw
                         Network.DNS.Resolver
                         Network.DNS.Utils
                         Network.DNS.Types
