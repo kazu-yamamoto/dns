@@ -224,10 +224,15 @@ lookupAuth = lookupSection authority
 
 -- | Look up a name and return the entire DNS Response
 --
---  For each IP address of the DNS server:
+--  For given DNS servers, the following is done either sequentially or
+--  in parallel (see 'resolvParallel'):
 --
---  * Try UDP queries with the limitation of 'resolvRetry'.
+--  * Try UDP queries with the limitation of 'resolvRetry' (use EDNS0 if specifiecd).
 --  * If the response is truncated, try a TCP query only once.
+--
+--
+--  In parallel lookup, the first received answer is accepted even if
+--  it is an error.
 --
 --   The example code:
 --
