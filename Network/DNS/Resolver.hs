@@ -205,11 +205,10 @@ fromDNSFormat = fromDNSMessage
 -- | Look up resource records for a domain, collecting the results
 --   from the ANSWER section of the response.
 --
---   We repeat an example from "Network.DNS.Lookup":
+--   Example:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookup resolver hostname A
+--   >>> withResolver rs $ \resolver -> lookup resolver "www.example.com" A
 --   Right [93.184.216.34]
 --
 lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
@@ -237,9 +236,8 @@ lookupAuth = lookupSection authority
 --   The example code:
 --
 --   @
---   let hostname = Data.ByteString.Char8.pack \"www.example.com\"
 --   rs <- makeResolvSeed defaultResolvConf
---   withResolver rs $ \\resolver -> lookupRaw resolver hostname A
+--   withResolver rs $ \\resolver -> lookupRaw resolver \"www.example.com\" A
 --   @
 --
 --   And the (formatted) expected output:

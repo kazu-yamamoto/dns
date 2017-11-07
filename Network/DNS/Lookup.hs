@@ -82,19 +82,15 @@ import Data.Word (Word16, Word32)
 --
 --   A straightforward example:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "www.mew.org"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupA resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupA resolver "www.mew.org"
 --   Right [210.130.207.72]
 --
 --   This function will also follow a CNAME and resolve its target if
 --   one exists for the queries hostname:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "www.kame.net"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupA resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupA resolver "www.kame.net"
 --   Right [203.178.141.194]
 --
 lookupA :: Resolver -> Domain -> IO (Either DNSError [IPv4])
@@ -114,10 +110,8 @@ lookupA rlv dom = do
 --
 --   Examples:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "www.wide.ad.jp"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupAAAA resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupAAAA resolver "www.wide.ad.jp"
 --   Right [2001:200:dff:fff1:216:3eff:fe4b:651c]
 --
 lookupAAAA :: Resolver -> Domain -> IO (Either DNSError [IPv6])
@@ -143,18 +137,14 @@ lookupAAAA rlv dom = do
 --   examples posted on the internet). But remember, \"no results\" is
 --   still a successful result.
 --
---   >>> let hostname = Data.ByteString.Char8.pack "example.com"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupMX resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupMX resolver "example.com"
 --   Right []
 --
 --   The domain \"mew.org\" does however have a single MX:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "mew.org"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupMX resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupMX resolver "mew.org"
 --   Right [("mail.mew.org.",10)]
 --
 --   Also note that all hostnames are returned with a trailing dot to
@@ -179,10 +169,8 @@ lookupMX rlv dom = do
 --   Examples:
 --
 --   >>> import Data.List (sort)
---   >>> let hostname = Data.ByteString.Char8.pack "wide.ad.jp"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver hostname
+--   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver "wide.ad.jp"
 --   >>> fmap sort ips
 --   Right [133.138.10.39,203.178.136.30]
 --
@@ -255,10 +243,8 @@ lookupNSImpl lookup_function rlv dom = do
 --   Examples:
 --
 --   >>> import Data.List (sort)
---   >>> let hostname = Data.ByteString.Char8.pack "mew.org"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> ns <- withResolver rs $ \resolver -> lookupNS resolver hostname
+--   >>> ns <- withResolver rs $ \resolver -> lookupNS resolver "mew.org"
 --   >>> fmap sort ns
 --   Right ["ns1.mew.org.","ns2.mew.org."]
 --
@@ -279,12 +265,10 @@ lookupNS = lookupNSImpl DNS.lookup
 --   the IP address of which was found beforehand:
 --
 --   >>> import Data.List (sort)
---   >>> let hostname = Data.ByteString.Char8.pack "example.com"
---   >>>
 --   >>> let ri = RCHostName "192.5.6.30" -- a.gtld-servers.net
 --   >>> let rc = defaultResolvConf { resolvInfo = ri }
 --   >>> rs <- makeResolvSeed rc
---   >>> ns <- withResolver rs $ \resolver -> lookupNSAuth resolver hostname
+--   >>> ns <- withResolver rs $ \resolver -> lookupNSAuth resolver "example.com"
 --   >>> fmap sort ns
 --   Right ["a.iana-servers.net.","b.iana-servers.net."]
 --
@@ -302,10 +286,8 @@ lookupNSAuth = lookupNSImpl DNS.lookupAuth
 --   <http://en.wikipedia.org/wiki/DomainKeys_Identified_Mail>. As an
 --   example, we find the SPF record for \"mew.org\":
 --
---   >>> let hostname = Data.ByteString.Char8.pack "mew.org"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupTXT resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupTXT resolver "mew.org"
 --   Right ["v=spf1 +mx -all"]
 --
 lookupTXT :: Resolver -> Domain -> IO (Either DNSError [ByteString])
@@ -329,10 +311,8 @@ lookupTXT rlv dom = do
 --   This can be useful to validate TTLs for a server or get an abuse
 --   contact address for a domain.
 --
---   >>> let domain = Data.ByteString.Char8.pack "mew.org"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupSOA resolver domain
+--   >>> withResolver rs $ \resolver -> lookupSOA resolver "mew.org"
 --   Right [("ns1.mew.org.","kazu@mew.org.",201406240,3600,300,3600000,3600)]
 --
 lookupSOA :: Resolver -> Domain -> IO (Either DNSError [(Domain,Mailbox,Word32,Word32,Word32,Word32,Word32)])
@@ -356,10 +336,8 @@ lookupSOA rlv dom = do
 --   We look up the PTR associated with the IP address
 --   210.130.137.80, i.e., 80.137.130.210.in-addr.arpa:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "164.2.232.202.in-addr.arpa"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupPTR resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupPTR resolver "164.2.232.202.in-addr.arpa"
 --   Right ["www.iij.ad.jp."]
 --
 --   The 'lookupRDNS' function is more suited to this particular task.
@@ -383,10 +361,8 @@ lookupPTR rlv dom = do
 --   We repeat the example from 'lookupPTR', except now we pass the IP
 --   address directly:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "202.232.2.164"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupRDNS resolver hostname
+--   >>> withResolver rs $ \resolver -> lookupRDNS resolver "202.232.2.164"
 --   Right ["www.iij.ad.jp."]
 --
 lookupRDNS :: Resolver -> Domain -> IO (Either DNSError [Domain])
@@ -421,10 +397,8 @@ lookupRDNS rlv ip = lookupPTR rlv dom
 --
 --   Examples:
 --
---   >>> let q = Data.ByteString.Char8.pack "_xmpp-server._tcp.jabber.ietf.org"
---   >>>
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupSRV resolver q
+--   >>> withResolver rs $ \resolver -> lookupSRV resolver "_xmpp-server._tcp.jabber.ietf.org"
 --   Right [(5,0,5269,"jabber.ietf.org.")]
 
 -- Though the "jabber.ietf.orgs" SRV record may prove reasonably stable, as
