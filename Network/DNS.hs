@@ -6,6 +6,11 @@
 --   library/daemon authors may need to use the lower-level one.
 --   EDNS0 and TCP fallback are supported.
 --
+--   Examples:
+--
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupA resolver "www.mew.org"
+--   Right [210.130.207.72]
 module Network.DNS (
   -- * High level
     module Network.DNS.Lookup
