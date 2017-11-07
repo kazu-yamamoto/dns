@@ -1,10 +1,11 @@
 # 3.0.0
 
-- The version introduces some breaking changes internally. But upper layer APIs in the `Lookup` and `Resolver` modules remain the same.
+- The version introduces some breaking changes internally. But upper layer APIs in the `Lookup` module remain the same.
 - Breaking change: `Network.DNS.Types` is redesigned. `ResourceRecord` is not a sum type anymore. It holds only normal RRs. For EDNS0, a new scheme is implemented. [#63](https://github.com/kazu-yamamoto/dns/issues/63)
 - Breaking change: the `Encode` and `Decode` modules use strict ByteString instead of lazy one. [#59](https://github.com/kazu-yamamoto/dns/issues/59)
 - Default DNS servers are detected automatically on Windows if `RCFilePath` is used. Use vanilla `defaultResolvConf` on Windows! [#83](https://github.com/kazu-yamamoto/dns/pull/83)
-- Multiple DNS servers are used automatically if found. [#81](https://github.com/kazu-yamamoto/dns/pull/81)
+- Multiple DNS servers can be used. You can choose either sequential lookup or concurrent lookup. See `resolvConcurrent`. [#81](https://github.com/kazu-yamamoto/dns/pull/81)
+- EDNS0 queries are used by default. [#95](https://github.com/kazu-yamamoto/dns/pull/95)
 - `lookupSOA` is defined. [#93](https://github.com/kazu-yamamoto/dns/pull/93)
 - Some constructors such as ANY are added in the `Types` module.
 - Some bug fixes and code clean-up.
