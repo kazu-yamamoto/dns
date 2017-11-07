@@ -13,12 +13,12 @@ module Network.DNS.Resolver (
   , resolvTimeout
   , resolvRetry
   , resolvEDNS
+  , resolvParallel
   -- ** Related types
   , FileOrNumericHost(..)
   -- * Intermediate data type for resolver
   , ResolvSeed
   , makeResolvSeed
-  , splitResolvSeed
   -- * Type and function for resolver
   , Resolver
   , withResolver
@@ -45,12 +45,11 @@ module Network.DNS.Resolver (
 
 import qualified Data.ByteString as BS
 import Control.Exception as E
-import Control.Monad (forM)
+import Control.Monad (forM, replicateM)
 import Data.Maybe (isJust, maybe)
 import qualified Crypto.Random as C
 import Data.IORef (IORef)
 import qualified Data.IORef as I
-import Data.List (inits, tails)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Word (Word16)
@@ -131,43 +130,24 @@ makeAddrInfo addr mport = do
 
 ----------------------------------------------------------------
 
--- | Splitting 'ResolvSeed' by rotating IP address information.
-splitResolvSeed :: ResolvSeed -> [ResolvSeed]
-splitResolvSeed rs = map toResolvSeed nss
-  where
-    nss = rotate $ NE.toList $ nameservers rs
-    toResolvSeed ns = rs { nameservers = NE.fromList ns }
-
-rotate :: [a] -> [[a]]
-rotate xs = init $ zipWith (++) (tails xs) (inits xs)
-
-----------------------------------------------------------------
-
 -- | Giving a thread-safe 'Resolver' to the function of the second
---   argument.  Multiple 'withResolver's can be used concurrently.
---   Multiple lookups must be done sequentially with a given
---   'Resolver'. If multiple 'Resolver's are needed concurrently,
---   use 'withResolvers'.
+--   argument.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed f = makeResolver seed >>= f
 
+{-# DEPRECATED withResolvers "Use withResolver with resolvParallel set to True" #-}
 -- | Giving thread-safe 'Resolver's to the function of the second
 --   argument.  For each 'Resolver', multiple lookups must be done
 --   sequentially.  'Resolver's can be used concurrently.
---
---   @
---   let conf = defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8", "8.8.4.4"] }
---   rs <- makeResolvSeed conf
---   let rss = splitResolvSeed rs
---   withResolvers rrs $ \\resolvers -> ...
---   @
 withResolvers :: [ResolvSeed] -> ([Resolver] -> IO a) -> IO a
 withResolvers seeds f = mapM makeResolver seeds >>= f
 
 makeResolver :: ResolvSeed -> IO Resolver
 makeResolver seed = do
-  ref <- C.drgNew >>= I.newIORef
-  return $ Resolver seed (getRandom ref)
+  let n = NE.length $ nameservers seed
+  refs <- replicateM n (C.drgNew >>= I.newIORef)
+  let gens = NE.fromList $ map getRandom refs
+  return $ Resolver seed gens
 
 getRandom :: IORef C.ChaChaDRG -> IO Word16
 getRandom ref = I.atomicModifyIORef' ref $ \gen ->
@@ -244,10 +224,15 @@ lookupAuth = lookupSection authority
 
 -- | Look up a name and return the entire DNS Response
 --
---  For each IP address of the DNS server:
+--  For given DNS servers, the following is done either sequentially or
+--  in parallel (see 'resolvParallel'):
 --
---  * Try UDP queries with the limitation of 'resolvRetry'.
+--  * Try UDP queries with the limitation of 'resolvRetry' (use EDNS0 if specifiecd).
 --  * If the response is truncated, try a TCP query only once.
+--
+--
+--  In parallel lookup, the first received answer is accepted even if
+--  it is an error.
 --
 --   The example code:
 --
@@ -286,7 +271,7 @@ lookupAuth = lookupSection authority
 --  @
 --
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRaw = resolve receive False
+lookupRaw rslv dom typ = resolve dom typ rslv False receive
 
 -- | Same as lookupRaw, but the query sets the AD bit, which solicits the
 --   the authentication status in the server reply.  In most applications
@@ -295,4 +280,4 @@ lookupRaw = resolve receive False
 --   interface should in most cases only be used with a loopback resolver.
 --
 lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRawAD = resolve receive True
+lookupRawAD rslv dom typ = resolve dom typ rslv True receive
