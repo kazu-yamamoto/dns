@@ -70,7 +70,6 @@ resolve rcv ad rlv dom typ = loop $ NE.uncons nss
     edns0  = resolvEDNS conf
     q = Question dom typ
 
-
 ----------------------------------------------------------------
 
 udpTcpLookup :: Question
