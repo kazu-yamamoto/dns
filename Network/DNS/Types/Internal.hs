@@ -83,7 +83,8 @@ data ResolvSeed = ResolvSeed {
 ----------------------------------------------------------------
 
 -- | Abstract data type of DNS Resolver.
---   This includes a newly seeded random generator for DNS packet identifiers.
+--   This includes newly seeded identifier generators for all
+--   specified DNS servers.
 data Resolver = Resolver {
     resolvseed :: ResolvSeed
   , genIds     :: NonEmpty (IO Word16)

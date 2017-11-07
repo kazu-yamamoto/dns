@@ -130,10 +130,7 @@ makeAddrInfo addr mport = do
 ----------------------------------------------------------------
 
 -- | Giving a thread-safe 'Resolver' to the function of the second
---   argument.  Multiple 'withResolver's can be used concurrently.
---   Multiple lookups must be done sequentially with a given
---   'Resolver'. If multiple 'Resolver's are needed concurrently,
---   use 'withResolvers'.
+--   argument.
 withResolver :: ResolvSeed -> (Resolver -> IO a) -> IO a
 withResolver seed f = makeResolver seed >>= f
 
