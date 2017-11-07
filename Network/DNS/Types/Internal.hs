@@ -66,7 +66,7 @@ defaultResolvConf = ResolvConf {
 
 ----------------------------------------------------------------
 
--- | Abstract data type of DNS Resolver seed.
+-- | Intermediate abstract data type for resolvers.
 --   IP address information of DNS servers is generated
 --   according to 'resolvInfo' internally.
 --   This value can be safely reused for 'withResolver'.
