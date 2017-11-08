@@ -33,14 +33,16 @@ data CacheConf = CacheConf {
   , maximumTTL  :: TTL
     -- | TTL in the case of 'DNSError'.
   , negativeTTL :: TTL
+    -- | Dealy of pruning in second.
+  , pruningDelay  :: Int
   } deriving Show
 
 -- | Default cache configuration.
 --
 -- >>> defaultCacheConf
--- CacheConf {minimumTTL = 60, maximumTTL = 300, negativeTTL = 300}
+-- CacheConf {minimumTTL = 60, maximumTTL = 300, negativeTTL = 300, pruningDelay = 10}
 defaultCacheConf :: CacheConf
-defaultCacheConf = CacheConf 60 300 300
+defaultCacheConf = CacheConf 60 300 300 10
 
 ----------------------------------------------------------------
 
@@ -119,5 +121,5 @@ data ResolvSeed = ResolvSeed {
 data Resolver = Resolver {
     resolvseed :: ResolvSeed
   , genIds     :: NonEmpty (IO Word16)
-  , cache      :: CacheRef
+  , cache      :: Maybe Cache
 }

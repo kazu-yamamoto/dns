@@ -613,7 +613,7 @@ type CLASS = Word16
 classIN :: CLASS
 classIN = 1
 
--- | Time to live.
+-- | Time to live in second.
 type TTL = Word32
 
 -- | Raw data format for resource records.

@@ -1,11 +1,12 @@
 module Network.DNS.Memo where
 
 import Control.Applicative ((<$>))
+import qualified Control.Reaper as R
 import Data.ByteString.Short (ShortByteString)
-import Data.IORef (IORef, newIORef, readIORef, atomicModifyIORef', IORef)
+import Data.List (foldl')
 import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, getCurrentTime)
 
 import Network.DNS.Types
 
@@ -15,19 +16,32 @@ type Prio = UTCTime
 
 type Entry = Either DNSError [RData]
 
-type PSQ = OrdPSQ
-newtype CacheRef = CacheRef (IORef (PSQ Key Prio Entry))
+type DB = OrdPSQ Key Prio Entry
 
-newCacheRef :: IO CacheRef
-newCacheRef = CacheRef <$> newIORef PSQ.empty
+type Cache = R.Reaper DB (Key,Prio,Entry)
 
-lookupCacheRef :: Key -> CacheRef -> IO (Maybe (Prio, Entry))
-lookupCacheRef key (CacheRef ref) = PSQ.lookup key <$> readIORef ref
+newCache :: Int -> IO Cache
+newCache delay = R.mkReaper R.defaultReaperSettings {
+    R.reaperEmpty  = PSQ.empty
+  , R.reaperCons   = \(k, tim, v) psq -> PSQ.insert k tim v psq
+  , R.reaperAction = prune
+  , R.reaperDelay  = delay * 1000000
+  , R.reaperNull   = PSQ.null
+  }
 
-insertCacheRef :: Key -> Prio -> Entry -> CacheRef -> IO ()
-insertCacheRef key tim ent (CacheRef ref) =
-    atomicModifyIORef' ref $ \q -> (PSQ.insert key tim ent q, ())
+lookupCache :: Key -> Cache -> IO (Maybe (Prio, Entry))
+lookupCache key reaper = PSQ.lookup key <$> R.reaperRead reaper
 
-pruneCacheRef :: Prio -> CacheRef -> IO ()
-pruneCacheRef tim (CacheRef ref) =
-    atomicModifyIORef' ref $ \p -> (snd (PSQ.atMostView tim p), ())
+insertCache :: Key -> Prio -> Entry -> Cache -> IO ()
+insertCache key tim ent reaper = R.reaperAdd reaper (key,tim,ent)
+
+-- Theoretically speaking, atMostView itself is good enough for pruning.
+-- But auto-update assumes a list based db which does not provide atMost
+-- functions. So, we need to do this redundant way.
+prune :: DB -> IO (DB -> DB)
+prune oldpsq = do
+    tim <- getCurrentTime
+    let (_, pruned) = PSQ.atMostView tim oldpsq
+    return $ \newpsq -> foldl' ins pruned $ PSQ.toList newpsq
+  where
+    ins psq (k,p,v) = PSQ.insert k p v psq

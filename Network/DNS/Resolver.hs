@@ -23,6 +23,7 @@ module Network.DNS.Resolver (
   , minimumTTL
   , maximumTTL
   , negativeTTL
+  , pruningDelay
   -- * Intermediate data type for resolver
   , ResolvSeed
   , makeResolvSeed
@@ -146,8 +147,11 @@ makeResolver seed = do
   let n = NE.length $ nameservers seed
   refs <- replicateM n (C.drgNew >>= I.newIORef)
   let gens = NE.fromList $ map getRandom refs
-  cacheref <- newCacheRef
-  return $ Resolver seed gens cacheref
+  case resolvCache $ resolvconf seed of
+    Just cacheconf -> do
+        c <- newCache $ pruningDelay cacheconf
+        return $ Resolver seed gens $ Just c
+    Nothing -> return $ Resolver seed gens Nothing
 
 getRandom :: IORef C.ChaChaDRG -> IO Word16
 getRandom ref = I.atomicModifyIORef' ref $ \gen ->
