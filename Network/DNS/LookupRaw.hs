@@ -66,8 +66,11 @@ fromDNSFormat = fromDNSMessage
 
 ----------------------------------------------------------------
 
--- | Look up resource records for a domain, collecting the results
+-- | Look up resource records of a specified type for a domain,
+--   collecting the results
 --   from the ANSWER section of the response.
+--   See manual the manual of 'lookupRaw'
+--   to understand the concrete behavior.
 --
 --   Example:
 --
@@ -78,8 +81,11 @@ fromDNSFormat = fromDNSMessage
 lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookup = lookupSection answer
 
--- | Look up resource records for a domain, collecting the results
+-- | Look up resource records of a specified type for a domain,
+--   collecting the results
 --   from the AUTHORITY section of the response.
+--   See manual the manual of 'lookupRaw'
+--   to understand the concrete behavior.
 lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookupAuth = lookupSection authority
 
@@ -87,15 +93,34 @@ lookupAuth = lookupSection authority
 
 -- | Look up a name and return the entire DNS Response
 --
---  For given DNS servers, the following is done either sequentially or
---  concurrently. (see 'resolvConcurrent'):
+--  For a given DNS server, the queries are done:
 --
---  * Try UDP queries with the limitation of 'resolvRetry' (use EDNS0 if specifiecd).
---  * If the response is truncated, try a TCP query only once.
+--  * A new UDP socket bound to a new local port is created and
+--    a new identifier is created atomically from the cryptographically
+--    secure pseudo random number generator for the target DNS server.
+--    Then UDP queries are tried with the limitation of 'resolvRetry'
+--    (use EDNS0 if specifiecd).
+--    If it appear that the target DNS server does not support EDNS0,
+--    it falls back to traditional queries.
+--
+--  * If the response is truncated, a new TCP socket bound to a new
+--    locla port is created. Then exactly one TCP query is retried.
 --
 --
---  In concurrent lookup, the first received answer is accepted even if
---  it is an error.
+-- If multiple DNS server are specified 'ResolvConf' ('RCHostNames ')
+-- or found ('RCFilePath'), either sequential lookup or
+-- concurrent lookup is carried out:
+--
+--  * In sequential lookup ('resolvConcurrent' is False),
+--    the query procedure above is processed
+--    in the order of the DNS servers sequentially until a successful
+--    response is received.
+--
+--  * In concurrent lookup ('resolvConcurrent' is True),
+--    the query procedure above is processed
+--    for each DNS server concurrently.
+--    The first received response is accepted even if
+--    it is an error.
 --
 --   The example code:
 --
@@ -135,7 +160,7 @@ lookupAuth = lookupSection authority
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
 lookupRaw rslv dom typ = resolve dom typ rslv False receive
 
--- | Same as lookupRaw, but the query sets the AD bit, which solicits the
+-- | Same as 'lookupRaw' but the query sets the AD bit, which solicits the
 --   the authentication status in the server reply.  In most applications
 --   (other than diagnostic tools) that want authenticated data It is
 --   unwise to trust the AD bit in the responses of non-local servers, this
