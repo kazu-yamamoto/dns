@@ -79,7 +79,7 @@ data ResolvConf = ResolvConf {
   , resolvEDNS       :: [ResourceRecord]
    -- | Concurrent queries if multiple DNS servers are specified.
   , resolvConcurrent :: Bool
-   -- | Cache configuration
+   -- | Cache configuration.
   , resolvCache      :: Maybe CacheConf
 } deriving Show
 
@@ -90,6 +90,7 @@ data ResolvConf = ResolvConf {
 -- * 'resolvRetry' is 3.
 -- * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
 -- * 'resolvConcurrent' is False.
+-- * 'resolvCache' is Nothing.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo       = RCFilePath "/etc/resolv.conf"
