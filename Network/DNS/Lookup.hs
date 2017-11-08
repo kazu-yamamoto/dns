@@ -1,13 +1,13 @@
--- | Simple, high-level DNS lookup functions.
+-- | Simple, high-level DNS lookup functions for clients.
 --
---   All of the lookup functions necessary run in IO, since they
+--   All of the lookup functions necessary run in IO since they
 --   interact with the network. The return types are similar, but
 --   differ in what can be returned from a successful lookup.
 --
---   We can think of the return type as \"either what I asked for, or
---   an error\". For example, the 'lookupA' function, if successful,
+--   We can think of the return type as either \"what I asked for\" or
+--   \"an error\". For example, the 'lookupA' function, if successful,
 --   will return a list of 'IPv4'. The 'lookupMX' function will
---   instead return a list of @('Domain',Int)@ pairs, where each pair
+--   instead return a list of @('Domain','Int')@ pairs, where each pair
 --   represents a hostname and its associated priority.
 --
 --   The order of multiple results may not be consistent between
@@ -49,14 +49,17 @@
 --   Left RetryLimitExceeded
 --
 --   As is the convention, successful results will always be wrapped
---   in a 'Right', while errors will be wrapped in a 'Left'.
+--   in a 'Right' while errors will be wrapped in a 'Left'.
 --
 --   For convenience, you may wish to enable GHC\'s OverloadedStrings
 --   extension. This will allow you to avoid calling
 --   'Data.ByteString.Char8.pack' on each domain name. See
---   <http://www.haskell.org/ghc/docs/7.6.3/html/users_guide/type-class-extensions.html#overloaded-strings>
---   for more information.
+--   <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#overloaded-string-literals>
+--   for more information. In the following examples,
+--   we assuem this extension is enabled.
 --
+--   All lookup functions eventually call 'lookupRaw'. See its manual
+--   to understand the concrete lookup behavior.
 module Network.DNS.Lookup (
     lookupA, lookupAAAA
   , lookupMX, lookupAviaMX, lookupAAAAviaMX
