@@ -14,8 +14,16 @@ module Network.DNS.Resolver (
   , resolvRetry
   , resolvEDNS
   , resolvConcurrent
-  -- ** Related types
+  , resolvCache
+  -- ** Specifying DNS servers
   , FileOrNumericHost(..)
+  -- ** Configuring cache
+  , CacheConf
+  , defaultCacheConf
+  , minimumTTL
+  , maximumTTL
+  , negativeTTL
+  , pruningDelay
   -- * Intermediate data type for resolver
   , ResolvSeed
   , makeResolvSeed
@@ -49,6 +57,7 @@ import Network.BSD (getProtocolNumber)
 import Network.DNS.Transport
 import Network.DNS.Types
 import Network.DNS.Types.Internal
+import Network.DNS.Memo
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), PortNumber(..), HostName, SocketType(Datagram), getAddrInfo, defaultHints)
 import Prelude hiding (lookup)
 
@@ -138,7 +147,11 @@ makeResolver seed = do
   let n = NE.length $ nameservers seed
   refs <- replicateM n (C.drgNew >>= I.newIORef)
   let gens = NE.fromList $ map getRandom refs
-  return $ Resolver seed gens
+  case resolvCache $ resolvconf seed of
+    Just cacheconf -> do
+        c <- newCache $ pruningDelay cacheconf
+        return $ Resolver seed gens $ Just c
+    Nothing -> return $ Resolver seed gens Nothing
 
 getRandom :: IORef C.ChaChaDRG -> IO Word16
 getRandom ref = I.atomicModifyIORef' ref $ \gen ->

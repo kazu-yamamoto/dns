@@ -4,6 +4,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Network.Socket (AddrInfo(..), PortNumber(..), HostName)
 import Data.Word (Word16)
 
+import Network.DNS.Memo
 import Network.DNS.Types
 
 ----------------------------------------------------------------
@@ -21,6 +22,29 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
                        | RCHostNames [HostName] -- ^ Numeric IP addresses. /Warning/: host names are invalid.
                        | RCHostPort HostName PortNumber -- ^ A numeric IP address and port number. /Warning/: host names are invalid.
                        deriving Show
+
+----------------------------------------------------------------
+
+-- | Cache configuration for responses.
+data CacheConf = CacheConf {
+    -- | If RR's TTL is lower than this value, this value is used instead.
+    minimumTTL  :: TTL
+    -- | If RR's TTL is higher than this value, this value is used instead.
+  , maximumTTL  :: TTL
+    -- | TTL in the case of 'DNSError'.
+  , negativeTTL :: TTL
+    -- | Dealy of pruning in second.
+  , pruningDelay  :: Int
+  } deriving Show
+
+-- | Default cache configuration.
+--
+-- >>> defaultCacheConf
+-- CacheConf {minimumTTL = 60, maximumTTL = 300, negativeTTL = 300, pruningDelay = 10}
+defaultCacheConf :: CacheConf
+defaultCacheConf = CacheConf 60 300 300 10
+
+----------------------------------------------------------------
 
 -- | Type for resolver configuration.
 --  Use 'defaultResolvConf' to create a new value.
@@ -40,6 +64,10 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
 --  An example to disable EDNS0 with a 1,280-bytes buffer:
 --
 --  >>> let conf = defaultResolvConf { resolvEDNS = [fromEDNS0 defaultEDNS0 { udpSize = 1280 }] }
+--
+--  An example to enable cache:
+--
+--  >>> let conf = defaultResolvConf { resolvCache = Just defaultCacheConf }
 data ResolvConf = ResolvConf {
    -- | Server information.
     resolvInfo       :: FileOrNumericHost
@@ -51,6 +79,8 @@ data ResolvConf = ResolvConf {
   , resolvEDNS       :: [ResourceRecord]
    -- | Concurrent queries if multiple DNS servers are specified.
   , resolvConcurrent :: Bool
+   -- | Cache configuration.
+  , resolvCache      :: Maybe CacheConf
 } deriving Show
 
 -- | Return a default 'ResolvConf':
@@ -60,6 +90,7 @@ data ResolvConf = ResolvConf {
 -- * 'resolvRetry' is 3.
 -- * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
 -- * 'resolvConcurrent' is False.
+-- * 'resolvCache' is Nothing.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo       = RCFilePath "/etc/resolv.conf"
@@ -67,6 +98,7 @@ defaultResolvConf = ResolvConf {
   , resolvRetry      = 3
   , resolvEDNS       = [fromEDNS0 defaultEDNS0]
   , resolvConcurrent = False
+  , resolvCache      = Nothing
 }
 
 ----------------------------------------------------------------
@@ -86,8 +118,9 @@ data ResolvSeed = ResolvSeed {
 
 -- | Abstract data type of DNS Resolver.
 --   This includes newly seeded identifier generators for all
---   specified DNS servers.
+--   specified DNS servers and a cache database.
 data Resolver = Resolver {
     resolvseed :: ResolvSeed
   , genIds     :: NonEmpty (IO Word16)
+  , cache      :: Maybe Cache
 }
