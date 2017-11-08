@@ -127,7 +127,7 @@ type Mailbox = ByteString
 newtype TYPE = TYPE {
     -- | From type to number.
     fromTYPE :: Word16
-  } deriving Eq
+  } deriving (Eq, Ord)
 
 -- https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml#dns-parameters-4
 
@@ -257,7 +257,7 @@ data TYPE = A          -- ^ IPv4 address
           | ANY        -- ^ A request for all records the server/cache
                        --   has available
           | UnknownTYPE Word16  -- ^ Unknown type
-          deriving (Eq, Show, Read)
+          deriving (Eq, Ord, Show, Read)
 
 -- | From type to number.
 fromTYPE :: TYPE -> Word16

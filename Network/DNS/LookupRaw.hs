@@ -11,9 +11,14 @@ module Network.DNS.LookupRaw (
   , fromDNSFormat
   ) where
 
+import Data.ByteString.Short (toShort)
+import Data.Time (getCurrentTime, addUTCTime)
+
 import Network.DNS.IO
+import Network.DNS.Memo
 import Network.DNS.Transport
 import Network.DNS.Types
+import Network.DNS.Types.Internal
 
 import Prelude hiding (lookup)
 
@@ -32,18 +37,69 @@ lookupSection :: (DNSMessage -> [ResourceRecord])
               -> Domain
               -> TYPE
               -> IO (Either DNSError [RData])
-lookupSection section rlv dom typ = do
-    eans <- lookupRaw rlv dom typ
-    case eans of
-        Left  err -> return $ Left err
-        Right ans -> return $ fromDNSMessage ans toRData
+lookupSection section rlv dom typ = case mcacheConf of
+    Nothing -> do
+        eans <- lookupRaw rlv dom typ
+        case eans of
+          Left err  -> return $ Left err
+          Right ans -> return $ fromDNSMessage ans toRData
+    Just cacheconf -> lookupCacheSection section rlv dom typ cacheconf
   where
-    {- CNAME hack
-    dom' = if "." `isSuffixOf` dom then dom else dom ++ "."
-    correct r = rrname r == dom' && rrtype r == typ
-    -}
     correct ResourceRecord{..} = rrtype == typ
-    toRData x = map rdata . filter correct $ section x
+    toRData = map rdata . filter correct . section
+    mcacheConf = resolvCache $ resolvconf $ resolvseed rlv
+
+lookupCacheSection :: (DNSMessage -> [ResourceRecord])
+                   -> Resolver
+                   -> Domain
+                   -> TYPE
+                   -> CacheConf
+                   -> IO (Either DNSError [RData])
+lookupCacheSection section rlv dom typ cconf = do
+    mx <- lookupCacheRef (sdom,typ) cref
+    case mx of
+      Nothing -> do
+          eans <- lookupRaw rlv dom typ
+          case eans of
+            Left  err -> do
+                let v = Left err
+                insertNegative cconf cref key v
+                return v
+            Right ans -> do
+                let errs = fromDNSMessage ans toRR
+                case errs of
+                  Left  err -> do
+                      let v = Left err
+                      insertNegative cconf cref key v
+                      return v
+                  Right rss -> do
+                      let rds = map rdata rss
+                          v = Right rds
+                          ttls = map rrttl rss
+                      insertPositive cconf cref key v ttls
+                      return v
+      Just (_,x) -> return x
+  where
+    correct ResourceRecord{..} = rrtype == typ
+    toRR = filter correct . section
+    cref = cache rlv
+    sdom = toShort dom
+    key = (sdom,typ)
+
+insertPositive :: CacheConf -> CacheRef -> Key -> Entry -> [TTL] -> IO ()
+insertPositive CacheConf{..} ref k v ttls = do
+    tim <- addUTCTime life <$> getCurrentTime
+    insertCacheRef k tim v ref
+  where
+    life = fromIntegral $ case ttls of
+      []    -> minimumTTL -- fixme: what is a proper value?
+      ttl:_ -> minimumTTL `max` (maximumTTL `min` ttl)
+
+insertNegative :: CacheConf -> CacheRef -> Key -> Entry -> IO ()
+insertNegative CacheConf{..} ref k v = do
+    let life = fromIntegral negativeTTL
+    tim <- addUTCTime life <$> getCurrentTime
+    insertCacheRef k tim v ref
 
 -- | Extract necessary information from 'DNSMessage'
 fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
@@ -71,6 +127,7 @@ fromDNSFormat = fromDNSMessage
 --   from the ANSWER section of the response.
 --   See manual the manual of 'lookupRaw'
 --   to understand the concrete behavior.
+--   Cache is used if 'resolvCache' is 'Just'.
 --
 --   Example:
 --
@@ -121,6 +178,8 @@ lookupAuth = lookupSection authority
 --    for each DNS server concurrently.
 --    The first received response is accepted even if
 --    it is an error.
+--
+--  Cache is not used even if 'resolvCache' is 'Just'.
 --
 --   The example code:
 --
