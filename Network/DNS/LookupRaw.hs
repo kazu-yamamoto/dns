@@ -11,6 +11,7 @@ module Network.DNS.LookupRaw (
   , fromDNSFormat
   ) where
 
+import Control.Monad (when)
 import Data.ByteString.Short (toShort)
 import Data.Time (getCurrentTime, addUTCTime)
 
@@ -61,45 +62,49 @@ lookupCacheSection section rlv dom typ cconf = do
       Nothing -> do
           eans <- lookupRaw rlv dom typ
           case eans of
-            Left  err -> do
-                let v = Left err
-                insertNegative cconf c key v
-                return v
+            Left  err ->
+                -- Probably a network error happens.
+                -- We do not cache anything.
+                return $ Left err
             Right ans -> do
                 let errs = fromDNSMessage ans toRR
                 case errs of
                   Left  err -> do
                       let v = Left err
-                      insertNegative cconf c key v
+                      case filter (SOA `isTypeOf`) $ authority ans of
+                        (ResourceRecord _ _ _ _ (RD_SOA _ _ _ _ _ _ ttl)):_
+                             -> insertNegative cconf c key v ttl
+                        _    -> return () -- does not cache anything
                       return v
                   Right rss -> do
                       let rds = map rdata rss
                           v = Right rds
-                          ttls = map rrttl rss
-                      insertPositive cconf c key v ttls
+                      case map rrttl rss of
+                        []   -> return () -- does not cache anything
+                        ttls -> let ttl = minimum ttls
+                                in insertPositive cconf c key v ttl
                       return v
       Just (_,x) -> return x
   where
-    correct ResourceRecord{..} = rrtype == typ
-    toRR = filter correct . section
+    isTypeOf t ResourceRecord{..} = rrtype == t
+    toRR = filter (typ `isTypeOf`) . section
     Just c = cache rlv
     sdom = toShort dom
     key = (sdom,typ)
 
-insertPositive :: CacheConf -> Cache -> Key -> Entry -> [TTL] -> IO ()
-insertPositive CacheConf{..} c k v ttls = do
+insertPositive :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
+insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
     tim <- addUTCTime life <$> getCurrentTime
     insertCache k tim v c
   where
-    life = fromIntegral $ case ttls of
-      []    -> minimumTTL -- fixme: what is a proper value?
-      ttl:_ -> minimumTTL `max` (maximumTTL `min` ttl)
+    life = fromIntegral (minimumTTL `max` (maximumTTL `min` ttl))
 
-insertNegative :: CacheConf -> Cache -> Key -> Entry -> IO ()
-insertNegative CacheConf{..} c k v = do
-    let life = fromIntegral negativeTTL
+insertNegative :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
+insertNegative CacheConf{..} c k v ttl = when (ttl /= 0) $ do
     tim <- addUTCTime life <$> getCurrentTime
     insertCache k tim v c
+  where
+    life = fromIntegral ttl
 
 -- | Extract necessary information from 'DNSMessage'
 fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a

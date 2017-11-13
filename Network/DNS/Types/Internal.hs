@@ -31,8 +31,6 @@ data CacheConf = CacheConf {
     minimumTTL  :: TTL
     -- | If RR's TTL is higher than this value, this value is used instead.
   , maximumTTL  :: TTL
-    -- | TTL in the case of 'DNSError'.
-  , negativeTTL :: TTL
     -- | Dealy of pruning in second.
   , pruningDelay  :: Int
   } deriving Show
@@ -40,9 +38,9 @@ data CacheConf = CacheConf {
 -- | Default cache configuration.
 --
 -- >>> defaultCacheConf
--- CacheConf {minimumTTL = 60, maximumTTL = 300, negativeTTL = 300, pruningDelay = 10}
+-- CacheConf {minimumTTL = 60, maximumTTL = 300, pruningDelay = 10}
 defaultCacheConf :: CacheConf
-defaultCacheConf = CacheConf 60 300 300 10
+defaultCacheConf = CacheConf 60 300 10
 
 ----------------------------------------------------------------
 

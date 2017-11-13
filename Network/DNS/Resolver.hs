@@ -22,7 +22,6 @@ module Network.DNS.Resolver (
   , defaultCacheConf
   , minimumTTL
   , maximumTTL
-  , negativeTTL
   , pruningDelay
   -- * Intermediate data type for resolver
   , ResolvSeed
