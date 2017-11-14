@@ -69,15 +69,16 @@ lookupCacheSection section rlv dom typ cconf = do
                 -- We do not cache anything.
                 return $ Left err
             Right ans -> do
-                let errs = fromDNSMessage ans toRR
-                case errs of
-                  Left  err -> do
-                      let v = Left err
+                let ex = fromDNSMessage ans toRR
+                case ex of
+                  Left NameError -> do
+                      let v = Left NameError
                       case filter (SOA `isTypeOf`) $ authority ans of
                         (ResourceRecord _ _ _ _ (RD_SOA _ _ _ _ _ _ ttl)):_
                              -> insertNegative cconf c key v ttl
                         _    -> return () -- does not cache anything
                       return v
+                  Left e -> return $ Left e
                   Right rss0 -> do
                       let rds0 = map rdata rss0
                           rss = filter ((/= 0) . rrttl) rss0
