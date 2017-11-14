@@ -33,7 +33,7 @@ import Prelude hiding (lookup)
 --   choose which section (answer, authority, or additional) you would like
 --   to inspect for the result.
 
-lookupSection :: (DNSMessage -> [ResourceRecord])
+lookupSection :: Section
               -> Resolver
               -> Domain
               -> TYPE
@@ -47,17 +47,20 @@ lookupSection section rlv dom typ = case mcacheConf of
     Just cacheconf -> lookupCacheSection section rlv dom typ cacheconf
   where
     correct ResourceRecord{..} = rrtype == typ
-    toRData = map rdata . filter correct . section
+    toRData = map rdata . filter correct . sectionF
     mcacheConf = resolvCache $ resolvconf $ resolvseed rlv
+    sectionF = case section of
+      Answer    -> answer
+      Authority -> authority
 
-lookupCacheSection :: (DNSMessage -> [ResourceRecord])
+lookupCacheSection :: Section
                    -> Resolver
                    -> Domain
                    -> TYPE
                    -> CacheConf
                    -> IO (Either DNSError [RData])
 lookupCacheSection section rlv dom typ cconf = do
-    mx <- lookupCache (sdom,typ) c
+    mx <- lookupCache (sdom,typ,section) c
     case mx of
       Nothing -> do
           eans <- lookupRaw rlv dom typ
@@ -87,10 +90,13 @@ lookupCacheSection section rlv dom typ cconf = do
       Just (_,x) -> return x
   where
     isTypeOf t ResourceRecord{..} = rrtype == t
-    toRR = filter (typ `isTypeOf`) . section
+    toRR = filter (typ `isTypeOf`) . sectionF
     Just c = cache rlv
     sdom = toShort dom
-    key = (sdom,typ)
+    key = (sdom,typ,section)
+    sectionF = case section of
+      Answer    -> answer
+      Authority -> authority
 
 insertPositive :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
@@ -141,7 +147,7 @@ fromDNSFormat = fromDNSMessage
 --   Right [93.184.216.34]
 --
 lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
-lookup = lookupSection answer
+lookup = lookupSection Answer
 
 -- | Look up resource records of a specified type for a domain,
 --   collecting the results
@@ -149,7 +155,7 @@ lookup = lookupSection answer
 --   See manual the manual of 'lookupRaw'
 --   to understand the concrete behavior.
 lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
-lookupAuth = lookupSection authority
+lookupAuth = lookupSection Authority
 
 ----------------------------------------------------------------
 

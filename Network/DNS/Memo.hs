@@ -10,8 +10,11 @@ import Data.Time (UTCTime, getCurrentTime)
 
 import Network.DNS.Types
 
+data Section = Answer | Authority deriving (Eq, Ord, Show)
+
 type Key = (ShortByteString -- avoiding memory fragmentation
-           ,TYPE)
+           ,TYPE
+           ,Section)
 type Prio = UTCTime
 
 type Entry = Either DNSError [RData]
