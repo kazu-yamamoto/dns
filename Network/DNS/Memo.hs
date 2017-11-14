@@ -2,7 +2,8 @@ module Network.DNS.Memo where
 
 import Control.Applicative ((<$>))
 import qualified Control.Reaper as R
-import Data.ByteString.Short (ShortByteString)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 import Data.List (foldl')
 import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
@@ -12,7 +13,7 @@ import Network.DNS.Types
 
 data Section = Answer | Authority deriving (Eq, Ord, Show)
 
-type Key = (ShortByteString -- avoiding memory fragmentation
+type Key = (ByteString
            ,TYPE
            ,Section)
 type Prio = UTCTime
@@ -36,7 +37,12 @@ lookupCache :: Key -> Cache -> IO (Maybe (Prio, Entry))
 lookupCache key reaper = PSQ.lookup key <$> R.reaperRead reaper
 
 insertCache :: Key -> Prio -> Entry -> Cache -> IO ()
-insertCache key tim ent reaper = R.reaperAdd reaper (key,tim,ent)
+insertCache (dom,typ,sec) tim ent0 reaper = R.reaperAdd reaper (key,tim,ent)
+  where
+    key = (B.copy dom,typ,sec)
+    ent = case ent0 of
+      l@(Left _)  -> l
+      (Right rds) -> Right $ map copy rds
 
 -- Theoretically speaking, atMostView itself is good enough for pruning.
 -- But auto-update assumes a list based db which does not provide atMost
@@ -48,3 +54,25 @@ prune oldpsq = do
     return $ \newpsq -> foldl' ins pruned $ PSQ.toList newpsq
   where
     ins psq (k,p,v) = PSQ.insert k p v psq
+
+copy :: RData -> RData
+copy r@(RD_A _)           = r
+copy (RD_NS dom)          = RD_NS $ B.copy dom
+copy (RD_CNAME dom)       = RD_CNAME $ B.copy dom
+copy (RD_SOA mn mr a b c d e) = RD_SOA (B.copy mn) (B.copy mr) a b c d e
+copy (RD_PTR dom)         = RD_PTR $ B.copy dom
+copy RD_NULL              = RD_NULL
+copy (RD_MX prf dom)      = RD_MX prf $ B.copy dom
+copy (RD_TXT txt)         = RD_TXT $ B.copy txt
+copy r@(RD_AAAA _)        = r
+copy (RD_SRV a b c dom)   = RD_SRV a b c $ B.copy dom
+copy (RD_DNAME dom)       = RD_DNAME $ B.copy dom
+copy (RD_OPT od)          = RD_OPT $ map copyOData od
+copy (RD_DS t a dt dv)    = RD_DS t a dt $ B.copy dv
+copy (RD_DNSKEY f p a k)  = RD_DNSKEY f p a $ B.copy k
+copy (RD_TLSA a b c dgst) = RD_TLSA a b c $ B.copy dgst
+copy (UnknownRData is)    = UnknownRData $ B.copy is
+
+copyOData :: OData -> OData
+copyOData o@(OD_ClientSubnet _ _ _) = o
+copyOData (UnknownOData c b)        = UnknownOData c $ B.copy b

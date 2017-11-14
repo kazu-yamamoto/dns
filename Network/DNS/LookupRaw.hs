@@ -12,7 +12,6 @@ module Network.DNS.LookupRaw (
   ) where
 
 import Control.Monad (when)
-import Data.ByteString.Short (toShort)
 import Data.Time (getCurrentTime, addUTCTime)
 
 import Network.DNS.IO
@@ -60,7 +59,7 @@ lookupCacheSection :: Section
                    -> CacheConf
                    -> IO (Either DNSError [RData])
 lookupCacheSection section rlv dom typ cconf = do
-    mx <- lookupCache (sdom,typ,section) c
+    mx <- lookupCache (dom,typ,section) c
     case mx of
       Nothing -> do
           eans <- lookupRaw rlv dom typ
@@ -93,8 +92,7 @@ lookupCacheSection section rlv dom typ cconf = do
     isTypeOf t ResourceRecord{..} = rrtype == t
     toRR = filter (typ `isTypeOf`) . sectionF
     Just c = cache rlv
-    sdom = toShort dom
-    key = (sdom,typ,section)
+    key = (dom,typ,section)
     sectionF = case section of
       Answer    -> answer
       Authority -> authority
