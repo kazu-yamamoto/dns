@@ -79,14 +79,15 @@ lookupCacheSection section rlv dom typ cconf = do
                              -> insertNegative cconf c key v ttl
                         _    -> return () -- does not cache anything
                       return v
-                  Right rss -> do
-                      let rds = map rdata rss
-                          v = Right rds
+                  Right rss0 -> do
+                      let rds0 = map rdata rss0
+                          rss = filter ((/= 0) . rrttl) rss0
+                          rds = map rdata rss
                       case map rrttl rss of
                         []   -> return () -- does not cache anything
                         ttls -> let ttl = minimum ttls
-                                in insertPositive cconf c key v ttl
-                      return v
+                                in insertPositive cconf c key (Right rds) ttl
+                      return $ Right rds0
       Just (_,x) -> return x
   where
     isTypeOf t ResourceRecord{..} = rrtype == t
