@@ -7,6 +7,7 @@
 - Multiple DNS servers can be used. You can choose either sequential lookup or concurrent lookup. See `resolvConcurrent`. [#81](https://github.com/kazu-yamamoto/dns/pull/81)
 - EDNS0 queries are used by default. [#95](https://github.com/kazu-yamamoto/dns/pull/95)
 - `lookupSOA` is defined. [#93](https://github.com/kazu-yamamoto/dns/pull/93)
+- Cache mechanism is provided. See `resolvCache`.
 - Some constructors such as ANY are added in the `Types` module.
 - Some bug fixes and code clean-up.
 
