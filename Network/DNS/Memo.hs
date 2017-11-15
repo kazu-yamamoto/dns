@@ -14,8 +14,7 @@ import Network.DNS.Types
 data Section = Answer | Authority deriving (Eq, Ord, Show)
 
 type Key = (ByteString
-           ,TYPE
-           ,Section)
+           ,TYPE)
 type Prio = UTCTime
 
 type Entry = Either DNSError [RData]
@@ -37,9 +36,9 @@ lookupCache :: Key -> Cache -> IO (Maybe (Prio, Entry))
 lookupCache key reaper = PSQ.lookup key <$> R.reaperRead reaper
 
 insertCache :: Key -> Prio -> Entry -> Cache -> IO ()
-insertCache (dom,typ,sec) tim ent0 reaper = R.reaperAdd reaper (key,tim,ent)
+insertCache (dom,typ) tim ent0 reaper = R.reaperAdd reaper (key,tim,ent)
   where
-    key = (B.copy dom,typ,sec)
+    key = (B.copy dom,typ)
     ent = case ent0 of
       l@(Left _)  -> l
       (Right rds) -> Right $ map copy rds

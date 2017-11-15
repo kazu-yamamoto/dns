@@ -37,29 +37,38 @@ lookupSection :: Section
               -> Domain
               -> TYPE
               -> IO (Either DNSError [RData])
-lookupSection section rlv dom typ = case mcacheConf of
-    Nothing -> do
-        eans <- lookupRaw rlv dom typ
-        case eans of
-          Left err  -> return $ Left err
-          Right ans -> return $ fromDNSMessage ans toRData
-    Just cacheconf -> lookupCacheSection section rlv dom typ cacheconf
+lookupSection section rlv dom typ
+  | section == Authority = lookupFleshSection rlv dom typ section
+  | otherwise = case mcacheConf of
+      Nothing           -> lookupFleshSection rlv dom typ section
+      Just cacheconf    -> lookupCacheSection rlv dom typ cacheconf
+  where
+    mcacheConf = resolvCache $ resolvconf $ resolvseed rlv
+
+lookupFleshSection :: Resolver
+                   -> Domain
+                   -> TYPE
+                   -> Section
+                   -> IO (Either DNSError [RData])
+lookupFleshSection rlv dom typ section = do
+    eans <- lookupRaw rlv dom typ
+    case eans of
+      Left err  -> return $ Left err
+      Right ans -> return $ fromDNSMessage ans toRData
   where
     correct ResourceRecord{..} = rrtype == typ
     toRData = map rdata . filter correct . sectionF
-    mcacheConf = resolvCache $ resolvconf $ resolvseed rlv
     sectionF = case section of
       Answer    -> answer
       Authority -> authority
 
-lookupCacheSection :: Section
-                   -> Resolver
+lookupCacheSection :: Resolver
                    -> Domain
                    -> TYPE
                    -> CacheConf
                    -> IO (Either DNSError [RData])
-lookupCacheSection section rlv dom typ cconf = do
-    mx <- lookupCache (dom,typ,section) c
+lookupCacheSection rlv dom typ cconf = do
+    mx <- lookupCache (dom,typ) c
     case mx of
       Nothing -> do
           eans <- lookupRaw rlv dom typ
@@ -91,12 +100,9 @@ lookupCacheSection section rlv dom typ cconf = do
       Just (_,x) -> return x
   where
     isTypeOf t ResourceRecord{..} = rrtype == t
-    toRR = filter (typ `isTypeOf`) . sectionF
+    toRR = filter (typ `isTypeOf`) . answer
     Just c = cache rlv
-    key = (dom,typ,section)
-    sectionF = case section of
-      Answer    -> answer
-      Authority -> authority
+    key = (dom,typ)
 
 insertPositive :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
@@ -154,6 +160,7 @@ lookup = lookupSection Answer
 --   from the AUTHORITY section of the response.
 --   See manual the manual of 'lookupRaw'
 --   to understand the concrete behavior.
+--   Cache is used even if 'resolvCache' is 'Just'.
 lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
 lookupAuth = lookupSection Authority
 
