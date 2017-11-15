@@ -27,6 +27,33 @@ import Prelude hiding (lookup)
 
 ----------------------------------------------------------------
 
+-- | Look up resource records of a specified type for a domain,
+--   collecting the results
+--   from the ANSWER section of the response.
+--   See manual the manual of 'lookupRaw'
+--   to understand the concrete behavior.
+--   Cache is used if 'resolvCache' is 'Just'.
+--
+--   Example:
+--
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookup resolver "www.example.com" A
+--   Right [93.184.216.34]
+--
+lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
+lookup = lookupSection Answer
+
+-- | Look up resource records of a specified type for a domain,
+--   collecting the results
+--   from the AUTHORITY section of the response.
+--   See manual the manual of 'lookupRaw'
+--   to understand the concrete behavior.
+--   Cache is used even if 'resolvCache' is 'Just'.
+lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
+lookupAuth = lookupSection Authority
+
+----------------------------------------------------------------
+
 -- | Looking up resource records of a domain. The first parameter is one of
 --   the field accessors of the 'DNSMessage' type -- this allows you to
 --   choose which section (answer, authority, or additional) you would like
@@ -117,52 +144,6 @@ insertNegative CacheConf{..} c k v ttl = when (ttl /= 0) $ do
   where
     life = fromIntegral ttl
 
--- | Extract necessary information from 'DNSMessage'
-fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
-fromDNSMessage ans conv = case errcode ans of
-    NoErr     -> Right $ conv ans
-    FormatErr -> Left FormatError
-    ServFail  -> Left ServerFailure
-    NameErr   -> Left NameError
-    NotImpl   -> Left NotImplemented
-    Refused   -> Left OperationRefused
-    BadOpt    -> Left BadOptRecord
-    _         -> Left UnknownDNSError
-  where
-    errcode = rcode . flags . header
-
-{-# DEPRECATED fromDNSFormat "Use fromDNSMessage instead" #-}
--- | For backward compatibility.
-fromDNSFormat :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
-fromDNSFormat = fromDNSMessage
-
-----------------------------------------------------------------
-
--- | Look up resource records of a specified type for a domain,
---   collecting the results
---   from the ANSWER section of the response.
---   See manual the manual of 'lookupRaw'
---   to understand the concrete behavior.
---   Cache is used if 'resolvCache' is 'Just'.
---
---   Example:
---
---   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookup resolver "www.example.com" A
---   Right [93.184.216.34]
---
-lookup :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
-lookup = lookupSection Answer
-
--- | Look up resource records of a specified type for a domain,
---   collecting the results
---   from the AUTHORITY section of the response.
---   See manual the manual of 'lookupRaw'
---   to understand the concrete behavior.
---   Cache is used even if 'resolvCache' is 'Just'.
-lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
-lookupAuth = lookupSection Authority
-
 ----------------------------------------------------------------
 
 -- | Look up a name and return the entire DNS Response
@@ -244,3 +225,24 @@ lookupRaw rslv dom typ = resolve dom typ rslv False receive
 --
 lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
 lookupRawAD rslv dom typ = resolve dom typ rslv True receive
+
+----------------------------------------------------------------
+
+-- | Extract necessary information from 'DNSMessage'
+fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
+fromDNSMessage ans conv = case errcode ans of
+    NoErr     -> Right $ conv ans
+    FormatErr -> Left FormatError
+    ServFail  -> Left ServerFailure
+    NameErr   -> Left NameError
+    NotImpl   -> Left NotImplemented
+    Refused   -> Left OperationRefused
+    BadOpt    -> Left BadOptRecord
+    _         -> Left UnknownDNSError
+  where
+    errcode = rcode . flags . header
+
+{-# DEPRECATED fromDNSFormat "Use fromDNSMessage instead" #-}
+-- | For backward compatibility.
+fromDNSFormat :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
+fromDNSFormat = fromDNSMessage
