@@ -83,9 +83,8 @@ lookupCacheSection rlv dom typ cconf = do
                   Left NameError -> do
                       let v = Left NameError
                       case filter (SOA `isTypeOf`) $ authority ans of
-                        (ResourceRecord _ _ _ _ (RD_SOA _ _ _ _ _ _ ttl)):_
-                             -> insertNegative cconf c key v ttl
-                        _    -> return () -- does not cache anything
+                        soa:_ -> insertNegative cconf c key v $ rrttl soa
+                        _     -> return () -- does not cache anything
                       return v
                   Left e -> return $ Left e
                   Right rss0 -> do
