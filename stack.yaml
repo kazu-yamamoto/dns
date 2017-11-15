@@ -4,3 +4,5 @@ packages:
 - '.'
 extra-deps:
 - QuickCheck-2.10
+- psqueues-0.2.4.0
+
