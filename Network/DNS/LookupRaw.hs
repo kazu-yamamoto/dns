@@ -116,9 +116,9 @@ lookupCacheSection rlv dom typ cconf = do
                       let v = Right []
                       cacheNegative cconf c key v ans
                       return v
-                  Right rss0 -> do
-                      cachePositive cconf c key rss0
-                      return $ Right $ map rdata rss0
+                  Right rss -> do
+                      cachePositive cconf c key rss
+                      return $ Right $ map rdata rss
       Just (_,x) -> return x
   where
     toRR = filter (typ `isTypeOf`) . answer
@@ -126,13 +126,12 @@ lookupCacheSection rlv dom typ cconf = do
     key = (dom,typ)
 
 cachePositive :: CacheConf -> Cache -> Key -> [ResourceRecord] -> IO ()
-cachePositive cconf c key rss0 = case ttls of
-  [] -> return () -- does not cache anything
-  _  -> insertPositive cconf c key (Right rds) $ minimum ttls
+cachePositive cconf c key rss
+  | ttl == 0  = return () -- does not cache anything
+  | otherwise = insertPositive cconf c key (Right rds) ttl
   where
-    rss = filter ((/= 0) . rrttl) rss0
-    rds  = map rdata rss
-    ttls = map rrttl rss
+    rds = map rdata rss
+    ttl = minimum $ map rrttl rss -- rss is non-empty
 
 insertPositive :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
