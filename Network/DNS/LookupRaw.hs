@@ -138,6 +138,7 @@ insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
   where
     life = fromIntegral (minimumTTL `max` (maximumTTL `min` ttl))
 
+cacheNegatively :: CacheConf -> Cache -> Key -> Entry -> DNSMessage -> IO ()
 cacheNegatively cconf c key v ans = case soas of
   soa:_ -> insertNegative cconf c key v $ rrttl soa
   _     -> return () -- does not cache anything
