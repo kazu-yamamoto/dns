@@ -65,19 +65,19 @@ lookupSection :: Section
               -> TYPE
               -> IO (Either DNSError [RData])
 lookupSection section rlv dom typ
-  | section == Authority = lookupFleshSection rlv dom typ section
+  | section == Authority = lookupFreshSection rlv dom typ section
   | otherwise = case mcacheConf of
-      Nothing           -> lookupFleshSection rlv dom typ section
+      Nothing           -> lookupFreshSection rlv dom typ section
       Just cacheconf    -> lookupCacheSection rlv dom typ cacheconf
   where
     mcacheConf = resolvCache $ resolvconf $ resolvseed rlv
 
-lookupFleshSection :: Resolver
+lookupFreshSection :: Resolver
                    -> Domain
                    -> TYPE
                    -> Section
                    -> IO (Either DNSError [RData])
-lookupFleshSection rlv dom typ section = do
+lookupFreshSection rlv dom typ section = do
     eans <- lookupRaw rlv dom typ
     case eans of
       Left err  -> return $ Left err
