@@ -109,11 +109,13 @@ lookupCacheSection rlv dom typ cconf = do
                 case ex of
                   Left NameError -> do
                       let v = Left NameError
-                      case filter (SOA `isTypeOf`) $ authority ans of
-                        soa:_ -> insertNegative cconf c key v $ rrttl soa
-                        _     -> return () -- does not cache anything
+                      cacheNegatively cconf c key v ans
                       return v
                   Left e -> return $ Left e
+                  Right [] -> do
+                      let v = Right []
+                      cacheNegatively cconf c key v ans
+                      return v
                   Right rss0 -> do
                       let rds0 = map rdata rss0
                           rss = filter ((/= 0) . rrttl) rss0
@@ -125,7 +127,6 @@ lookupCacheSection rlv dom typ cconf = do
                       return $ Right rds0
       Just (_,x) -> return x
   where
-    isTypeOf t ResourceRecord{..} = rrtype == t
     toRR = filter (typ `isTypeOf`) . answer
     Just c = cache rlv
     key = (dom,typ)
@@ -137,12 +138,21 @@ insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
   where
     life = fromIntegral (minimumTTL `max` (maximumTTL `min` ttl))
 
+cacheNegatively cconf c key v ans = case soas of
+  soa:_ -> insertNegative cconf c key v $ rrttl soa
+  _     -> return () -- does not cache anything
+  where
+    soas = filter (SOA `isTypeOf`) $ authority ans
+
 insertNegative :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertNegative CacheConf{..} c k v ttl = when (ttl /= 0) $ do
     tim <- addUTCTime life <$> getCurrentTime
     insertCache k tim v c
   where
     life = fromIntegral ttl
+
+isTypeOf :: TYPE -> ResourceRecord -> Bool
+isTypeOf t ResourceRecord{..} = rrtype == t
 
 ----------------------------------------------------------------
 
