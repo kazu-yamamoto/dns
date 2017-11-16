@@ -109,15 +109,15 @@ lookupCacheSection rlv dom typ cconf = do
                 case ex of
                   Left NameError -> do
                       let v = Left NameError
-                      cacheNegatively cconf c key v ans
+                      cacheNegative cconf c key v ans
                       return v
                   Left e -> return $ Left e
                   Right [] -> do
                       let v = Right []
-                      cacheNegatively cconf c key v ans
+                      cacheNegative cconf c key v ans
                       return v
                   Right rss0 -> do
-                      cachePositively cconf c key rss0
+                      cachePositive cconf c key rss0
                       return $ Right $ map rdata rss0
       Just (_,x) -> return x
   where
@@ -125,8 +125,8 @@ lookupCacheSection rlv dom typ cconf = do
     Just c = cache rlv
     key = (dom,typ)
 
-cachePositively :: CacheConf -> Cache -> Key -> [ResourceRecord] -> IO ()
-cachePositively cconf c key rss0 = case ttls of
+cachePositive :: CacheConf -> Cache -> Key -> [ResourceRecord] -> IO ()
+cachePositive cconf c key rss0 = case ttls of
   [] -> return () -- does not cache anything
   _  -> insertPositive cconf c key (Right rds) $ minimum ttls
   where
@@ -141,10 +141,10 @@ insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
   where
     life = fromIntegral (minimumTTL `max` (maximumTTL `min` ttl))
 
-cacheNegatively :: CacheConf -> Cache -> Key -> Entry -> DNSMessage -> IO ()
-cacheNegatively cconf c key v ans = case soas of
+cacheNegative :: CacheConf -> Cache -> Key -> Entry -> DNSMessage -> IO ()
+cacheNegative cconf c key v ans = case soas of
+  []    -> return () -- does not cache anything
   soa:_ -> insertNegative cconf c key v $ rrttl soa
-  _     -> return () -- does not cache anything
   where
     soas = filter (SOA `isTypeOf`) $ authority ans
 
