@@ -65,19 +65,19 @@ lookupSection :: Section
               -> TYPE
               -> IO (Either DNSError [RData])
 lookupSection section rlv dom typ
-  | section == Authority = lookupFleshSection rlv dom typ section
+  | section == Authority = lookupFreshSection rlv dom typ section
   | otherwise = case mcacheConf of
-      Nothing           -> lookupFleshSection rlv dom typ section
+      Nothing           -> lookupFreshSection rlv dom typ section
       Just cacheconf    -> lookupCacheSection rlv dom typ cacheconf
   where
     mcacheConf = resolvCache $ resolvconf $ resolvseed rlv
 
-lookupFleshSection :: Resolver
+lookupFreshSection :: Resolver
                    -> Domain
                    -> TYPE
                    -> Section
                    -> IO (Either DNSError [RData])
-lookupFleshSection rlv dom typ section = do
+lookupFreshSection rlv dom typ section = do
     eans <- lookupRaw rlv dom typ
     case eans of
       Left err  -> return $ Left err
@@ -109,26 +109,29 @@ lookupCacheSection rlv dom typ cconf = do
                 case ex of
                   Left NameError -> do
                       let v = Left NameError
-                      case filter (SOA `isTypeOf`) $ authority ans of
-                        soa:_ -> insertNegative cconf c key v $ rrttl soa
-                        _     -> return () -- does not cache anything
+                      cacheNegative cconf c key v ans
                       return v
                   Left e -> return $ Left e
-                  Right rss0 -> do
-                      let rds0 = map rdata rss0
-                          rss = filter ((/= 0) . rrttl) rss0
-                          rds = map rdata rss
-                      case map rrttl rss of
-                        []   -> return () -- does not cache anything
-                        ttls -> let ttl = minimum ttls
-                                in insertPositive cconf c key (Right rds) ttl
-                      return $ Right rds0
+                  Right [] -> do
+                      let v = Right []
+                      cacheNegative cconf c key v ans
+                      return v
+                  Right rss -> do
+                      cachePositive cconf c key rss
+                      return $ Right $ map rdata rss
       Just (_,x) -> return x
   where
-    isTypeOf t ResourceRecord{..} = rrtype == t
     toRR = filter (typ `isTypeOf`) . answer
     Just c = cache rlv
     key = (dom,typ)
+
+cachePositive :: CacheConf -> Cache -> Key -> [ResourceRecord] -> IO ()
+cachePositive cconf c key rss
+  | ttl == 0  = return () -- does not cache anything
+  | otherwise = insertPositive cconf c key (Right rds) ttl
+  where
+    rds = map rdata rss
+    ttl = minimum $ map rrttl rss -- rss is non-empty
 
 insertPositive :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
@@ -137,12 +140,22 @@ insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
   where
     life = fromIntegral (minimumTTL `max` (maximumTTL `min` ttl))
 
+cacheNegative :: CacheConf -> Cache -> Key -> Entry -> DNSMessage -> IO ()
+cacheNegative cconf c key v ans = case soas of
+  []    -> return () -- does not cache anything
+  soa:_ -> insertNegative cconf c key v $ rrttl soa
+  where
+    soas = filter (SOA `isTypeOf`) $ authority ans
+
 insertNegative :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertNegative CacheConf{..} c k v ttl = when (ttl /= 0) $ do
     tim <- addUTCTime life <$> getCurrentTime
     insertCache k tim v c
   where
     life = fromIntegral ttl
+
+isTypeOf :: TYPE -> ResourceRecord -> Bool
+isTypeOf t ResourceRecord{..} = rrtype == t
 
 ----------------------------------------------------------------
 
