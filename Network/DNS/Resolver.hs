@@ -20,7 +20,6 @@ module Network.DNS.Resolver (
   -- ** Configuring cache
   , CacheConf
   , defaultCacheConf
-  , minimumTTL
   , maximumTTL
   , pruningDelay
   -- * Intermediate data type for resolver

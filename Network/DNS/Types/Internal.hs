@@ -27,20 +27,18 @@ data FileOrNumericHost = RCFilePath FilePath -- ^ A path for \"resolv.conf\"
 
 -- | Cache configuration for responses.
 data CacheConf = CacheConf {
-    -- | If RR's TTL is lower than this value, this value is used instead.
-    minimumTTL  :: TTL
     -- | If RR's TTL is higher than this value, this value is used instead.
-  , maximumTTL  :: TTL
-    -- | Dealy of pruning in second.
+    maximumTTL  :: TTL
+    -- | Cache pruning interval in seconds.
   , pruningDelay  :: Int
   } deriving Show
 
 -- | Default cache configuration.
 --
 -- >>> defaultCacheConf
--- CacheConf {minimumTTL = 60, maximumTTL = 300, pruningDelay = 10}
+-- CacheConf {maximumTTL = 300, pruningDelay = 10}
 defaultCacheConf :: CacheConf
-defaultCacheConf = CacheConf 60 300 10
+defaultCacheConf = CacheConf 300 10
 
 ----------------------------------------------------------------
 
@@ -59,7 +57,7 @@ defaultCacheConf = CacheConf 60 300 10
 --
 --  >>> let conf = defaultResolvConf { resolvEDNS = [] }
 --
---  An example to disable EDNS0 with a 1,280-bytes buffer:
+--  An example to enable EDNS0 with a 1,280-bytes buffer:
 --
 --  >>> let conf = defaultResolvConf { resolvEDNS = [fromEDNS0 defaultEDNS0 { udpSize = 1280 }] }
 --
