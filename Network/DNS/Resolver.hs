@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
@@ -109,9 +108,9 @@ getDefaultDnsServers file = toAddresses <$> readFile file
 makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
 makeAddrInfo addr mport = do
     proto <- getProtocolNumber "udp"
-    let flags = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
+    let flgs = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
         hints = defaultHints {
-            addrFlags = if isJust mport then AI_NUMERICSERV : flags else flags
+            addrFlags = if isJust mport then AI_NUMERICSERV : flgs else flgs
           , addrSocketType = Datagram
           , addrProtocol = proto
           }
