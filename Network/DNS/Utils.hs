@@ -12,9 +12,9 @@ import qualified Data.ByteString.Char8 as BS (
   , map
   , null
   , pack )
-import Data.Char ( toLower )
+import Data.Char (toLower)
 
-import Network.DNS.Types ( Domain )
+import Network.DNS.Types (Domain)
 
 
 -- | Perform both 'normalizeCase' and 'normalizeRoot' on the given

@@ -27,7 +27,6 @@ module Network.DNS.IO (
 #endif
 
 import qualified Control.Monad.State as ST
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -37,25 +36,20 @@ import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit.Network (sourceSocket)
 import Data.IP (IPv4, IPv6)
-import Data.Monoid ((<>))
 import Network (Socket)
-
-#ifdef GHC708
-import Control.Applicative ((<$>))
-#endif
 
 #if defined(WIN) && defined(GHC708)
 import Network.Socket (send)
 import qualified Data.ByteString.Char8 as BS
-import Control.Monad (when)
 #else
 import Network.Socket.ByteString (sendAll)
 #endif
 
-import Network.DNS.Types
-import Network.DNS.Encode (encode)
 import Network.DNS.Decode.Internal (getResponse)
+import Network.DNS.Encode (encode)
+import Network.DNS.Imports
 import Network.DNS.StateBinary (PState, initialState)
+import Network.DNS.Types
 
 ----------------------------------------------------------------
 

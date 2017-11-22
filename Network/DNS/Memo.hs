@@ -1,14 +1,12 @@
 module Network.DNS.Memo where
 
-import Control.Applicative ((<$>))
 import qualified Control.Reaper as R
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
-import Data.List (foldl')
 import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
 import Data.Time (UTCTime, getCurrentTime)
 
+import Network.DNS.Imports
 import Network.DNS.Types
 
 data Section = Answer | Authority deriving (Eq, Ord, Show)

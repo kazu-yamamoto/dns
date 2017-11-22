@@ -100,15 +100,14 @@ module Network.DNS.Types (
   ) where
 
 import Control.Exception (Exception, IOException)
-import Data.Bits ((.&.), (.|.), shiftR, shiftL, testBit, setBit)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base64 as B64 (encode)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.Typeable (Typeable)
-import Data.Word (Word8, Word16, Word32)
+
+import Network.DNS.Imports
 
 ----------------------------------------------------------------
 

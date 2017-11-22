@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, CPP #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 module Network.DNS.StateBinary (
     PState(..)
   , initialState
@@ -34,9 +34,7 @@ module Network.DNS.StateBinary (
 import Control.Monad.State (State, StateT)
 import qualified Control.Monad.State as ST
 import qualified Data.Attoparsec.ByteString as A
-
 import qualified Data.Attoparsec.Types as T
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BB
@@ -45,13 +43,9 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.Map (Map)
 import qualified Data.Map as M
-import Data.Word (Word8, Word16, Word32)
-import Network.DNS.Types
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative ((<$>), (<*))
-import Data.Monoid (Monoid, mconcat, mappend, mempty)
-#endif
+import Network.DNS.Imports
+import Network.DNS.Types
 
 ----------------------------------------------------------------
 

@@ -1,9 +1,8 @@
 module Network.DNS.Types.Internal where
 
-import Data.List.NonEmpty (NonEmpty(..))
 import Network.Socket (AddrInfo(..), PortNumber(..), HostName)
-import Data.Word (Word16)
 
+import Network.DNS.Imports
 import Network.DNS.Memo
 import Network.DNS.Types
 

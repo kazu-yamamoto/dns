@@ -72,13 +72,14 @@ module Network.DNS.Lookup (
   , lookupSRV
   ) where
 
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import Data.IP (IPv4, IPv6)
-import Network.DNS.Resolver as DNS
+
+import Network.DNS.Imports
 import Network.DNS.LookupRaw as DNS
+import Network.DNS.Resolver as DNS
 import Network.DNS.Types
-import Data.Word (Word16, Word32)
+
 
 ----------------------------------------------------------------
 

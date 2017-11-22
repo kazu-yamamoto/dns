@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Network.DNS.Decode.Internal (
     getResponse
@@ -10,21 +10,14 @@ module Network.DNS.Decode.Internal (
   , getMailbox
   ) where
 
-import Control.Monad (replicateM)
-import Data.Bits ((.&.), shiftR, testBit)
-import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import Data.IP (IP(..), toIPv4, toIPv6b)
-import Data.Word (Word16)
-import Network.DNS.StateBinary
-import Network.DNS.Types
-import Numeric (showHex)
 import qualified Safe
 
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative
-#endif
+import Network.DNS.Imports
+import Network.DNS.StateBinary
+import Network.DNS.Types
 
 ----------------------------------------------------------------
 

@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 -- | Decoders for DNS.
 module Network.DNS.Decode (
     -- * Decoder
@@ -13,15 +11,10 @@ module Network.DNS.Decode (
   , decodeMailbox
   ) where
 
-import Control.Applicative (many)
-import Data.ByteString (ByteString)
+import Network.DNS.Decode.Internal
+import Network.DNS.Imports
 import Network.DNS.StateBinary
 import Network.DNS.Types
-import Network.DNS.Decode.Internal
-
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative
-#endif
 
 ----------------------------------------------------------------
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE RecordWildCards, CPP #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Encoders for DNS.
 module Network.DNS.Encode (
@@ -12,23 +12,15 @@ module Network.DNS.Encode (
   , encodeMailbox
   ) where
 
-import Control.Monad (when)
 import Control.Monad.State (State, modify, execState, gets)
-import Data.Binary (Word16)
-import Data.Bits ((.|.), bit, shiftL)
 import qualified Data.ByteString.Builder as BB
-import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.IP (IP(..), fromIPv4, fromIPv6b)
-import Data.List (dropWhileEnd)
-import Data.Monoid ((<>))
+
+import Network.DNS.Imports
 import Network.DNS.StateBinary
 import Network.DNS.Types
-
-#if __GLASGOW_HASKELL__ < 709
-import Data.Monoid (mconcat)
-#endif
 
 ----------------------------------------------------------------
 

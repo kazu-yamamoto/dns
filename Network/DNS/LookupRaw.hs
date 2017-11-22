@@ -11,16 +11,15 @@ module Network.DNS.LookupRaw (
   , fromDNSFormat
   ) where
 
-import Control.Monad (when)
 import Data.Time (getCurrentTime, addUTCTime)
+import Prelude hiding (lookup)
 
 import Network.DNS.IO
+import Network.DNS.Imports hiding (lookup)
 import Network.DNS.Memo
 import Network.DNS.Transport
 import Network.DNS.Types
 import Network.DNS.Types.Internal
-
-import Prelude hiding (lookup)
 
 -- $setup
 -- >>> import Network.DNS.Resolver

@@ -27,6 +27,7 @@ Library
                         Network.DNS.Decode
                         Network.DNS.IO
   Other-Modules:        Network.DNS.Decode.Internal
+                        Network.DNS.Imports
                         Network.DNS.Memo
                         Network.DNS.StateBinary
                         Network.DNS.Transport

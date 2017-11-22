@@ -41,37 +41,29 @@ module Network.DNS.Resolver (
 #define GHC708
 #endif
 
-import qualified Data.ByteString as BS
 import Control.Exception as E
-import Control.Monad (forM, replicateM)
-import Data.Maybe (isJust, maybe)
 import qualified Crypto.Random as C
+import qualified Data.ByteString as BS
 import Data.IORef (IORef)
 import qualified Data.IORef as I
-import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
-import Data.Word (Word16)
 import Network.BSD (getProtocolNumber)
-import Network.DNS.Transport
-import Network.DNS.Types
-import Network.DNS.Types.Internal
-import Network.DNS.Memo
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), PortNumber(..), HostName, SocketType(Datagram), getAddrInfo, defaultHints)
 import Prelude hiding (lookup)
-
-#ifdef GHC708
-import Control.Applicative ((<$>), (<*>), pure)
-#endif
 
 #if defined(WIN)
 import qualified Data.List.Split as Split
 import Foreign.C.String
 import Foreign.Marshal.Alloc (allocaBytes)
-import Data.Word
 #else
 import Data.Char (isSpace)
-import Data.List (isPrefixOf)
 #endif
+
+import Network.DNS.Imports
+import Network.DNS.Memo
+import Network.DNS.Transport
+import Network.DNS.Types
+import Network.DNS.Types.Internal
 
 ----------------------------------------------------------------
 
