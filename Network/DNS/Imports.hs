@@ -5,10 +5,11 @@ module Network.DNS.Imports (
   , module Control.Monad
   , module Data.Bits
   , module Data.List
+  , module Data.Maybe
   , module Data.Monoid
   , module Data.Ord
+  , module Data.Typeable
   , module Data.Word
-  , module Data.Maybe
   , module Numeric
   ) where
 
@@ -21,5 +22,6 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
 import Data.Ord
+import Data.Typeable
 import Data.Word
 import Numeric

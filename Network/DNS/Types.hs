@@ -105,7 +105,6 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
-import Data.Typeable (Typeable)
 
 import Network.DNS.Imports
 
