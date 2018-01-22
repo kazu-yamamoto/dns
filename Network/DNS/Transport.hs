@@ -177,10 +177,10 @@ tcpLookup ident ai q tm ad =
             sendVC vc qry
             receiveVC vc
         case mres of
-            Nothing  -> E.throwIO TimeoutExpired
+            Nothing                     -> E.throwIO TimeoutExpired
             Just res
                 | checkResp q ident res -> return res
-                | otherwise -> E.throwIO SequenceNumberMismatch
+                | otherwise             -> E.throwIO SequenceNumberMismatch
 
 ----------------------------------------------------------------
 
