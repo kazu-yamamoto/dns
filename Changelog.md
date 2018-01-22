@@ -1,3 +1,7 @@
+# 3.0.1
+
+- Supporting GHC 7.8 again.
+
 # 3.0.0
 
 - The version introduces some breaking changes internally. But upper layer APIs in the `Lookup` module remain the same.
