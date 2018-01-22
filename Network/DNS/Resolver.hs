@@ -46,8 +46,7 @@ import qualified Data.ByteString as BS
 import Data.IORef (IORef)
 import qualified Data.IORef as I
 import qualified Data.List.NonEmpty as NE
-import Network.BSD (getProtocolNumber)
-import Network.Socket (AddrInfoFlag(..), AddrInfo(..), PortNumber(..), HostName, SocketType(Datagram), getAddrInfo, defaultHints)
+import Network.Socket (AddrInfoFlag(..), AddrInfo(..), PortNumber, HostName, SocketType(Datagram), getAddrInfo, defaultHints)
 import Prelude hiding (lookup)
 
 #if defined(WIN)
@@ -107,12 +106,10 @@ getDefaultDnsServers file = toAddresses <$> readFile file
 
 makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
 makeAddrInfo addr mport = do
-    proto <- getProtocolNumber "udp"
     let flgs = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
         hints = defaultHints {
             addrFlags = if isJust mport then AI_NUMERICSERV : flgs else flgs
           , addrSocketType = Datagram
-          , addrProtocol = proto
           }
         serv = maybe "domain" show mport
     head <$> getAddrInfo (Just hints) (Just addr) (Just serv)

@@ -1,6 +1,6 @@
 module Network.DNS.Types.Internal where
 
-import Network.Socket (AddrInfo(..), PortNumber(..), HostName)
+import Network.Socket (AddrInfo(..), PortNumber, HostName)
 
 import Network.DNS.Imports
 import Network.DNS.Memo

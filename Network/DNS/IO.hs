@@ -36,7 +36,7 @@ import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit.Network (sourceSocket)
 import Data.IP (IPv4, IPv6)
-import Network (Socket)
+import Network.Socket (Socket)
 
 #if defined(WIN) && defined(GHC708)
 import Network.Socket (send)
