@@ -31,7 +31,11 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
+#if MIN_VERSION_conduit(1,3,0)
+import Data.Conduit (($$+), ($$+-), ConduitT, Void, (.|), runConduit)
+#else
 import Data.Conduit (($$), ($$+), ($$+-), (=$), Sink)
+#endif
 import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit.Network (sourceSocket)
@@ -53,13 +57,21 @@ import Network.DNS.Types
 
 ----------------------------------------------------------------
 
+#if MIN_VERSION_conduit(1,3,0)
+sink :: ConduitT ByteString Void IO (DNSMessage, PState)
+#else
 sink :: Sink ByteString IO (DNSMessage, PState)
+#endif
 sink = sinkParser $ ST.runStateT getResponse initialState
 
 -- | Receiving DNS data from 'Socket' and parse it.
 
 receive :: Socket -> IO DNSMessage
+#if MIN_VERSION_conduit(1,3,0)
+receive sock = fst <$> runConduit (sourceSocket sock .| sink)
+#else
 receive sock = fst <$> (sourceSocket sock $$ sink)
+#endif
 
 -- | Receive and parse a single virtual-circuit (TCP) query or response.
 --   It is up to the caller to implement any desired timeout.
@@ -70,7 +82,11 @@ receiveVC sock = do
     let len = case map ord $ LBS.unpack lenbytes of
                 [hi, lo] -> 256 * hi + lo
                 _        -> 0
+#if MIN_VERSION_conduit(1,3,0)
+    fst <$> (src $$+- CB.isolate len .| sink)
+#else
     fst <$> (src $$+- CB.isolate len =$ sink)
+#endif
 
 ----------------------------------------------------------------
 
