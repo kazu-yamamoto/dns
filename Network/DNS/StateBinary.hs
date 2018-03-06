@@ -1,4 +1,6 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE CPP #-}
 module Network.DNS.StateBinary (
     PState(..)
   , initialState
@@ -43,6 +45,7 @@ import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.Semigroup as Sem
 
 import Network.DNS.Imports
 import Network.DNS.Types
@@ -59,9 +62,14 @@ data WState = WState {
 initialWState :: WState
 initialWState = WState M.empty 0
 
+instance Sem.Semigroup SPut where
+    p1 <> p2 = (Sem.<>) <$> p1 <*> p2
+
 instance Monoid SPut where
     mempty = return mempty
-    mappend a b = mconcat <$> sequence [a, b]
+#if !(MIN_VERSION_base(4,11,0))
+    mappend = (Sem.<>)
+#endif
 
 put8 :: Word8 -> SPut
 put8 = fixedSized 1 BB.word8
