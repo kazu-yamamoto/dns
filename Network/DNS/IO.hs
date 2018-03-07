@@ -32,9 +32,9 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
 #if MIN_VERSION_conduit(1,3,0)
-import Data.Conduit (($$+), ($$+-), ConduitT, Void, (.|), runConduit)
+import Data.Conduit (($$+), ($$+-), ConduitM, (.|), runConduit)
 #else
-import Data.Conduit (($$), ($$+), ($$+-), (=$), Sink)
+import Data.Conduit (($$+), ($$+-), ConduitM, (.|), ($$))
 #endif
 import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Binary as CB
@@ -57,11 +57,7 @@ import Network.DNS.Types
 
 ----------------------------------------------------------------
 
-#if MIN_VERSION_conduit(1,3,0)
-sink :: ConduitT ByteString Void IO (DNSMessage, PState)
-#else
-sink :: Sink ByteString IO (DNSMessage, PState)
-#endif
+sink :: ConduitM ByteString o IO (DNSMessage, PState)
 sink = sinkParser $ ST.runStateT getResponse initialState
 
 -- | Receiving DNS data from 'Socket' and parse it.
@@ -82,11 +78,7 @@ receiveVC sock = do
     let len = case map ord $ LBS.unpack lenbytes of
                 [hi, lo] -> 256 * hi + lo
                 _        -> 0
-#if MIN_VERSION_conduit(1,3,0)
     fst <$> (src $$+- CB.isolate len .| sink)
-#else
-    fst <$> (src $$+- CB.isolate len =$ sink)
-#endif
 
 ----------------------------------------------------------------
 
