@@ -31,11 +31,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
-#if MIN_VERSION_conduit(1,3,0)
 import Data.Conduit (($$+), ($$+-), ConduitM, (.|), runConduit)
-#else
-import Data.Conduit (($$+), ($$+-), ConduitM, (.|), ($$))
-#endif
 import Data.Conduit.Attoparsec (sinkParser)
 import qualified Data.Conduit.Binary as CB
 import Data.Conduit.Network (sourceSocket)
@@ -63,11 +59,7 @@ sink = sinkParser $ ST.runStateT getResponse initialState
 -- | Receiving DNS data from 'Socket' and parse it.
 
 receive :: Socket -> IO DNSMessage
-#if MIN_VERSION_conduit(1,3,0)
 receive sock = fst <$> runConduit (sourceSocket sock .| sink)
-#else
-receive sock = fst <$> (sourceSocket sock $$ sink)
-#endif
 
 -- | Receive and parse a single virtual-circuit (TCP) query or response.
 --   It is up to the caller to implement any desired timeout.
