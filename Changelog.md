@@ -1,3 +1,8 @@
+# 3.0.2
+
+- Supporting conduit 1.3 [#105](https://github.com/kazu-yamamoto/dns/pull/105)
+- Supporting GHC 8.4 with semigroup hack.
+
 # 3.0.1
 
 - Supporting GHC 7.8 again.
