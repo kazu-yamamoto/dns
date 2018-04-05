@@ -24,6 +24,7 @@ module Network.DNS.StateBinary (
   , getInt32
   , getNByteString
   , getPosition
+  , getInput
   , wsPop
   , wsPush
   , wsPosition
@@ -122,6 +123,7 @@ type SGet = StateT PState (T.Parser ByteString)
 data PState = PState {
     psDomain :: IntMap Domain
   , psPosition :: Int
+  , psInput :: ByteString
   }
 
 ----------------------------------------------------------------
@@ -129,15 +131,18 @@ data PState = PState {
 getPosition :: SGet Int
 getPosition = psPosition <$> ST.get
 
+getInput :: SGet ByteString
+getInput = psInput <$> ST.get
+
 addPosition :: Int -> SGet ()
 addPosition n = do
-    PState dom pos <- ST.get
-    ST.put $ PState dom (pos + n)
+    PState dom pos inp <- ST.get
+    ST.put $ PState dom (pos + n) inp
 
 push :: Int -> Domain -> SGet ()
 push n d = do
-    PState dom pos <- ST.get
-    ST.put $ PState (IM.insert n d dom) pos
+    PState dom pos inp <- ST.get
+    ST.put $ PState (IM.insert n d dom) pos inp
 
 pop :: Int -> SGet (Maybe Domain)
 pop n = IM.lookup n . psDomain <$> ST.get
@@ -188,14 +193,14 @@ getNByteString n = ST.lift (A.take n) <* addPosition n
 
 ----------------------------------------------------------------
 
-initialState :: PState
-initialState = PState IM.empty 0
+initialState :: ByteString -> PState
+initialState inp = PState IM.empty 0 inp
 
 runSGet :: SGet a -> ByteString -> Either String (a, PState)
-runSGet parser bs = A.eitherResult $ A.parse (ST.runStateT parser initialState) bs
+runSGet parser inp = A.eitherResult $ A.parse (ST.runStateT parser $ initialState inp) inp
 
 runSGetWithLeftovers :: SGet a -> ByteString -> Either String ((a, PState), ByteString)
-runSGetWithLeftovers parser bs = toResult $ A.parse (ST.runStateT parser initialState) bs
+runSGetWithLeftovers parser inp = toResult $ A.parse (ST.runStateT parser $ initialState inp) inp
   where
     toResult :: A.Result r -> Either String (r, ByteString)
     toResult (A.Done i r) = Right (r, i)
