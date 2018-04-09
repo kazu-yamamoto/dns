@@ -647,7 +647,7 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_DNSKEY Word16 Word8 Word8 ByteString
                                  -- ^ DNSKEY (RFC4034)
            --RD_NSEC3
-           --RD_NSEC3PARAM
+           | RD_NSEC3PARAM Word8 Word8 Word16 ByteString
            | RD_TLSA Word8 Word8 Word8 ByteString
                                  -- ^ TLSA (RFC6698)
            --RD_CDS
@@ -675,6 +675,10 @@ instance Show RData where
   show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ hexencode dv
   show RD_NULL = "NULL"
   show (RD_DNSKEY f p a k) = show f ++ " " ++ show p ++ " " ++ show a ++ " " ++ b64encode k
+  show (RD_NSEC3PARAM h f i s) = show h ++ " " ++ show f ++ " " ++ show i ++ " " ++ showSalt s
+    where
+      showSalt ""    = "-"
+      showSalt salt  = hexencode salt
 
 hexencode :: ByteString -> String
 hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex

@@ -166,6 +166,12 @@ putRData rd = case rd of
         , put8 a
         , putByteString k
         ]
+    (RD_NSEC3PARAM h f i s) -> mconcat
+        [ put8 h
+        , put8 f
+        , put16 i
+        , putByteStringWithLength s
+        ]
     UnknownRData bytes -> putByteString bytes
 
 putOData :: OData -> SPut

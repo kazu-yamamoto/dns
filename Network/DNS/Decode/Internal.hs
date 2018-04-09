@@ -174,6 +174,7 @@ getRData DS len = RD_DS <$> decodeTag
     decodeDval = getNByteString (len - 4)
 --
 getRData NULL len = const RD_NULL <$> getNByteString len
+--
 getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
                                 <*> decodeKeyProto
                                 <*> decodeKeyAlg
@@ -183,6 +184,22 @@ getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
     decodeKeyProto  = get8
     decodeKeyAlg    = get8
     decodeKeyBytes  = getNByteString (len - 4)
+--
+getRData NSEC3PARAM len = RD_NSEC3PARAM <$> decodeHashAlg
+                                <*> decodeFlags
+                                <*> decodeIterations
+                                <*> decodeSalt
+  where
+    decodeHashAlg    = get8
+    decodeFlags      = get8
+    decodeIterations = get16
+    decodeSalt       = do
+        let n = len - 5
+        slen <- get8
+        guard $ fromIntegral slen == n
+        if (n == 0)
+        then return B.empty
+        else getNByteString n
 --
 getRData _  len = UnknownRData <$> getNByteString len
 
