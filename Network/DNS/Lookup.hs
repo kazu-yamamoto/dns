@@ -309,12 +309,16 @@ lookupTXT rlv dom = do
 
 ----------------------------------------------------------------
 
--- | Look up the \'SOA\' record for the given domain. The results include the
---   domain, mailbox, serial number, refresh time, retry time, expiration
---   time, and minimum TTL.
+-- | Look up the \'SOA\' record for the given domain. The result 7-tuple
+--   consists of the \'mname\', \'rname\', \'serial\', \'refresh\', \'retry\',
+--   \'expire\' and \'minimum\' fields of the SOA record.
 --
---   This can be useful to validate TTLs for a server or get an abuse
---   contact address for a domain.
+--   An \@ separator is used between the first and second labels of the
+--   \'rname\' field.  Since \'rname\' is an email address, it often contains
+--   periods within its first label.  Presently, the trailing period is not
+--   removed from the domain part of the \'rname\', but this may change in the
+--   future.  Users should be prepared to remove any trailing period before
+--   using the \'rname\` as a contact email address.
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupSOA resolver "mew.org"

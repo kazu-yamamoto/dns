@@ -114,8 +114,9 @@ import Network.DNS.Imports
 type Domain = ByteString
 
 -- | Type for a mailbox encoded on the wire as a DNS name, but the first label
--- is conceptually the user name, and sometimes has internal '.' characters
--- that are not label separators.
+-- is conceptually the user name, and sometimes has contains internal periods
+-- that are not label separators. Therefore, in mailboxes \@ is used as the
+-- separator between the first and second labels.
 type Mailbox = ByteString
 
 ----------------------------------------------------------------
