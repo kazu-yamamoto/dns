@@ -1,20 +1,16 @@
-{-# LANGUAGE RecordWildCards, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 import Control.Applicative
 import Control.Concurrent
 import Control.Monad
-import qualified Data.ByteString as S
-import Data.ByteString.Lazy hiding (putStrLn, filter, length)
-import Data.Default.Class
-import Data.IP
+import Data.IP (IPv4)
 import Data.Maybe
-import Data.Monoid
-import Network.BSD
 import Network.DNS hiding (lookup)
 import Network.Socket hiding (recvFrom)
 import Network.Socket.ByteString
 import System.Environment
 import System.Timeout
+import qualified Data.ByteString as S
 
 data Conf = Conf {
     bufSize :: Int
@@ -23,73 +19,86 @@ data Conf = Conf {
   , hosts   :: [(Domain, IPv4)]
 }
 
-instance Default Conf where
-    def = Conf {
-        bufSize = 512
-      , timeOut = 3 * 1000 * 1000
-      , realDNS = "8.8.8.8"
-      , hosts   = [("localhost.", "127.0.0.1")]
-    }
+defaultConf :: Conf
+defaultConf = Conf {
+    bufSize = 512
+  , timeOut = 3 * 1000 * 1000
+  , realDNS = "8.8.8.8"
+  , hosts   = [("localhost.", "127.0.0.1")]
+  }
 
 timeout' :: String -> Int -> IO a -> IO (Maybe a)
 timeout' msg tm io = do
     result <- timeout tm io
-    maybe (putStrLn msg) (const $ return ()) result
+    case result of
+      Nothing -> putStrLn msg
+      Just _  -> return ()
     return result
 
-proxyRequest :: Conf -> ResolvConf -> DNSMessage -> IO (Maybe DNSMessage)
-proxyRequest Conf{..} rc req = do
-    let worker Resolver{..} = do
-            let packet = mconcat . toChunks $ encode req
-            sendAll dnsSock packet
-            receive dnsSock
-    rs <- makeResolvSeed rc
-    withResolver rs $ \r ->
-        (>>= check) <$> timeout' "proxy timeout" timeOut (worker r)
+proxyRequest :: Conf -> DNSMessage -> IO (Maybe DNSMessage)
+proxyRequest conf req = do
+    sock <- openSocket (realDNS conf) False
+    mrsp <- timeout' "proxy timeout" (timeOut conf) $ worker sock
+    close sock
+    case mrsp of
+      Nothing  -> return Nothing
+      Just rsp -> return $ check rsp
   where
+    worker sock = do
+        sendAll sock $ encode req
+        receive sock
     ident = identifier . header $ req
     check :: DNSMessage -> Maybe DNSMessage
-    check rsp = let hdr = header rsp
-                in  if identifier hdr == ident
-                        then Just rsp
-                        else Nothing
+    check rsp
+      | identifier (header rsp) == ident = Just rsp
+      | otherwise                        = Nothing
 
-handleRequest :: Conf -> ResolvConf -> DNSMessage -> IO (Maybe DNSMessage)
-handleRequest conf@Conf{hosts=hosts} rc req =
-    maybe
-      (proxyRequest conf rc req)
-      (return . Just)
-      lookupHosts
+lookupHosts :: Conf -> DNSMessage -> Maybe DNSMessage
+lookupHosts conf req = do
+    q <- listToMaybe . filterA . question $ req
+    ip <- lookup (qname q) $ hosts conf
+    return $ responseA ident q [ip]
   where
-    filterA = filter ((==A) . qtype)
+    filterA = filter ((== A) . qtype)
     ident = identifier . header $ req
-    lookupHosts = do
-        q <- listToMaybe . filterA . question $ req
-        ip <- lookup (qname q) hosts
-        return $ responseA ident q [ip]
+
+handleRequest :: Conf -> DNSMessage -> IO (Maybe DNSMessage)
+handleRequest conf req = case lookupHosts conf req of
+  Nothing  -> proxyRequest conf req
+  Just rsp -> return $ Just rsp
 
 handlePacket :: Conf -> Socket -> SockAddr -> S.ByteString -> IO ()
-handlePacket conf@Conf{..} sock addr bs = case decode (fromChunks [bs]) of
+handlePacket conf sock addr bs = case decode bs of
+    Left msg  -> putStrLn msg
     Right req -> do
-        let rc = defaultResolvConf { resolvInfo = RCHostName realDNS }
-        mrsp <- handleRequest conf rc req
+        mrsp <- handleRequest conf req
         case mrsp of
-            Just rsp ->
-                let packet = mconcat . toChunks $ encode rsp
-                in void $ timeout' "send timeout" timeOut (sendAllTo sock packet addr)
-            Nothing -> return ()
-    Left msg -> putStrLn msg
+            Nothing  -> return ()
+            Just rsp -> do
+                let pkt = encode rsp
+                    tout = timeOut conf
+                void $ timeout' "send timeout" tout $ sendAllTo sock pkt addr
+
+openSocket :: HostName -> Bool -> IO Socket
+openSocket host passive = do
+    let hints
+          | passive   = defaultHints {addrFlags = [AI_PASSIVE]}
+          | otherwise = defaultHints
+    addrinfos <- getAddrInfo (Just hints) (Just host) (Just "domain")
+    addrinfo <- maybe (fail "no addr info") return (listToMaybe addrinfos)
+    sock <- socket (addrFamily addrinfo) Datagram defaultProtocol
+    let addr = addrAddress addrinfo
+    if passive then
+       bind sock addr
+    else
+       connect sock addr
+    return sock
 
 main :: IO ()
 main = withSocketsDo $ do
-    dns <- fromMaybe (realDNS def) . listToMaybe <$> getArgs
-    let conf = def { realDNS=dns }
-    addrinfos <- getAddrInfo
-                   (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                   Nothing (Just "domain")
-    addrinfo <- maybe (fail "no addr info") return (listToMaybe addrinfos)
-    sock <- socket (addrFamily addrinfo) Datagram defaultProtocol
-    bindSocket sock (addrAddress addrinfo)
+    sock <- openSocket "127.0.0.1" True
+    dns <- fromMaybe (realDNS defaultConf) . listToMaybe <$> getArgs
+    let conf = defaultConf { realDNS = dns }
     forever $ do
         (bs, addr) <- recvFrom sock (bufSize conf)
         forkIO $ handlePacket conf sock addr bs
