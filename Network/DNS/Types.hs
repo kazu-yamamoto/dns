@@ -121,7 +121,7 @@ type Mailbox = ByteString
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 -- | Types for resource records.
 newtype TYPE = TYPE {
     -- | From type to number.
@@ -419,7 +419,7 @@ data OPCODE
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 -- | Response code including EDNS0's 12bit ones.
 newtype RCODE = RCODE {
     -- | From rcode to number.
@@ -742,7 +742,7 @@ data EDNS0 = EDNS0 {
   , options  :: [OData]
   } deriving (Eq, Show)
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 -- | Default information for EDNS0.
 --
 -- >>> defaultEDNS0
@@ -784,7 +784,7 @@ toEDNS0 _ _ = Nothing
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 -- | EDNS0 Option Code (RFC 6891).
 newtype OptCode = OptCode {
     -- | From option code to number.
