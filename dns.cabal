@@ -63,10 +63,12 @@ Test-Suite network
   Ghc-Options:          -Wall
   Main-Is:              Spec.hs
   Other-Modules:        LookupSpec
+                        IOSpec
   Build-Depends:        dns
                       , base
                       , bytestring
                       , hspec
+                      , network
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
