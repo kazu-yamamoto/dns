@@ -26,7 +26,7 @@ module Network.DNS.IO (
 #define GHC708
 #endif
 
-import Control.Exception (throwIO)
+import qualified Control.Exception as E
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -52,9 +52,9 @@ import Network.DNS.Types
 
 receive :: Socket -> IO DNSMessage
 receive sock = do
-    emsg <- decode <$> recv sock 4096
+    emsg <- decode <$> recvDNS sock 4096
     case emsg of
-        Left _    -> throwIO FormatError -- fixme
+        Left  e   -> E.throwIO e
         Right msg -> return msg
 
 -- | Receive and parse a single virtual-circuit (TCP) query or response.
@@ -63,14 +63,17 @@ receive sock = do
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = do
     -- fixme: length lenbytes == 0 or 1
-    lenbytes <- recv sock 2
+    lenbytes <- recvDNS sock 2
     let len = case map ord $ BS.unpack lenbytes of
                 [hi, lo] -> 256 * hi + lo
                 _        -> 0
-    emsg <- decode <$> recv sock len
+    emsg <- decode <$> recvDNS sock len
     case emsg of
-        Left _    -> throwIO FormatError -- fixme
+        Left e    -> E.throwIO e
         Right msg -> return msg
+
+recvDNS :: Socket -> Int -> IO ByteString
+recvDNS sock n = recv sock n `E.catch` \e -> E.throwIO $ NetworkFailure e
 
 ----------------------------------------------------------------
 
