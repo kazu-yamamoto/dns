@@ -242,8 +242,9 @@ getDomain' sep1 = do
                 Nothing -> do
                     inp <- getInput
                     case runSGet getDomain (B.drop offset inp) of
-                      Left str -> fail str
-                      Right o -> push pos (fst o) >> return (fst o)
+                      Left (DecodeError err) -> fail err
+                      Left err               -> fail $ show err
+                      Right o  -> push pos (fst o) >> return (fst o)
                 Just o -> push pos o >> return o
         -- As for now, extended labels have no use.
         -- This may change some time in the future.

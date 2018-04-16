@@ -196,16 +196,21 @@ getNByteString n = ST.lift (A.take n) <* addPosition n
 initialState :: ByteString -> PState
 initialState inp = PState IM.empty 0 inp
 
-runSGet :: SGet a -> ByteString -> Either String (a, PState)
-runSGet parser inp = A.eitherResult $ A.parse (ST.runStateT parser $ initialState inp) inp
+runSGet :: SGet a -> ByteString -> Either DNSError (a, PState)
+runSGet parser inp = toResult $ A.parse (ST.runStateT parser $ initialState inp) inp
+  where
+    toResult :: A.Result r -> Either DNSError r
+    toResult (A.Done _ r)        = Right r
+    toResult (A.Fail _ _ msg)    = Left $ DecodeError msg
+    toResult (A.Partial _)       = Left $ DecodeError "incomplete input"
 
-runSGetWithLeftovers :: SGet a -> ByteString -> Either String ((a, PState), ByteString)
+runSGetWithLeftovers :: SGet a -> ByteString -> Either DNSError ((a, PState), ByteString)
 runSGetWithLeftovers parser inp = toResult $ A.parse (ST.runStateT parser $ initialState inp) inp
   where
-    toResult :: A.Result r -> Either String (r, ByteString)
-    toResult (A.Done i r) = Right (r, i)
-    toResult (A.Partial f) = toResult $ f BS.empty
-    toResult (A.Fail _ _ err) = Left err
+    toResult :: A.Result r -> Either DNSError (r, ByteString)
+    toResult (A.Done     i r) = Right (r, i)
+    toResult (A.Partial  f)   = toResult $ f BS.empty
+    toResult (A.Fail _ _ err) = Left $ DecodeError err
 
 runSPut :: SPut -> ByteString
 runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState

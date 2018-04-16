@@ -56,13 +56,16 @@ spec = do
 
 tripleDecodeTest :: ByteString -> IO ()
 tripleDecodeTest hexbs =
-    ecase (decode $ fromHexString hexbs) fail $ \ x1 ->
-        ecase (decode $ encode x1) fail $ \ x2 ->
-            ecase (decode $ encode x2) fail $ \ x3 ->
+    ecase (decode $ fromHexString hexbs) fail' $ \ x1 ->
+        ecase (decode $ encode x1) fail' $ \ x2 ->
+            ecase (decode $ encode x2) fail' $ \ x3 ->
                 x3 `shouldBe` x2
+  where
+    fail' (DecodeError err) = fail err
+    fail' _                 = error "fail'"
 
 ecase :: Either a b -> (a -> c) -> (b -> c) -> c
-ecase (Left a) f _ = f a
+ecase (Left  a) f _ = f a
 ecase (Right b) _ g = g b
 
 ----------------------------------------------------------------

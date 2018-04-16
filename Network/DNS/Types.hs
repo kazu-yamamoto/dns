@@ -353,6 +353,7 @@ data DNSError =
     -- | Network failure.
   | NetworkFailure IOException
     -- | Error is unknown
+  | DecodeError String
   | UnknownDNSError
   deriving (Eq, Show, Typeable)
 
