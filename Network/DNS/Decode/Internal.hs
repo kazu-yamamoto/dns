@@ -33,7 +33,6 @@ getResponse = do
                   <*> getResourceRecords nsCount
                   <*> getResourceRecords arCount
 
-
 ----------------------------------------------------------------
 
 getDNSFlags :: SGet DNSFlags
@@ -83,8 +82,8 @@ getOptCode = toOptCode <$> get16
 
 getQuery :: SGet Question
 getQuery = Question <$> getDomain
-                       <*> getTYPE
-                       <*  ignoreClass
+                    <*> getTYPE
+                    <*  ignoreClass
 
 getResourceRecords :: Int -> SGet [ResourceRecord]
 getResourceRecords n = replicateM n getResourceRecord
