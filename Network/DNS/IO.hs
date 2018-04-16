@@ -26,51 +26,51 @@ module Network.DNS.IO (
 #define GHC708
 #endif
 
-import qualified Control.Monad.State as ST
+import Control.Exception (throwIO)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
-import Data.Conduit (($$+), ($$+-), ConduitM, (.|), runConduit)
-import Data.Conduit.Attoparsec (sinkParser)
-import qualified Data.Conduit.Binary as CB
-import Data.Conduit.Network (sourceSocket)
 import Data.IP (IPv4, IPv6)
 import Network.Socket (Socket)
 
 #if defined(WIN) && defined(GHC708)
-import Network.Socket (send)
+import Network.Socket (send, recv)
 import qualified Data.ByteString.Char8 as BS
 #else
-import Network.Socket.ByteString (sendAll)
+import Network.Socket.ByteString (sendAll, recv)
 #endif
 
-import Network.DNS.Decode.Internal (getResponse)
+import Network.DNS.Decode (decode)
 import Network.DNS.Encode (encode)
 import Network.DNS.Imports
-import Network.DNS.StateBinary (PState, initialState)
 import Network.DNS.Types
 
 ----------------------------------------------------------------
 
-sink :: ConduitM ByteString o IO (DNSMessage, PState)
-sink = sinkParser $ ST.runStateT getResponse initialState
-
 -- | Receiving DNS data from 'Socket' and parse it.
 
 receive :: Socket -> IO DNSMessage
-receive sock = fst <$> runConduit (sourceSocket sock .| sink)
+receive sock = do
+    emsg <- decode <$> recv sock 4096
+    case emsg of
+        Left _    -> throwIO FormatError -- fixme
+        Right msg -> return msg
 
 -- | Receive and parse a single virtual-circuit (TCP) query or response.
 --   It is up to the caller to implement any desired timeout.
 
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = do
-    (src, lenbytes) <- sourceSocket sock $$+ CB.take 2
-    let len = case map ord $ LBS.unpack lenbytes of
+    -- fixme: length lenbytes == 0 or 1
+    lenbytes <- recv sock 2
+    let len = case map ord $ BS.unpack lenbytes of
                 [hi, lo] -> 256 * hi + lo
                 _        -> 0
-    fst <$> (src $$+- CB.isolate len .| sink)
+    emsg <- decode <$> recv sock len
+    case emsg of
+        Left _    -> throwIO FormatError -- fixme
+        Right msg -> return msg
 
 ----------------------------------------------------------------
 
