@@ -65,35 +65,36 @@ receive sock = do
 
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = do
-    lenbytes <- recvDNS sock 2
-    let len = case map ord $ BS.unpack lenbytes of
-                [hi, lo] -> 256 * hi + lo
-                _        -> 0
-    emsg <- decode <$> recvDNS sock len
-    case emsg of
+    len <- toLen <$> recvDNS sock 2
+    bs <- recvDNS sock len
+    case decode bs of
         Left e    -> E.throwIO e
         Right msg -> return msg
+  where
+    toLen bs = case map ord $ BS.unpack bs of
+        [hi, lo] -> 256 * hi + lo
+        _        -> 0              -- never reached
 
 recvDNS :: Socket -> Int -> IO ByteString
-recvDNS sock n = recv1 `E.catch` \e -> E.throwIO $ NetworkFailure e
+recvDNS sock len = recv1 `E.catch` \e -> E.throwIO $ NetworkFailure e
   where
     recv1 = do
-        bs1 <- recvCore n
-        if BS.length bs1 == n then
+        bs1 <- recvCore len
+        if BS.length bs1 == len then
             return bs1
           else do
             loop bs1
     loop bs0 = do
-        let left = n - BS.length bs0
+        let left = len - BS.length bs0
         bs1 <- recvCore left
         let bs = bs0 `BS.append` bs1
-        if BS.length bs == n then
+        if BS.length bs == len then
             return bs
-          else do
+          else
             loop bs
     eofE = mkIOError eofErrorType "connection terminated" Nothing Nothing
-    recvCore n0 = do
-        bs <- recv sock n0
+    recvCore len0 = do
+        bs <- recv sock len0
         if bs == "" then
             E.throwIO eofE
           else
