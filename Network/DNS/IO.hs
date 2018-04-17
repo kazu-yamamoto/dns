@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Network.DNS.IO (
     -- * Receiving from socket
@@ -33,6 +34,8 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
 import Data.IP (IPv4, IPv6)
 import Network.Socket (Socket)
+import System.IO.Error
+
 
 #if defined(WIN) && defined(GHC708)
 import Network.Socket (send, recv)
@@ -52,8 +55,8 @@ import Network.DNS.Types
 
 receive :: Socket -> IO DNSMessage
 receive sock = do
-    emsg <- decode <$> recvDNS sock 4096
-    case emsg of
+    bs <- recv sock 4096 `E.catch` \e -> E.throwIO $ NetworkFailure e
+    case decode bs of
         Left  e   -> E.throwIO e
         Right msg -> return msg
 
@@ -62,7 +65,6 @@ receive sock = do
 
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = do
-    -- fixme: length lenbytes == 0 or 1
     lenbytes <- recvDNS sock 2
     let len = case map ord $ BS.unpack lenbytes of
                 [hi, lo] -> 256 * hi + lo
@@ -73,7 +75,29 @@ receiveVC sock = do
         Right msg -> return msg
 
 recvDNS :: Socket -> Int -> IO ByteString
-recvDNS sock n = recv sock n `E.catch` \e -> E.throwIO $ NetworkFailure e
+recvDNS sock n = recv1 `E.catch` \e -> E.throwIO $ NetworkFailure e
+  where
+    recv1 = do
+        bs1 <- recvCore n
+        if BS.length bs1 == n then
+            return bs1
+          else do
+            loop bs1
+    loop bs0 = do
+        let left = n - BS.length bs0
+        bs1 <- recvCore left
+        let bs = bs0 `BS.append` bs1
+        if BS.length bs == n then
+            return bs
+          else do
+            loop bs
+    eofE = mkIOError eofErrorType "connection terminated" Nothing Nothing
+    recvCore n0 = do
+        bs <- recv sock n0
+        if bs == "" then
+            E.throwIO eofE
+          else
+            return bs
 
 ----------------------------------------------------------------
 
