@@ -241,7 +241,7 @@ getDomain' sep1 = do
             case mo of
                 Nothing -> do
                     inp <- getInput
-                    case runSGet getDomain (B.drop offset inp) of
+                    case runSGet (getDomain' sep1) (B.drop offset inp) of
                       Left (DecodeError err) -> fail err
                       Left err               -> fail $ show err
                       Right o  -> push pos (fst o) >> return (fst o)
