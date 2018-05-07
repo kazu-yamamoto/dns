@@ -256,10 +256,9 @@ getDomain' sep1 pointerStack = do
         _ -> do
             hs <- getNByteString n
             ds <- getDomain' '.' []
-            let dom =
-                    case ds of -- avoid trailing ".."
-                        "." -> hs `BS.append` "."
-                        _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
+            let dom = case ds of -- avoid trailing ".."
+                    "." -> hs `BS.append` "."
+                    _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
             push pos dom
             return dom
   where
