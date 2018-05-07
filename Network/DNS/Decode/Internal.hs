@@ -255,7 +255,7 @@ getDomain' sep1 pointerStack = do
         _ | isExtLabel c -> return ""
         _ -> do
             hs <- getNByteString n
-            ds <- getDomain' '.' []
+            ds <- getDomain' '.' pointerStack
             let dom = case ds of -- avoid trailing ".."
                     "." -> hs `BS.append` "."
                     _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
