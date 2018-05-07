@@ -218,16 +218,16 @@ getOData opc len = UnknownOData opc <$> getNByteString len
 ----------------------------------------------------------------
 
 getDomain :: SGet Domain
-getDomain = getDomain' '.'
+getDomain = getDomain' '.' []
 
 getMailbox :: SGet Mailbox
-getMailbox = getDomain' '@'
+getMailbox = getDomain' '@' []
 
 -- | Get a domain name, using sep1 as the separate between the 1st and 2nd
 -- label.  Subsequent labels (and always the trailing label) are terminated
 -- with a ".".
-getDomain' :: Char -> SGet ByteString
-getDomain' sep1 = do
+getDomain' :: Char -> [Int] -> SGet ByteString
+getDomain' sep1 pointerStack = do
     pos <- getPosition
     c <- getInt8
     let n = getValue c
@@ -239,19 +239,23 @@ getDomain' sep1 = do
             let offset = n * 256 + d
             mo <- pop offset
             case mo of
-                Nothing -> do
-                    inp <- getInput
-                    case runSGet (getDomain' sep1) (B.drop offset inp) of
-                      Left (DecodeError err) -> fail err
-                      Left err               -> fail $ show err
-                      Right o  -> push pos (fst o) >> return (fst o)
+                Nothing
+                  | offset `elem` pointerStack -> return "" -- pointer loop
+                  | otherwise                  -> do
+                      inp <- getInput
+                      let newStack = offset : pointerStack
+                          target = B.drop offset inp
+                      case runSGet (getDomain' sep1 newStack) target of
+                          Left (DecodeError err) -> fail err
+                          Left err               -> fail $ show err
+                          Right o  -> push pos (fst o) >> return (fst o)
                 Just o -> push pos o >> return o
         -- As for now, extended labels have no use.
         -- This may change some time in the future.
         _ | isExtLabel c -> return ""
         _ -> do
             hs <- getNByteString n
-            ds <- getDomain' '.'
+            ds <- getDomain' '.' []
             let dom =
                     case ds of -- avoid trailing ".."
                         "." -> hs `BS.append` "."
