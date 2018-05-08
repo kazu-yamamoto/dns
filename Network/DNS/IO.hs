@@ -55,7 +55,8 @@ import Network.DNS.Types
 
 receive :: Socket -> IO DNSMessage
 receive sock = do
-    bs <- recv sock 4096 `E.catch` \e -> E.throwIO $ NetworkFailure e
+    let bufsiz = fromIntegral maxUdpSize
+    bs <- recv sock bufsiz `E.catch` \e -> E.throwIO $ NetworkFailure e
     case decode bs of
         Left  e   -> E.throwIO e
         Right msg -> return msg
