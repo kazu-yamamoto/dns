@@ -235,38 +235,37 @@ getDomain' sep1 lim loopcnt
   -- 127 is the logical limitation of pointers.
   | loopcnt >= 127 = fail "too deep pointers"
   | otherwise      = do
-    pos <- getPosition
-    c <- getInt8
-    let n = getValue c
-    -- Syntax hack to avoid using MultiWayIf
-    case () of
-        _ | c == 0 -> return "." -- Perhaps the root domain?
-        _ | isPointer c -> do
-            d <- getInt8
-            let offset = n * 256 + d
-            when (offset >= lim) $ fail "pointer is too large"
-            mo <- pop offset
-            case mo of
-                Nothing
-                  | otherwise                  -> do
-                      target <- B.drop offset <$> getInput
-                      case runSGet (getDomain' sep1 lim (loopcnt + 1)) target of
-                          Left (DecodeError err) -> fail err
-                          Left err               -> fail $ show err
-                          Right o  -> push pos (fst o) >> return (fst o)
-                Just o -> push pos o >> return o
-        -- As for now, extended labels have no use.
-        -- This may change some time in the future.
-        _ | isExtLabel c -> return ""
-        _ -> do
-            hs <- getNByteString n
-            ds <- getDomain' '.' lim (loopcnt + 1)
-            let dom = case ds of -- avoid trailing ".."
-                    "." -> hs `BS.append` "."
-                    _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
-            push pos dom
-            return dom
+      pos <- getPosition
+      c <- getInt8
+      let n = getValue c
+      getdomain pos c n
   where
+    getdomain pos c n
+      | c == 0 = return "." -- Perhaps the root domain?
+      | isPointer c = do
+          d <- getInt8
+          let offset = n * 256 + d
+          when (offset >= lim) $ fail "pointer is too large"
+          mo <- pop offset
+          case mo of
+              Nothing -> do
+                  target <- B.drop offset <$> getInput
+                  case runSGet (getDomain' sep1 lim (loopcnt + 1)) target of
+                        Left (DecodeError err) -> fail err
+                        Left err               -> fail $ show err
+                        Right o  -> push pos (fst o) >> return (fst o)
+              Just o -> push pos o >> return o
+      -- As for now, extended labels have no use.
+      -- This may change some time in the future.
+      | isExtLabel c = return ""
+      | otherwise = do
+          hs <- getNByteString n
+          ds <- getDomain' '.' lim (loopcnt + 1)
+          let dom = case ds of -- avoid trailing ".."
+                  "." -> hs `BS.append` "."
+                  _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
+          push pos dom
+          return dom
     getValue c = c .&. 0x3f
     isPointer c = testBit c 7 && testBit c 6
     isExtLabel c = not (testBit c 7) && testBit c 6
