@@ -220,18 +220,21 @@ getOData opc len = UnknownOData opc <$> getNByteString len
 getDomain :: SGet Domain
 getDomain = do
     lim <- B.length <$> getInput
-    getDomain' '.' lim []
+    getDomain' '.' lim 0
 
 getMailbox :: SGet Mailbox
 getMailbox = do
     lim <- B.length <$> getInput
-    getDomain' '@' lim []
+    getDomain' '@' lim 0
 
 -- | Get a domain name, using sep1 as the separate between the 1st and 2nd
 -- label.  Subsequent labels (and always the trailing label) are terminated
 -- with a ".".
-getDomain' :: Char -> Int -> [Int] -> SGet ByteString
-getDomain' sep1 lim pointerStack = do
+getDomain' :: Char -> Int -> Int -> SGet ByteString
+getDomain' sep1 lim loopcnt
+  -- 127 is the logical limitation of pointers.
+  | loopcnt >= 127 = fail "too deep pointers"
+  | otherwise      = do
     pos <- getPosition
     c <- getInt8
     let n = getValue c
@@ -245,11 +248,9 @@ getDomain' sep1 lim pointerStack = do
             mo <- pop offset
             case mo of
                 Nothing
-                  | offset `elem` pointerStack -> return "" -- pointer loop
                   | otherwise                  -> do
                       target <- B.drop offset <$> getInput
-                      let newStack = offset : pointerStack
-                      case runSGet (getDomain' sep1 lim newStack) target of
+                      case runSGet (getDomain' sep1 lim (loopcnt + 1)) target of
                           Left (DecodeError err) -> fail err
                           Left err               -> fail $ show err
                           Right o  -> push pos (fst o) >> return (fst o)
@@ -259,7 +260,7 @@ getDomain' sep1 lim pointerStack = do
         _ | isExtLabel c -> return ""
         _ -> do
             hs <- getNByteString n
-            ds <- getDomain' '.' lim pointerStack
+            ds <- getDomain' '.' lim (loopcnt + 1)
             let dom = case ds of -- avoid trailing ".."
                     "." -> hs `BS.append` "."
                     _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
