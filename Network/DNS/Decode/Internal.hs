@@ -218,16 +218,20 @@ getOData opc len = UnknownOData opc <$> getNByteString len
 ----------------------------------------------------------------
 
 getDomain :: SGet Domain
-getDomain = getDomain' '.' []
+getDomain = do
+    lim <- B.length <$> getInput
+    getDomain' '.' lim []
 
 getMailbox :: SGet Mailbox
-getMailbox = getDomain' '@' []
+getMailbox = do
+    lim <- B.length <$> getInput
+    getDomain' '@' lim []
 
 -- | Get a domain name, using sep1 as the separate between the 1st and 2nd
 -- label.  Subsequent labels (and always the trailing label) are terminated
 -- with a ".".
-getDomain' :: Char -> [Int] -> SGet ByteString
-getDomain' sep1 pointerStack = do
+getDomain' :: Char -> Int -> [Int] -> SGet ByteString
+getDomain' sep1 lim pointerStack = do
     pos <- getPosition
     c <- getInt8
     let n = getValue c
@@ -237,15 +241,15 @@ getDomain' sep1 pointerStack = do
         _ | isPointer c -> do
             d <- getInt8
             let offset = n * 256 + d
+            when (offset >= lim) $ fail "pointer is too large"
             mo <- pop offset
             case mo of
                 Nothing
                   | offset `elem` pointerStack -> return "" -- pointer loop
                   | otherwise                  -> do
-                      inp <- getInput
+                      target <- B.drop offset <$> getInput
                       let newStack = offset : pointerStack
-                          target = B.drop offset inp
-                      case runSGet (getDomain' sep1 newStack) target of
+                      case runSGet (getDomain' sep1 lim newStack) target of
                           Left (DecodeError err) -> fail err
                           Left err               -> fail $ show err
                           Right o  -> push pos (fst o) >> return (fst o)
@@ -255,7 +259,7 @@ getDomain' sep1 pointerStack = do
         _ | isExtLabel c -> return ""
         _ -> do
             hs <- getNByteString n
-            ds <- getDomain' '.' pointerStack
+            ds <- getDomain' '.' lim pointerStack
             let dom = case ds of -- avoid trailing ".."
                     "." -> hs `BS.append` "."
                     _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
