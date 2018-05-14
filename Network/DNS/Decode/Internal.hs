@@ -233,7 +233,7 @@ getMailbox = do
 getDomain' :: Char -> Int -> Int -> SGet ByteString
 getDomain' sep1 lim loopcnt
   -- 127 is the logical limitation of pointers.
-  | loopcnt >= 127 = fail "too deep pointers"
+  | loopcnt >= 127 = fail "pointer recursion limit exceeded"
   | otherwise      = do
       pos <- getPosition
       c <- getInt8
