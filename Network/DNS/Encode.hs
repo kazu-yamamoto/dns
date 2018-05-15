@@ -98,10 +98,12 @@ putDNSFlags DNSFlags{..} = put16 word
 
     word = execState st 0
 
+-- XXX: Use question class when implemented
+--
 putQuestion :: Question -> SPut
 putQuestion Question{..} = putDomain qname
                            <> put16 (fromTYPE qtype)
-                           <> put16 1
+                           <> put16 classIN
 
 putResourceRecord :: ResourceRecord -> SPut
 putResourceRecord ResourceRecord{..} = mconcat [

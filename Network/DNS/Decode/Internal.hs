@@ -80,6 +80,9 @@ getTYPE = toTYPE <$> get16
 getOptCode :: SGet OptCode
 getOptCode = toOptCode <$> get16
 
+-- XXX: Include the class when implemented, or otherwise perhaps check the
+-- implicit assumption that the class is classIN.
+--
 getQuery :: SGet Question
 getQuery = Question <$> getDomain
                     <*> getTYPE
