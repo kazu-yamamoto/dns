@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Network.DNS.IO (
     -- * Receiving from socket
@@ -26,51 +27,79 @@ module Network.DNS.IO (
 #define GHC708
 #endif
 
-import qualified Control.Monad.State as ST
+import qualified Control.Exception as E
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
-import Data.Conduit (($$+), ($$+-), ConduitM, (.|), runConduit)
-import Data.Conduit.Attoparsec (sinkParser)
-import qualified Data.Conduit.Binary as CB
-import Data.Conduit.Network (sourceSocket)
 import Data.IP (IPv4, IPv6)
 import Network.Socket (Socket)
+import System.IO.Error
+
 
 #if defined(WIN) && defined(GHC708)
-import Network.Socket (send)
+import Network.Socket (send, recv)
 import qualified Data.ByteString.Char8 as BS
 #else
-import Network.Socket.ByteString (sendAll)
+import Network.Socket.ByteString (sendAll, recv)
 #endif
 
-import Network.DNS.Decode.Internal (getResponse)
+import Network.DNS.Decode (decode)
 import Network.DNS.Encode (encode)
 import Network.DNS.Imports
-import Network.DNS.StateBinary (PState, initialState)
 import Network.DNS.Types
 
 ----------------------------------------------------------------
 
-sink :: ConduitM ByteString o IO (DNSMessage, PState)
-sink = sinkParser $ ST.runStateT getResponse initialState
-
 -- | Receiving DNS data from 'Socket' and parse it.
 
 receive :: Socket -> IO DNSMessage
-receive sock = fst <$> runConduit (sourceSocket sock .| sink)
+receive sock = do
+    let bufsiz = fromIntegral maxUdpSize
+    bs <- recv sock bufsiz `E.catch` \e -> E.throwIO $ NetworkFailure e
+    case decode bs of
+        Left  e   -> E.throwIO e
+        Right msg -> return msg
 
 -- | Receive and parse a single virtual-circuit (TCP) query or response.
 --   It is up to the caller to implement any desired timeout.
 
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = do
-    (src, lenbytes) <- sourceSocket sock $$+ CB.take 2
-    let len = case map ord $ LBS.unpack lenbytes of
-                [hi, lo] -> 256 * hi + lo
-                _        -> 0
-    fst <$> (src $$+- CB.isolate len .| sink)
+    len <- toLen <$> recvDNS sock 2
+    bs <- recvDNS sock len
+    case decode bs of
+        Left e    -> E.throwIO e
+        Right msg -> return msg
+  where
+    toLen bs = case map ord $ BS.unpack bs of
+        [hi, lo] -> 256 * hi + lo
+        _        -> 0              -- never reached
+
+recvDNS :: Socket -> Int -> IO ByteString
+recvDNS sock len = recv1 `E.catch` \e -> E.throwIO $ NetworkFailure e
+  where
+    recv1 = do
+        bs1 <- recvCore len
+        if BS.length bs1 == len then
+            return bs1
+          else do
+            loop bs1
+    loop bs0 = do
+        let left = len - BS.length bs0
+        bs1 <- recvCore left
+        let bs = bs0 `BS.append` bs1
+        if BS.length bs == len then
+            return bs
+          else
+            loop bs
+    eofE = mkIOError eofErrorType "connection terminated" Nothing Nothing
+    recvCore len0 = do
+        bs <- recv sock len0
+        if bs == "" then
+            E.throwIO eofE
+          else
+            return bs
 
 ----------------------------------------------------------------
 

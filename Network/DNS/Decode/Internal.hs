@@ -33,7 +33,6 @@ getResponse = do
                   <*> getResourceRecords nsCount
                   <*> getResourceRecords arCount
 
-
 ----------------------------------------------------------------
 
 getDNSFlags :: SGet DNSFlags
@@ -83,8 +82,8 @@ getOptCode = toOptCode <$> get16
 
 getQuery :: SGet Question
 getQuery = Question <$> getDomain
-                       <*> getTYPE
-                       <*  ignoreClass
+                    <*> getTYPE
+                    <*  ignoreClass
 
 getResourceRecords :: Int -> SGet [ResourceRecord]
 getResourceRecords n = replicateM n getResourceRecord
@@ -219,44 +218,54 @@ getOData opc len = UnknownOData opc <$> getNByteString len
 ----------------------------------------------------------------
 
 getDomain :: SGet Domain
-getDomain = getDomain' '.'
+getDomain = do
+    lim <- B.length <$> getInput
+    getDomain' '.' lim 0
 
 getMailbox :: SGet Mailbox
-getMailbox = getDomain' '@'
+getMailbox = do
+    lim <- B.length <$> getInput
+    getDomain' '@' lim 0
 
 -- | Get a domain name, using sep1 as the separate between the 1st and 2nd
 -- label.  Subsequent labels (and always the trailing label) are terminated
 -- with a ".".
-getDomain' :: Char -> SGet ByteString
-getDomain' sep1 = do
-    pos <- getPosition
-    c <- getInt8
-    let n = getValue c
-    -- Syntax hack to avoid using MultiWayIf
-    case () of
-        _ | c == 0 -> return "." -- Perhaps the root domain?
-        _ | isPointer c -> do
-            d <- getInt8
-            let offset = n * 256 + d
-            mo <- pop offset
-            case mo of
-                Nothing -> fail $ "getDomain: " ++ show offset
-                -- A pointer may refer to another pointer.
-                -- So, register this position for the domain.
-                Just o -> push pos o >> return o
-        -- As for now, extended labels have no use.
-        -- This may change some time in the future.
-        _ | isExtLabel c -> return ""
-        _ -> do
-            hs <- getNByteString n
-            ds <- getDomain' '.'
-            let dom =
-                    case ds of -- avoid trailing ".."
-                        "." -> hs `BS.append` "."
-                        _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
-            push pos dom
-            return dom
+getDomain' :: Char -> Int -> Int -> SGet ByteString
+getDomain' sep1 lim loopcnt
+  -- 127 is the logical limitation of pointers.
+  | loopcnt >= 127 = fail "pointer recursion limit exceeded"
+  | otherwise      = do
+      pos <- getPosition
+      c <- getInt8
+      let n = getValue c
+      getdomain pos c n
   where
+    getdomain pos c n
+      | c == 0 = return "." -- Perhaps the root domain?
+      | isPointer c = do
+          d <- getInt8
+          let offset = n * 256 + d
+          when (offset >= lim) $ fail "pointer is too large"
+          mo <- pop offset
+          case mo of
+              Nothing -> do
+                  target <- B.drop offset <$> getInput
+                  case runSGet (getDomain' sep1 lim (loopcnt + 1)) target of
+                        Left (DecodeError err) -> fail err
+                        Left err               -> fail $ show err
+                        Right o  -> push pos (fst o) >> return (fst o)
+              Just o -> push pos o >> return o
+      -- As for now, extended labels have no use.
+      -- This may change some time in the future.
+      | isExtLabel c = return ""
+      | otherwise = do
+          hs <- getNByteString n
+          ds <- getDomain' '.' lim (loopcnt + 1)
+          let dom = case ds of -- avoid trailing ".."
+                  "." -> hs `BS.append` "."
+                  _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
+          push pos dom
+          return dom
     getValue c = c .&. 0x3f
     isPointer c = testBit c 7 && testBit c 6
     isExtLabel c = not (testBit c 7) && testBit c 6

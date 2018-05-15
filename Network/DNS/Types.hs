@@ -80,6 +80,8 @@ module Network.DNS.Types (
   -- * EDNS0
   , EDNS0
   , defaultEDNS0
+  , maxUdpSize
+  , minUdpSize
   -- ** Accessors
   , udpSize
   , extRCODE
@@ -353,6 +355,7 @@ data DNSError =
     -- | Network failure.
   | NetworkFailure IOException
     -- | Error is unknown
+  | DecodeError String
   | UnknownDNSError
   deriving (Eq, Show, Typeable)
 
@@ -756,6 +759,22 @@ data EDNS0 = EDNS0 {
 defaultEDNS0 :: EDNS0
 defaultEDNS0 = EDNS0 4096 NoErr False []
 
+-- | Maximum UDP size. If 'udpSize' of 'EDNS0' is larger than this,
+--   'fromEDNS0' uses this value instead.
+--
+-- >>> maxUdpSize
+-- 16384
+maxUdpSize :: Word16
+maxUdpSize = 16384
+
+-- | Minimum UDP size. If 'udpSize' of 'EDNS0' is smaller than this,
+--   'fromEDNS0' uses this value instead.
+--
+-- >>> minUdpSize
+-- 512
+minUdpSize :: Word16
+minUdpSize = 512
+
 -- | Generating a resource record for the additional section based on EDNS0.
 -- 'DNSFlags' is not generated.
 -- Just set the same 'RCODE' to 'DNSFlags'.
@@ -764,7 +783,7 @@ fromEDNS0 edns = ResourceRecord name' type' class' ttl' rdata'
   where
     name'  = "."
     type'  = OPT
-    class' = udpSize edns
+    class' = maxUdpSize `min` (minUdpSize `max` udpSize edns)
     ttl0'   = fromIntegral (fromRCODE (extRCODE edns) .&. 0x0ff0) `shiftL` 20
     ttl'
       | dnssecOk edns = ttl0' `setBit` 15
