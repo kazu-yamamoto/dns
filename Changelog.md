@@ -1,3 +1,9 @@
+# 3.0.3
+
+- Implementing NSEC3PARAM [#109](https://github.com/kazu-yamamoto/dns/pull/109)
+- Fixing an example of DNS server.
+- Improving DNS decoder [#111](https://github.com/kazu-yamamoto/dns/pull/111)
+
 # 3.0.2
 
 - Supporting conduit 1.3 [#105](https://github.com/kazu-yamamoto/dns/pull/105)
