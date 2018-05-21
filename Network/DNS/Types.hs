@@ -600,6 +600,8 @@ toRCODEforHeader w = toRCODE (w .&. 0x0f)
 
 ----------------------------------------------------------------
 
+-- XXX: The Question really should also include the CLASS
+--
 -- | Raw data format for DNS questions.
 data Question = Question {
     qname  :: Domain -- ^ A domain name

@@ -19,11 +19,12 @@ import Network.DNS.Imports
 import Network.DNS.Types
 import Network.DNS.Types.Internal
 
--- | Check response for a matching identifier.  If we ever do pipelined TCP,
--- we'll also need to match the QNAME, CLASS and QTYPE.  See:
+-- | Check response for a matching identifier and question.  If we ever do
+-- pipelined TCP, we'll need to handle out of order responses.  See:
 -- https://tools.ietf.org/html/rfc7766#section-7
-checkResp :: Question -> Identifier -> DNSMessage -> Bool
-checkResp _ seqno resp = identifier (header resp) == seqno
+checkResp :: [Question] -> Identifier -> DNSMessage -> Bool
+checkResp q seqno resp =
+   (identifier (header resp) == seqno) && (q == (question resp))
 
 ----------------------------------------------------------------
 
@@ -33,13 +34,13 @@ instance Exception TCPFallback
 type Rslv0 = Bool -> (Socket -> IO DNSMessage)
            -> IO (Either DNSError DNSMessage)
 
-type Rslv1 = Question
+type Rslv1 = [Question]
           -> [ResourceRecord]
           -> Int -- Timeout
           -> Int -- Retry
           -> Rslv0
 
-type TcpRslv = Identifier -> AddrInfo -> Question -> Int -- Timeout
+type TcpRslv = Identifier -> AddrInfo -> [Question] -> Int -- Timeout
             -> Bool -> IO DNSMessage
 
 type UdpRslv = [ResourceRecord] -> Int -- Retry
@@ -66,7 +67,9 @@ resolve dom typ rlv ad rcv
   | concurrent    = resolveConcurrent nss        gens        q edns tm retry ad rcv
   | otherwise     = resolveSequential nss        gens        q edns tm retry ad rcv
   where
-    q = Question dom typ
+    q = case BS.last dom of
+          '.' -> [Question dom typ]
+          _   -> [Question (dom <> ".") typ]
 
     gens = NE.toList $ genIds rlv
 
@@ -128,7 +131,7 @@ udpOpen ai = do
 -- This throws DNSError or TCPFallback.
 udpLookup :: UdpRslv
 udpLookup edns retry rcv ident ai q tm ad = do
-    let qry = encodeQuestions ident [q] edns ad
+    let qry = encodeQuestions ident q edns ad
         ednsRetry = not $ null edns
     E.handle (ioErrorToDNSError ai "UDP") $
       bracket (udpOpen ai) close (loop qry ednsRetry 0 RetryLimitExceeded)
@@ -136,22 +139,33 @@ udpLookup edns retry rcv ident ai q tm ad = do
     loop qry ednsRetry cnt err sock
       | cnt == retry = E.throwIO err
       | otherwise    = do
-          mres <- timeout tm (send sock qry >> rcv sock)
+          mres <- timeout tm (send sock qry >> getAns sock)
           case mres of
               Nothing  -> loop qry ednsRetry (cnt + 1) RetryLimitExceeded sock
-              Just res
-                | checkResp q ident res -> do
+              Just res -> do
                       let flgs = flags$ header res
                           truncated = trunCation flgs
                           rc = rcode flgs
                       if truncated then
                           E.throwIO TCPFallback
                       else if ednsRetry && rc == FormatErr then
-                          let nonednsQuery = encodeQuestions ident [q] [] ad
+                          let nonednsQuery = encodeQuestions ident q [] ad
                           in loop nonednsQuery False cnt RetryLimitExceeded sock
                       else
                           return res
-                | otherwise -> loop qry ednsRetry (cnt + 1) SequenceNumberMismatch sock
+
+    -- | Closed UDP ports are occasionally re-used for a new query, with
+    -- the nameserver returning an unexpected answer to the wrong socket.
+    -- Such answers should be simply dropped, with the client continuing
+    -- to wait for the right answer, without resending the question.
+    -- Note, this eliminates sequence mismatch as a UDP error condition,
+    -- instead we'll time out if no matching answer arrives.
+    --
+    getAns sock = do
+        mres <- rcv sock
+        if checkResp q ident mres
+        then return mres
+        else getAns sock
 
 ----------------------------------------------------------------
 
@@ -171,7 +185,7 @@ tcpLookup ident ai q tm ad =
   where
     addr = addrAddress ai
     perform vc = do
-        let qry = encodeQuestions ident [q] [] ad
+        let qry = encodeQuestions ident q [] ad
         mres <- timeout tm $ do
             connect vc addr
             sendVC vc qry
