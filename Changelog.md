@@ -1,3 +1,7 @@
+# 3.0.4
+
+- Drop unexpected UDP answers [#112](https://github.com/kazu-yamamoto/dns/pull/112)
+
 # 3.0.3
 
 - Implementing NSEC3PARAM [#109](https://github.com/kazu-yamamoto/dns/pull/109)
