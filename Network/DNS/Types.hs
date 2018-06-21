@@ -418,6 +418,9 @@ data OPCODE
   = OP_STD -- ^ A standard query.
   | OP_INV -- ^ An inverse query.
   | OP_SSR -- ^ A server status request.
+  | OP_3_UNASSIGNED
+  | OP_NOTIFY -- ^ A zone change notification (RFC1996)
+  | OP_UPDATE -- ^ An update request (RFC2136)
   deriving (Eq, Show, Enum, Bounded)
 
 ----------------------------------------------------------------
