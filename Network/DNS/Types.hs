@@ -69,6 +69,8 @@ module Network.DNS.Types (
   , NotZone
   , BadOpt
   )
+  , fromOPCODE
+  , toOPCODE
   , fromRCODE
   , toRCODE
   , fromRCODEforHeader
@@ -418,10 +420,26 @@ data OPCODE
   = OP_STD -- ^ A standard query.
   | OP_INV -- ^ An inverse query.
   | OP_SSR -- ^ A server status request.
-  | OP_3_UNASSIGNED
+  -- OPCODE 3 is unassigned
   | OP_NOTIFY -- ^ A zone change notification (RFC1996)
   | OP_UPDATE -- ^ An update request (RFC2136)
   deriving (Eq, Show, Enum, Bounded)
+
+toOPCODE :: Word16 -> Maybe OPCODE
+toOPCODE i = case i of
+  0 -> Just OP_STD
+  1 -> Just OP_INV
+  2 -> Just OP_SSR
+  4 -> Just OP_NOTIFY
+  5 -> Just OP_UPDATE
+  _ -> Nothing
+
+fromOPCODE :: OPCODE -> Word16
+fromOPCODE OP_STD    = 0
+fromOPCODE OP_INV    = 1
+fromOPCODE OP_SSR    = 2
+fromOPCODE OP_NOTIFY = 4
+fromOPCODE OP_UPDATE = 5
 
 ----------------------------------------------------------------
 

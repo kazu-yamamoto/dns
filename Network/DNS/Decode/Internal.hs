@@ -53,7 +53,7 @@ getDNSFlags = do
                         rc
                         (getAuthenData flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
-    getOpcode w = Safe.toEnumMay (fromIntegral (shiftR w 11 .&. 0x0f))
+    getOpcode w = toOPCODE (shiftR w 11 .&. 0x0f)
     getAuthAnswer w = testBit w 10
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8
