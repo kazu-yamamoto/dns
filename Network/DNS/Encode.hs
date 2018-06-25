@@ -78,9 +78,6 @@ putHeader hdr = putIdentifier (identifier hdr)
 putDNSFlags :: DNSFlags -> SPut
 putDNSFlags DNSFlags{..} = put16 word
   where
-    word16 :: Enum a => a -> Word16
-    word16 = toEnum . fromEnum
-
     set :: Word16 -> State Word16 ()
     set byte = modify (.|. byte)
 
@@ -92,7 +89,7 @@ putDNSFlags DNSFlags{..} = put16 word
               , when recDesired          $ set (bit 8)
               , when trunCation          $ set (bit 9)
               , when authAnswer          $ set (bit 10)
-              , set (word16 opcode `shiftL` 11)
+              , set (fromOPCODE opcode `shiftL` 11)
               , when (qOrR==QR_Response) $ set (bit 15)
               ]
 

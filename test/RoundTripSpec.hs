@@ -166,7 +166,7 @@ genQorR :: Gen QorR
 genQorR = elements [minBound .. maxBound]
 
 genOPCODE :: Gen OPCODE
-genOPCODE  = elements [minBound .. maxBound]
+genOPCODE  = elements [OP_STD, OP_INV, OP_SSR, OP_NOTIFY, OP_UPDATE]
 
 genRCODE :: Gen RCODE
 genRCODE = elements $ map toRCODE [0..15]
