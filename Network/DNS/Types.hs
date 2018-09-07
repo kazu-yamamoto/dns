@@ -804,35 +804,35 @@ data ResourceRecord = ResourceRecord {
   } deriving (Eq,Show)
 
 -- | Raw data format for each type.
-data RData = RD_A IPv4           -- ^ IPv4 address
-           | RD_NS Domain        -- ^ An authoritative name serve
-           | RD_CNAME Domain     -- ^ The canonical name for an alias
-           | RD_SOA Domain Mailbox Word32 Word32 Word32 Word32 Word32
-                                 -- ^ Marks the start of a zone of authority
-           | RD_NULL             -- ^ A null RR (EXPERIMENTAL).
-                                 -- Anything can be in a NULL record,
-                                 -- for now we just drop this data.
-           | RD_PTR Domain       -- ^ A domain name pointer
-           | RD_MX Word16 Domain -- ^ Mail exchange
-           | RD_TXT ByteString   -- ^ Text strings
-           | RD_AAAA IPv6        -- ^ IPv6 Address
-           | RD_SRV Word16 Word16 Word16 Domain
-                                 -- ^ Server Selection (RFC2782)
-           | RD_DNAME Domain     -- ^ DNAME (RFC6672)
-           | RD_OPT [OData]      -- ^ OPT (RFC6891)
-           | RD_DS Word16 Word8 Word8 ByteString -- ^ Delegation Signer (RFC4034)
+data RData = RD_A !IPv4            -- ^ IPv4 address
+           | RD_NS !Domain         -- ^ An authoritative name serve
+           | RD_CNAME !Domain      -- ^ The canonical name for an alias
+           | RD_SOA !Domain !Mailbox !Word32 !Word32 !Word32 !Word32 !Word32
+                                   -- ^ Marks the start of a zone of authority
+           | RD_NULL               -- ^ A null RR (EXPERIMENTAL).
+                                   -- Anything can be in a NULL record,
+                                   -- for now we just drop this data.
+           | RD_PTR !Domain        -- ^ A domain name pointer
+           | RD_MX !Word16 !Domain -- ^ Mail exchange
+           | RD_TXT !ByteString    -- ^ Text strings
+           | RD_AAAA !IPv6         -- ^ IPv6 Address
+           | RD_SRV !Word16 !Word16 !Word16 !Domain
+                                   -- ^ Server Selection (RFC2782)
+           | RD_DNAME !Domain      -- ^ DNAME (RFC6672)
+           | RD_OPT ![OData]       -- ^ OPT (RFC6891)
+           | RD_DS !Word16 !Word8 !Word8 !ByteString -- ^ Delegation Signer (RFC4034)
            --RD_RRSIG
            --RD_NSEC
-           | RD_DNSKEY Word16 Word8 Word8 ByteString
-                                 -- ^ DNSKEY (RFC4034)
+           | RD_DNSKEY !Word16 !Word8 !Word8 !ByteString
+                                   -- ^ DNSKEY (RFC4034)
            --RD_NSEC3
-           | RD_NSEC3PARAM Word8 Word8 Word16 ByteString
-           | RD_TLSA Word8 Word8 Word8 ByteString
-                                 -- ^ TLSA (RFC6698)
+           | RD_NSEC3PARAM !Word8 !Word8 !Word16 !ByteString
+           | RD_TLSA !Word8 !Word8 !Word8 !ByteString
+                                   -- ^ TLSA (RFC6698)
            --RD_CDS
            --RD_CDNSKEY
            --RD_CSYNC
-           | UnknownRData ByteString   -- ^ Unknown resource data
+           | UnknownRData !ByteString   -- ^ Unknown resource data
     deriving (Eq, Ord)
 
 instance Show RData where

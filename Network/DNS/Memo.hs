@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+
 module Network.DNS.Memo where
 
 import qualified Control.Reaper as R
@@ -34,12 +36,18 @@ lookupCache :: Key -> Cache -> IO (Maybe (Prio, Entry))
 lookupCache key reaper = PSQ.lookup key <$> R.reaperRead reaper
 
 insertCache :: Key -> Prio -> Entry -> Cache -> IO ()
-insertCache (dom,typ) tim ent0 reaper = R.reaperAdd reaper (key,tim,ent)
+insertCache (!dom,!typ) !tim !ent0 !reaper = R.reaperAdd reaper (key,tim,ent)
   where
-    key = (B.copy dom,typ)
-    ent = case ent0 of
+    !key = let dom' = B.copy dom in (dom',typ)
+    !ent = case ent0 of
       l@(Left _)  -> l
-      (Right rds) -> Right $ map copy rds
+      (Right rds) -> let !rds' = map' copy rds in Right rds'
+    map' :: (a -> b) -> [a] -> [b]
+    map' _ [] = []
+    map' f (x:xs) = let !x'  = f x
+                        !xs' = map' f xs
+                        !xxs' = x' : xs'
+                    in xxs'
 
 -- Theoretically speaking, atMostView itself is good enough for pruning.
 -- But auto-update assumes a list based db which does not provide atMost
