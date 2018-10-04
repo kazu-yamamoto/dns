@@ -8,8 +8,9 @@ module Network.DNS.IO (
     -- * Sending to socket
   , send
   , sendVC
-    -- ** Creating Query
+    -- ** Encoding queries for transmission
   , encodeQuestions
+  , encodeQuestions'
   , composeQuery
   , composeQueryAD
     -- ** Creating Response
@@ -127,24 +128,43 @@ sendAll sock bs = do
 
 ----------------------------------------------------------------
 
--- | Creating query.
+-- | The encoded 'DNSMessage' has the specified request ID and value of the
+-- Authenticated Data (AD) bit (RFC4035, Section 3.2.3).
+--
+-- The caller is responsible for generating the ID via a securely seeded
+-- CSPRNG).
+--
 encodeQuestions :: Identifier
                 -> [Question]
                 -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-                -> Bool             -- ^ Authentication
+                -> Bool             -- ^ The AD bit
                 -> ByteString
-encodeQuestions idt qs adds auth = encode qry
+encodeQuestions idt qs adds ad = encodeQuestions' idt qs adds $ adBit (Just ad)
+
+-- | The encoded 'DNSMessage' has the specified request ID.  The default values
+-- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
+-- parameter.  A suitable combination of flags can be created via the 'rdBit',
+-- 'adBit' and 'cdBit' generators of the 'Network.DNS.Types.QueryFlags'
+-- 'Monoid'.
+--
+-- The caller is responsible for generating the ID via a securely seeded
+-- CSPRNG).
+--
+encodeQuestions' :: Identifier
+                 -> [Question]
+                 -> [ResourceRecord] -- ^ Additional RRs for EDNS.
+                 -> QueryFlags       -- ^ Custom RD/AD/CD flags?
+                 -> ByteString
+encodeQuestions' idt qs adds fs = encode qry
   where
-      hdr = header defaultQuery
-      flg = flags hdr
-      qry = defaultQuery {
-          header = hdr {
-              identifier = idt,
-              flags = flg {
-                  authenData = auth
-              }
-           }
+      qry = DNSMessage {
+          header = DNSHeader {
+              identifier = idt
+            , flags = queryDNSFlags fs
+            }
         , question = qs
+        , answer     = []
+        , authority  = []
         , additional = adds
         }
 

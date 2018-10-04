@@ -4,8 +4,9 @@ module Network.DNS.LookupRaw (
   -- * Looking up functions
     lookup
   , lookupAuth
-  -- * Raw looking up function
+  -- * Lookups returning DNS Messages
   , lookupRaw
+  , lookupRaw'
   , lookupRawAD
   , fromDNSMessage
   , fromDNSFormat
@@ -227,7 +228,7 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --  @
 --
 lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRaw rslv dom typ = resolve dom typ rslv False receive
+lookupRaw rslv dom typ = resolve dom typ rslv mempty receive
 
 -- | Same as 'lookupRaw' but the query sets the AD bit, which solicits the
 --   the authentication status in the server reply.  In most applications
@@ -236,7 +237,18 @@ lookupRaw rslv dom typ = resolve dom typ rslv False receive
 --   interface should in most cases only be used with a loopback resolver.
 --
 lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRawAD rslv dom typ = resolve dom typ rslv True receive
+lookupRawAD rslv dom typ = resolve dom typ rslv (adBit (Just True)) receive
+
+-- | Similar to 'lookupRawAD' but the query-related flag bits are specified
+-- via a 'QueryFlags' combination of overrides, which are generated as a
+-- 'Monoid' by the 'rdBit', 'adBit' and 'cdBit' combinators.
+--
+lookupRaw' :: Resolver   -- ^ Resolver obtained via 'withResolver'
+           -> Domain     -- ^ Query domain
+           -> TYPE       -- ^ Query RRtype
+           -> QueryFlags -- ^ RD, AD and CD flags
+           -> IO (Either DNSError DNSMessage)
+lookupRaw' rslv dom typ fl = resolve dom typ rslv fl receive
 
 ----------------------------------------------------------------
 

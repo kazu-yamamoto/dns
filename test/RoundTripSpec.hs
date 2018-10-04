@@ -148,7 +148,7 @@ genDNSHeader = DNSHeader <$> genWord16 <*> genDNSFlags
 genDNSFlags :: Gen DNSFlags
 genDNSFlags =
   DNSFlags <$> genQorR <*> genOPCODE <*> genBool <*> genBool
-            <*> genBool <*> genBool <*> genRCODE <*> genBool
+           <*> genBool <*> genBool <*> genRCODE <*> genBool <*> genBool
 
 genWord16 :: Gen Word16
 genWord16 = arbitrary

@@ -52,6 +52,7 @@ getDNSFlags = do
                         (getRecAvailable flgs)
                         rc
                         (getAuthenData flgs)
+                        (getChkDisable flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
     getOpcode w = toOPCODE (shiftR w 11 .&. 0x0f)
     getAuthAnswer w = testBit w 10
@@ -60,6 +61,7 @@ getDNSFlags = do
     getRecAvailable w = testBit w 7
     getRcode w = toRCODEforHeader $ fromIntegral w
     getAuthenData w = testBit w 5
+    getChkDisable w = testBit w 4
 
 ----------------------------------------------------------------
 

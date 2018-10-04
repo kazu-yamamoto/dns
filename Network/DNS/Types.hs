@@ -53,7 +53,6 @@ module Network.DNS.Types (
   , DNSHeader (..)
   , Identifier
   , QorR (..)
-  , DNSFlags (..)
   , OPCODE (..)
   , RCODE (
     NoErr
@@ -69,6 +68,15 @@ module Network.DNS.Types (
   , NotZone
   , BadOpt
   )
+  -- *** DNS flags
+  , DNSFlags (..)
+  , defaultDNSFlags
+  , QueryFlags
+  , queryDNSFlags
+  , rdBit
+  , adBit
+  , cdBit
+  -- **** OPCODE and RCODE
   , fromOPCODE
   , toOPCODE
   , fromRCODE
@@ -103,12 +111,16 @@ module Network.DNS.Types (
   , Mailbox
   ) where
 
+import Control.Applicative ((<|>))
 import Control.Exception (Exception, IOException)
 import qualified Data.ByteString.Base64 as B64 (encode)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
+import Data.List as List (intercalate)
+import Data.Maybe (catMaybes)
+import qualified Data.Semigroup as Sem (Semigroup, (<>))
 
 import Network.DNS.Imports
 
@@ -405,8 +417,113 @@ data DNSFlags = DNSFlags {
                            -- available in the name server.
 
   , rcode        :: RCODE  -- ^ Response code.
-  , authenData   :: Bool   -- ^ Authentic Data (RFC4035).
+  , authenData   :: Bool   -- ^ AD bit (RFC4035, Section 3.2.3).
+  , chkDisable   :: Bool   -- ^ CD bit (RFC4035, Section 3.2.2).
   } deriving (Eq, Show)
+
+
+-- | Default 'DNSFlags' record suitable for making recursive queries.  By default
+-- the RD bit is set, and the AD and CD bits are cleared.
+--
+defaultDNSFlags :: DNSFlags
+defaultDNSFlags = DNSFlags
+         { qOrR         = QR_Query
+         , opcode       = OP_STD
+         , authAnswer   = False
+         , trunCation   = False
+         , recDesired   = True
+         , recAvailable = False
+         , authenData   = False
+         , chkDisable   = False
+         , rcode        = NoErr
+         }
+
+-- | Optional overrides of query-related DNS flags.  The 'Monoid' instance
+-- makes it possible to combine the generators 'rdBit', 'adBit' and 'cdBit' to
+-- yield all possible combinations of "set", "clear" and "reset" (to default)
+-- for each of the bits.
+--
+-- >>> :{
+-- let setrd = rdBit (Just True)
+--     setad = adBit (Just True)
+--     setcd = cdBit (Just True)
+--     clrrd = rdBit (Just False)
+--     clrad = adBit (Just False)
+--     clrcd = cdBit (Just False)
+--     rstrd = rdBit Nothing
+--     rstad = adBit Nothing
+--     rstcd = cdBit Nothing
+--  in rstcd <> setrd <> clrad <> setcd <> setad
+-- :}
+-- rd:1,ad:0
+--
+data QueryFlags = QueryFlags
+    { _rdBit :: ! (Maybe (Maybe Bool))
+    , _adBit :: ! (Maybe (Maybe Bool))
+    , _cdBit :: ! (Maybe (Maybe Bool))
+    }
+
+instance Sem.Semigroup QueryFlags where
+    (QueryFlags rd1 ad1 cd1) <> (QueryFlags rd2 ad2 cd2) =
+        QueryFlags (rd1 <|> rd2) (ad1 <|> ad2) (cd1 <|> cd2)
+
+instance Monoid QueryFlags where
+    mempty = QueryFlags Nothing Nothing Nothing
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+instance Show QueryFlags where
+    show (QueryFlags rd ad cd) = List.intercalate "," $ catMaybes $ catMaybes $
+           [ fmap (fmap $ showFlag "rd") rd
+           , fmap (fmap $ showFlag "ad") ad
+           , fmap (fmap $ showFlag "cd") cd ]
+      where
+        showFlag :: String -> Bool -> String
+        showFlag nm True  = nm ++ ":1"
+        showFlag nm False = nm ++ ":0"
+
+-- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
+-- resulting 'DNSFlags' suitable for making queries with the requested flag
+-- settings.  This is only needed if you're creating your own 'DNSMessage',
+-- the 'Network.DNS.LookupRaw.lookupRaw'' function takes a 'QueryFlags'
+-- argument and handles this conversion internally.
+--
+-- Default overrides can be specified in the resolver configuration by setting
+-- the 'Network.DNS.resolvQueryFlags' field of the
+-- 'Network.DNS.Resolver.ResolvConf' argument to
+-- 'Network.DNS.Resolver.makeResolvSeed'.  These then apply to lookups via
+-- resolvers based on the resulting configuration, with the exception of
+-- 'Network.DNS.LookupRaw.lookupRawAD' which always sets the AD bit, and
+-- 'Network.DNS.LookupRaw.lookupRaw'' which takes an additional 'QueryFlags'
+-- argument to augment the default overrides.
+--
+queryDNSFlags :: QueryFlags -> DNSFlags
+queryDNSFlags (QueryFlags rd ad cd) =
+    let d = defaultDNSFlags
+     in d { recDesired = maybe (recDesired d) (maybe (recDesired d) id) rd
+          , authenData = maybe (authenData d) (maybe (authenData d) id) ad
+          , chkDisable = maybe (chkDisable d) (maybe (chkDisable d) id) cd
+          }
+
+rdBit, adBit, cdBit :: Maybe Bool -> QueryFlags
+
+-- | To reset the RD bit to the default state pass 'Nothing', otherwise
+-- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
+--
+rdBit rd = mempty { _rdBit = Just rd }
+
+-- | To reset the AD bit to the default state pass 'Nothing', otherwise
+-- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
+--
+adBit ad = mempty { _adBit = Just ad }
+
+-- | To reset the CD bit to the default state pass 'Nothing', otherwise
+-- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
+--
+cdBit cd = mempty { _cdBit = Just cd }
 
 ----------------------------------------------------------------
 
@@ -719,16 +836,7 @@ defaultQuery :: DNSMessage
 defaultQuery = DNSMessage {
     header = DNSHeader {
        identifier = 0
-     , flags = DNSFlags {
-           qOrR         = QR_Query
-         , opcode       = OP_STD
-         , authAnswer   = False
-         , trunCation   = False
-         , recDesired   = True
-         , recAvailable = False
-         , rcode        = NoErr
-         , authenData   = False
-         }
+     , flags = defaultDNSFlags
      }
   , question   = []
   , answer     = []
