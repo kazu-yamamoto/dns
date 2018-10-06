@@ -2,10 +2,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.DNS.IO (
-    -- * Receiving from socket
+    -- * Receiving DNS messages
     receive
   , receiveVC
-    -- * Sending to socket
+    -- * Sending pre-encoded messages
   , send
   , sendVC
     -- ** Encoding queries for transmission
@@ -13,7 +13,7 @@ module Network.DNS.IO (
   , encodeQuestions'
   , composeQuery
   , composeQueryAD
-    -- ** Creating Response
+    -- ** Creating query response messages
   , responseA
   , responseAAAA
   ) where

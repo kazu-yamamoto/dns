@@ -52,8 +52,19 @@ module Network.DNS.Types (
   -- ** DNS Header
   , DNSHeader (..)
   , Identifier
+  -- *** DNS flags
+  , DNSFlags (..)
   , QorR (..)
+  , defaultDNSFlags
+  , QueryFlags
+  , queryDNSFlags
+  , rdBit
+  , adBit
+  , cdBit
+  -- **** OPCODE and RCODE
   , OPCODE (..)
+  , fromOPCODE
+  , toOPCODE
   , RCODE (
     NoErr
   , FormatErr
@@ -68,17 +79,6 @@ module Network.DNS.Types (
   , NotZone
   , BadOpt
   )
-  -- *** DNS flags
-  , DNSFlags (..)
-  , defaultDNSFlags
-  , QueryFlags
-  , queryDNSFlags
-  , rdBit
-  , adBit
-  , cdBit
-  -- **** OPCODE and RCODE
-  , fromOPCODE
-  , toOPCODE
   , fromRCODE
   , toRCODE
   , fromRCODEforHeader
@@ -443,6 +443,8 @@ defaultDNSFlags = DNSFlags
 -- yield all possible combinations of "set", "clear" and "reset" (to default)
 -- for each of the bits.
 --
+-- ==== __Example__
+--
 -- >>> :{
 -- let setrd = rdBit (Just True)
 --     setad = adBit (Just True)
@@ -542,6 +544,8 @@ data OPCODE
   | OP_UPDATE -- ^ An update request (RFC2136)
   deriving (Eq, Show, Enum, Bounded)
 
+-- | Convert a 16-bit DNS OPCODE number to its internal representation
+--
 toOPCODE :: Word16 -> Maybe OPCODE
 toOPCODE i = case i of
   0 -> Just OP_STD
@@ -551,6 +555,9 @@ toOPCODE i = case i of
   5 -> Just OP_UPDATE
   _ -> Nothing
 
+-- | Convert the internal representation of a DNS OPCODE to its 16-bit numeric
+-- value.
+--
 fromOPCODE :: OPCODE -> Word16
 fromOPCODE OP_STD    = 0
 fromOPCODE OP_INV    = 1

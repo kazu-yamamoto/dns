@@ -1,13 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.DNS.LookupRaw (
-  -- * Looking up functions
+  -- * Lookups returning requested RData
     lookup
   , lookupAuth
   -- * Lookups returning DNS Messages
   , lookupRaw
   , lookupRaw'
   , lookupRawAD
+  -- * DNS Message procesing
   , fromDNSMessage
   , fromDNSFormat
   ) where
@@ -252,7 +253,17 @@ lookupRaw' rslv dom typ fl = resolve dom typ rslv fl receive
 
 ----------------------------------------------------------------
 
--- | Extract necessary information from 'DNSMessage'
+-- | Messages with a non-error RCODE are passed to the supplied function
+-- for processing.  Other messages are translated to 'DNSError' instances.
+--
+-- Note that 'NameError' is not a lookup error.  The lookup is successful,
+-- bearing the sad news that the requested domain does not exist.  'NameError'
+-- resposes may return a meaningful AD bit, may contain useful data in the
+-- authority section, and even initial CNAME records that lead to the
+-- ultimately non-existent domain.  Applications that wish to process the
+-- content of 'NameError' (NXDomain) messages will need to implement their
+-- own RCODE handling.
+--
 fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
 fromDNSMessage ans conv = case errcode ans of
     NoErr     -> Right $ conv ans
