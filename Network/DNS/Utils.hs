@@ -6,12 +6,7 @@ module Network.DNS.Utils (
   , normalizeRoot
   ) where
 
-import qualified Data.ByteString.Char8 as BS (
-    append
-  , last
-  , map
-  , null
-  , pack )
+import qualified Data.ByteString.Char8 as BS
 import Data.Char (toLower)
 
 import Network.DNS.Types (Domain)
@@ -37,7 +32,7 @@ import Network.DNS.Types (Domain)
 --
 --   Ensure that we don't crash on the empty 'Domain':
 --
---   >>> import qualified Data.ByteString.Char8 as BS ( empty )
+--   >>> import qualified Data.ByteString.Char8 as BS
 --   >>> normalize BS.empty
 --   "."
 --
@@ -70,7 +65,7 @@ normalize = normalizeCase . normalizeRoot
 --
 --   Ensure that we don't crash on the empty 'Domain':
 --
---   >>> import qualified Data.ByteString.Char8 as BS ( empty )
+--   >>> import qualified Data.ByteString.Char8 as BS
 --   >>> normalizeCase BS.empty
 --   ""
 --
@@ -124,7 +119,7 @@ normalizeCase = BS.map toLower
 --
 --   Ensure that we don't crash on the empty 'Domain':
 --
---   >>> import qualified Data.ByteString.Char8 as BS ( empty )
+--   >>> import qualified Data.ByteString.Char8 as BS
 --   >>> normalizeRoot BS.empty
 --   "."
 --

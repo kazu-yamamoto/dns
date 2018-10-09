@@ -113,13 +113,13 @@ module Network.DNS.Types (
   ) where
 
 import Control.Exception (Exception, IOException)
-import qualified Data.ByteString.Base64 as B64 (encode)
+import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
-import Data.List as List
-import qualified Data.Semigroup as Sem (Semigroup, (<>))
+import qualified Data.List as List
+import qualified Data.Semigroup as Sem
 
 import Network.DNS.Imports
 
