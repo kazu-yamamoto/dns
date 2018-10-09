@@ -13,7 +13,6 @@ module Network.DNS.Decode.Internal (
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import Data.IP (IP(..), toIPv4, toIPv6b)
-import qualified Safe
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
