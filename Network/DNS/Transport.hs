@@ -24,7 +24,7 @@ import Network.DNS.Types.Internal
 -- https://tools.ietf.org/html/rfc7766#section-7
 checkResp :: [Question] -> Identifier -> DNSMessage -> Bool
 checkResp q seqno resp =
-   (identifier (header resp) == seqno) && (q == (question resp))
+   identifier (header resp) == seqno && q == question resp
 
 ----------------------------------------------------------------
 
@@ -80,7 +80,7 @@ resolve dom typ rlv qfl rcv
     seed    = resolvseed rlv
     nss     = NE.toList $ nameservers seed
     onlyOne = length nss == 1
-    fl      = qfl <> (resolvQueryFlags $ resolvconf $ resolvseed rlv)
+    fl      = qfl <> resolvQueryFlags (resolvconf $ resolvseed rlv)
 
     conf       = resolvconf seed
     concurrent = resolvConcurrent conf

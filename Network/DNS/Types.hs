@@ -119,7 +119,7 @@ import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import Data.List as List (intercalate)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Semigroup as Sem (Semigroup, (<>))
 
 import Network.DNS.Imports
@@ -478,7 +478,7 @@ instance Monoid QueryFlags where
 #endif
 
 instance Show QueryFlags where
-    show (QueryFlags rd ad cd) = List.intercalate "," $ catMaybes $ catMaybes $
+    show (QueryFlags rd ad cd) = List.intercalate "," $ catMaybes $ catMaybes
            [ fmap (fmap $ showFlag "rd") rd
            , fmap (fmap $ showFlag "ad") ad
            , fmap (fmap $ showFlag "cd") cd ]
@@ -505,9 +505,9 @@ instance Show QueryFlags where
 queryDNSFlags :: QueryFlags -> DNSFlags
 queryDNSFlags (QueryFlags rd ad cd) =
     let d = defaultDNSFlags
-     in d { recDesired = maybe (recDesired d) (maybe (recDesired d) id) rd
-          , authenData = maybe (authenData d) (maybe (authenData d) id) ad
-          , chkDisable = maybe (chkDisable d) (maybe (chkDisable d) id) cd
+     in d { recDesired = maybe (recDesired d) (fromMaybe $ recDesired d) rd
+          , authenData = maybe (authenData d) (fromMaybe $ authenData d) ad
+          , chkDisable = maybe (chkDisable d) (fromMaybe $ chkDisable d) cd
           }
 
 rdBit, adBit, cdBit :: Maybe Bool -> QueryFlags
