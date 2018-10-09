@@ -56,6 +56,7 @@ module Network.DNS.Types (
   , DNSFlags (..)
   , QorR (..)
   , defaultDNSFlags
+  , FlagOp(..)
   , QueryFlags
   , queryDNSFlags
   , rdBit
@@ -111,15 +112,13 @@ module Network.DNS.Types (
   , Mailbox
   ) where
 
-import Control.Applicative ((<|>))
 import Control.Exception (Exception, IOException)
 import qualified Data.ByteString.Base64 as B64 (encode)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
-import Data.List as List (intercalate)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.List as List
 import qualified Data.Semigroup as Sem (Semigroup, (<>))
 
 import Network.DNS.Imports
@@ -438,6 +437,21 @@ defaultDNSFlags = DNSFlags
          , rcode        = NoErr
          }
 
+data FlagOp = FlagSet | FlagClear | FlagReset | FlagKeep deriving (Eq, Show)
+
+instance Sem.Semigroup FlagOp where
+    FlagKeep  <> op2 = op2
+    FlagReset <> _   = FlagKeep
+    op1       <> _   = op1
+
+instance Monoid FlagOp where
+    mempty = FlagKeep
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
 -- | Optional overrides of query-related DNS flags.  The 'Monoid' instance
 -- makes it possible to combine the generators 'rdBit', 'adBit' and 'cdBit' to
 -- yield all possible combinations of "set", "clear" and "reset" (to default)
@@ -446,31 +460,31 @@ defaultDNSFlags = DNSFlags
 -- ==== __Example__
 --
 -- >>> :{
--- let setrd = rdBit (Just True)
---     setad = adBit (Just True)
---     setcd = cdBit (Just True)
---     clrrd = rdBit (Just False)
---     clrad = adBit (Just False)
---     clrcd = cdBit (Just False)
---     rstrd = rdBit Nothing
---     rstad = adBit Nothing
---     rstcd = cdBit Nothing
+-- let setrd = rdBit FlagSet
+--     setad = adBit FlagSet
+--     setcd = cdBit FlagSet
+--     clrrd = rdBit FlagClear
+--     clrad = adBit FlagClear
+--     clrcd = cdBit FlagClear
+--     rstrd = rdBit FlagReset
+--     rstad = adBit FlagReset
+--     rstcd = cdBit FlagReset
 --  in rstcd <> setrd <> clrad <> setcd <> setad
 -- :}
 -- rd:1,ad:0
 --
 data QueryFlags = QueryFlags
-    { _rdBit :: ! (Maybe (Maybe Bool))
-    , _adBit :: ! (Maybe (Maybe Bool))
-    , _cdBit :: ! (Maybe (Maybe Bool))
+    { _rdBit :: !FlagOp
+    , _adBit :: !FlagOp
+    , _cdBit :: !FlagOp
     }
 
 instance Sem.Semigroup QueryFlags where
     (QueryFlags rd1 ad1 cd1) <> (QueryFlags rd2 ad2 cd2) =
-        QueryFlags (rd1 <|> rd2) (ad1 <|> ad2) (cd1 <|> cd2)
+        QueryFlags (rd1 <> rd2) (ad1 <> ad2) (cd1 <> cd2)
 
 instance Monoid QueryFlags where
-    mempty = QueryFlags Nothing Nothing Nothing
+    mempty = QueryFlags FlagKeep FlagKeep FlagKeep
 #if !(MIN_VERSION_base(4,11,0))
     -- this is redundant starting with base-4.11 / GHC 8.4
     -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
@@ -478,14 +492,16 @@ instance Monoid QueryFlags where
 #endif
 
 instance Show QueryFlags where
-    show (QueryFlags rd ad cd) = List.intercalate "," $ catMaybes $ catMaybes
-           [ fmap (fmap $ showFlag "rd") rd
-           , fmap (fmap $ showFlag "ad") ad
-           , fmap (fmap $ showFlag "cd") cd ]
+    show (QueryFlags rd ad cd) = List.intercalate "," $ List.delete "" [
+             showFlag "rd" rd
+           , showFlag "ad" ad
+           , showFlag "cd" cd ]
       where
-        showFlag :: String -> Bool -> String
-        showFlag nm True  = nm ++ ":1"
-        showFlag nm False = nm ++ ":0"
+        showFlag :: String -> FlagOp -> String
+        showFlag nm FlagSet   = nm ++ ":1"
+        showFlag nm FlagClear = nm ++ ":0"
+        showFlag _  FlagReset = ""
+        showFlag _  FlagKeep  = ""
 
 -- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
 -- resulting 'DNSFlags' suitable for making queries with the requested flag
@@ -503,29 +519,34 @@ instance Show QueryFlags where
 -- argument to augment the default overrides.
 --
 queryDNSFlags :: QueryFlags -> DNSFlags
-queryDNSFlags (QueryFlags rd ad cd) =
-    let d = defaultDNSFlags
-     in d { recDesired = maybe (recDesired d) (fromMaybe $ recDesired d) rd
-          , authenData = maybe (authenData d) (fromMaybe $ authenData d) ad
-          , chkDisable = maybe (chkDisable d) (fromMaybe $ chkDisable d) cd
-          }
+queryDNSFlags (QueryFlags rd ad cd) = d {
+      recDesired = toBool rd $ recDesired d
+    , authenData = toBool ad $ authenData d
+    , chkDisable = toBool cd $ chkDisable d
+    }
+  where
+    d = defaultDNSFlags
+    toBool FlagSet   _ = True
+    toBool FlagClear _ = False
+    toBool FlagReset v = v
+    toBool FlagKeep  v = v
 
-rdBit, adBit, cdBit :: Maybe Bool -> QueryFlags
+rdBit, adBit, cdBit :: FlagOp -> QueryFlags
 
 -- | To reset the RD bit to the default state pass 'Nothing', otherwise
 -- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
 --
-rdBit rd = mempty { _rdBit = Just rd }
+rdBit rd = mempty { _rdBit = rd }
 
 -- | To reset the AD bit to the default state pass 'Nothing', otherwise
 -- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
 --
-adBit ad = mempty { _adBit = Just ad }
+adBit ad = mempty { _adBit = ad }
 
 -- | To reset the CD bit to the default state pass 'Nothing', otherwise
 -- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
 --
-cdBit cd = mempty { _cdBit = Just cd }
+cdBit cd = mempty { _cdBit = cd }
 
 ----------------------------------------------------------------
 
