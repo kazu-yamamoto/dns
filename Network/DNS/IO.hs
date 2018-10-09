@@ -10,9 +10,6 @@ module Network.DNS.IO (
   , sendVC
     -- ** Encoding queries for transmission
   , encodeQuestions
-  , encodeQuestions'
-  , composeQuery
-  , composeQueryAD
     -- ** Creating query response messages
   , responseA
   , responseAAAA
@@ -126,21 +123,6 @@ sendAll sock bs = do
   when (sent < fromIntegral (BS.length bs)) $ sendAll sock (BS.drop (fromIntegral sent) bs)
 #endif
 
-----------------------------------------------------------------
-
--- | The encoded 'DNSMessage' has the specified request ID and value of the
--- Authenticated Data (AD) bit (RFC4035, Section 3.2.3).
---
--- The caller is responsible for generating the ID via a securely seeded
--- CSPRNG).
---
-encodeQuestions :: Identifier
-                -> [Question]
-                -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-                -> Bool             -- ^ The AD bit
-                -> ByteString
-encodeQuestions idt qs adds ad = encodeQuestions' idt qs adds $ adBit (Just ad)
-
 -- | The encoded 'DNSMessage' has the specified request ID.  The default values
 -- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
 -- parameter.  A suitable combination of flags can be created via the 'rdBit',
@@ -150,12 +132,12 @@ encodeQuestions idt qs adds ad = encodeQuestions' idt qs adds $ adBit (Just ad)
 -- The caller is responsible for generating the ID via a securely seeded
 -- CSPRNG).
 --
-encodeQuestions' :: Identifier
-                 -> [Question]
-                 -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-                 -> QueryFlags       -- ^ Custom RD/AD/CD flags?
-                 -> ByteString
-encodeQuestions' idt qs adds fs = encode qry
+encodeQuestions :: Identifier
+                -> [Question]
+                -> [ResourceRecord] -- ^ Additional RRs for EDNS.
+                -> QueryFlags       -- ^ Custom RD/AD/CD flags?
+                -> ByteString
+encodeQuestions idt qs adds fs = encode qry
   where
       qry = DNSMessage {
           header = DNSHeader {
@@ -167,16 +149,6 @@ encodeQuestions' idt qs adds fs = encode qry
         , authority  = []
         , additional = adds
         }
-
-{-# DEPRECATED composeQuery "Use encodeQuestions instead" #-}
--- | Composing query without EDNS0.
-composeQuery :: Identifier -> [Question] -> ByteString
-composeQuery idt qs = encodeQuestions idt qs [] False
-
-{-# DEPRECATED composeQueryAD "Use encodeQuestions instead" #-}
--- | Composing query with authentic data flag set without EDNS0.
-composeQueryAD :: Identifier -> [Question] -> ByteString
-composeQueryAD idt qs = encodeQuestions idt qs [] True
 
 ----------------------------------------------------------------
 

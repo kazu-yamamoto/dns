@@ -137,7 +137,7 @@ udpOpen ai = do
 -- This throws DNSError or TCPFallback.
 udpLookup :: UdpRslv
 udpLookup edns retry rcv ident ai q tm fl = do
-    let qry = encodeQuestions' ident q edns fl
+    let qry = encodeQuestions ident q edns fl
         ednsRetry = not $ null edns
     E.handle (ioErrorToDNSError ai "UDP") $
       bracket (udpOpen ai) close (loop qry ednsRetry 0 RetryLimitExceeded)
@@ -155,7 +155,7 @@ udpLookup edns retry rcv ident ai q tm fl = do
                       if truncated then
                           E.throwIO TCPFallback
                       else if ednsRetry && rc == FormatErr then
-                          let nonednsQuery = encodeQuestions' ident q [] fl
+                          let nonednsQuery = encodeQuestions ident q [] fl
                           in loop nonednsQuery False cnt RetryLimitExceeded sock
                       else
                           return res
@@ -191,7 +191,7 @@ tcpLookup ident ai q tm fl =
   where
     addr = addrAddress ai
     perform vc = do
-        let qry = encodeQuestions' ident q [] fl
+        let qry = encodeQuestions ident q [] fl
         mres <- timeout tm $ do
             connect vc addr
             sendVC vc qry

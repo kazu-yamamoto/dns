@@ -6,8 +6,6 @@ module Network.DNS.LookupRaw (
   , lookupAuth
   -- * Lookups returning DNS Messages
   , lookupRaw
-  , lookupRaw'
-  , lookupRawAD
   -- * DNS Message procesing
   , fromDNSMessage
   , fromDNSFormat
@@ -79,7 +77,7 @@ lookupFreshSection :: Resolver
                    -> Section
                    -> IO (Either DNSError [RData])
 lookupFreshSection rlv dom typ section = do
-    eans <- lookupRaw rlv dom typ
+    eans <- lookupRaw rlv dom typ mempty
     case eans of
       Left err  -> return $ Left err
       Right ans -> return $ fromDNSMessage ans toRData
@@ -99,7 +97,7 @@ lookupCacheSection rlv dom typ cconf = do
     mx <- lookupCache (dom,typ) c
     case mx of
       Nothing -> do
-          eans <- lookupRaw rlv dom typ
+          eans <- lookupRaw rlv dom typ mempty
           case eans of
             Left  err ->
                 -- Probably a network error happens.
@@ -193,11 +191,15 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --
 --  Cache is not used even if 'resolvCache' is 'Just'.
 --
+--  The query-related flag bits are specified
+--  via a 'QueryFlags' combination of overrides, which are generated as a
+--  'Monoid' by the 'rdBit', 'adBit' and 'cdBit' combinators.
+--
 --   The example code:
 --
 --   @
 --   rs <- makeResolvSeed defaultResolvConf
---   withResolver rs $ \\resolver -> lookupRaw resolver \"www.example.com\" A
+--   withResolver rs $ \\resolver -> lookupRaw resolver \"www.example.com\" A mempty
 --   @
 --
 --   And the (formatted) expected output:
@@ -228,28 +230,12 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --             additional = []})
 --  @
 --
-lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRaw rslv dom typ = resolve dom typ rslv mempty receive
-
--- | Same as 'lookupRaw' but the query sets the AD bit, which solicits the
---   the authentication status in the server reply.  In most applications
---   (other than diagnostic tools) that want authenticated data It is
---   unwise to trust the AD bit in the responses of non-local servers, this
---   interface should in most cases only be used with a loopback resolver.
---
-lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRawAD rslv dom typ = resolve dom typ rslv (adBit (Just True)) receive
-
--- | Similar to 'lookupRawAD' but the query-related flag bits are specified
--- via a 'QueryFlags' combination of overrides, which are generated as a
--- 'Monoid' by the 'rdBit', 'adBit' and 'cdBit' combinators.
---
-lookupRaw' :: Resolver   -- ^ Resolver obtained via 'withResolver'
-           -> Domain     -- ^ Query domain
-           -> TYPE       -- ^ Query RRtype
-           -> QueryFlags -- ^ RD, AD and CD flags
-           -> IO (Either DNSError DNSMessage)
-lookupRaw' rslv dom typ fl = resolve dom typ rslv fl receive
+lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
+          -> Domain     -- ^ Query domain
+          -> TYPE       -- ^ Query RRtype
+          -> QueryFlags -- ^ RD, AD and CD flags
+          -> IO (Either DNSError DNSMessage)
+lookupRaw rslv dom typ fl = resolve dom typ rslv fl receive
 
 ----------------------------------------------------------------
 
