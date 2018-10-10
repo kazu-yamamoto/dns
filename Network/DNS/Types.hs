@@ -437,7 +437,23 @@ defaultDNSFlags = DNSFlags
          , rcode        = NoErr
          }
 
-data FlagOp = FlagSet | FlagClear | FlagReset | FlagKeep deriving (Eq, Show)
+-- | Flag operations. This is an instance of 'Monoid'.
+-- If they are used with '(<>)', the left value wins.
+--
+-- >>> let dflt = mempty :: FlagOp
+-- >>> dflt
+-- FlagKeep
+-- >>> FlagSet <> dflt
+-- FlagSet
+-- >>> FlagClear <> FlagSet <> dflt
+-- FlagClear
+-- >>> FlagReset <> FlagClear <> FlagSet <> dflt
+-- FlagKeep
+data FlagOp = FlagSet   -- ^ Flag is set
+            | FlagClear -- ^ Flag is unset
+            | FlagReset -- ^ Flag is reset to the default value (`FlagKeep`)
+            | FlagKeep  -- ^ Flag is not changed
+            deriving (Eq, Show)
 
 instance Sem.Semigroup FlagOp where
     FlagKeep  <> op2 = op2
