@@ -30,7 +30,7 @@ import Network.DNS.Types.Internal
 -- | Look up resource records of a specified type for a domain,
 --   collecting the results
 --   from the ANSWER section of the response.
---   See manual the manual of 'lookupRaw'
+--   See the documentation of 'lookupRaw'
 --   to understand the concrete behavior.
 --   Cache is used if 'resolvCache' is 'Just'.
 --
@@ -46,7 +46,7 @@ lookup = lookupSection Answer
 -- | Look up resource records of a specified type for a domain,
 --   collecting the results
 --   from the AUTHORITY section of the response.
---   See manual the manual of 'lookupRaw'
+--   See the documentation of 'lookupRaw'
 --   to understand the concrete behavior.
 --   Cache is used even if 'resolvCache' is 'Just'.
 lookupAuth :: Resolver -> Domain -> TYPE -> IO (Either DNSError [RData])
@@ -253,7 +253,7 @@ lookupRawWithFlags rslv dom typ fl = resolve dom typ rslv fl receive
 --
 -- Note that 'NameError' is not a lookup error.  The lookup is successful,
 -- bearing the sad news that the requested domain does not exist.  'NameError'
--- resposes may return a meaningful AD bit, may contain useful data in the
+-- responses may return a meaningful AD bit, may contain useful data in the
 -- authority section, and even initial CNAME records that lead to the
 -- ultimately non-existent domain.  Applications that wish to process the
 -- content of 'NameError' (NXDomain) messages will need to implement their

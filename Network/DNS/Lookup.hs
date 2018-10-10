@@ -58,7 +58,7 @@
 --   for more information. In the following examples,
 --   we assuem this extension is enabled.
 --
---   All lookup functions eventually call 'lookupRaw'. See its manual
+--   All lookup functions eventually call 'lookupRaw'. See its documentation
 --   to understand the concrete lookup behavior.
 module Network.DNS.Lookup (
     lookupA, lookupAAAA

@@ -512,7 +512,7 @@ instance Show QueryFlags where
 -- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
 -- resulting 'DNSFlags' suitable for making queries with the requested flag
 -- settings.  This is only needed if you're creating your own 'DNSMessage',
--- the 'Network.DNS.LookupRaw.lookupRaw'' function takes a 'QueryFlags'
+-- the 'Network.DNS.LookupRaw.lookupRawWithFlags' function takes a 'QueryFlags'
 -- argument and handles this conversion internally.
 --
 -- Default overrides can be specified in the resolver configuration by setting
@@ -520,8 +520,7 @@ instance Show QueryFlags where
 -- 'Network.DNS.Resolver.ResolvConf' argument to
 -- 'Network.DNS.Resolver.makeResolvSeed'.  These then apply to lookups via
 -- resolvers based on the resulting configuration, with the exception of
--- 'Network.DNS.LookupRaw.lookupRawAD' which always sets the AD bit, and
--- 'Network.DNS.LookupRaw.lookupRaw'' which takes an additional 'QueryFlags'
+-- 'Network.DNS.LookupRaw.lookupRawWithFlags' which takes an additional 'QueryFlags'
 -- argument to augment the default overrides.
 --
 queryDNSFlags :: QueryFlags -> DNSFlags

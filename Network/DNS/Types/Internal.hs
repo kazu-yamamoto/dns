@@ -91,7 +91,7 @@ data ResolvConf = ResolvConf {
   , resolvCache      :: Maybe CacheConf
    -- | Overrides for the default flags used for queries via resolvers that use
    -- this configuration.  The overrides are generated as a 'Monoid' by the
-   -- 'rdBit', 'adBit' and 'cdBit' combinators.  The AD and CD bits are
+   -- 'rdFlag', 'adFlag' and 'cdFlag' combinators.  The AD and CD bits are
    -- typically only useful when recursion is not disabled.
   , resolvQueryFlags :: QueryFlags
 } deriving Show
