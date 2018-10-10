@@ -68,6 +68,7 @@ testResponseA = DNSMessage {
          , recAvailable = True
          , rcode = NoErr
          , authenData = False
+         , chkDisable = False
          }
        }
   , question = [Question {
@@ -110,6 +111,7 @@ testResponseTXT = DNSMessage {
          , recAvailable = True
          , rcode = NoErr
          , authenData = False
+         , chkDisable = False
          }
        }
   , question = [Question {

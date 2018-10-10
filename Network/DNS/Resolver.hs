@@ -14,6 +14,7 @@ module Network.DNS.Resolver (
   , resolvEDNS
   , resolvConcurrent
   , resolvCache
+  , resolvQueryFlags
   -- ** Specifying DNS servers
   , FileOrNumericHost(..)
   -- ** Configuring cache
@@ -47,7 +48,7 @@ import Data.IORef (IORef)
 import qualified Data.IORef as I
 import qualified Data.List.NonEmpty as NE
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), PortNumber, HostName, SocketType(Datagram), getAddrInfo, defaultHints)
-import Prelude hiding (lookup)
+import Prelude
 
 #if defined(WIN)
 import qualified Data.List.Split as Split

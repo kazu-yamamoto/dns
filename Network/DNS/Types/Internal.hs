@@ -63,6 +63,19 @@ defaultCacheConf = CacheConf 300 10
 --  An example to enable cache:
 --
 --  >>> let conf = defaultResolvConf { resolvCache = Just defaultCacheConf }
+--
+-- An example to disable requesting recursive service.
+--
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = rdFlag FlagClear }
+--
+-- An example to set the AD bit in all queries by default.
+--
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet }
+--
+-- An example to set the both the AD and CD bits in all queries by default.
+--
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet <> cdFlag FlagSet }
+--
 data ResolvConf = ResolvConf {
    -- | Server information.
     resolvInfo       :: FileOrNumericHost
@@ -76,6 +89,11 @@ data ResolvConf = ResolvConf {
   , resolvConcurrent :: Bool
    -- | Cache configuration.
   , resolvCache      :: Maybe CacheConf
+   -- | Overrides for the default flags used for queries via resolvers that use
+   -- this configuration.  The overrides are generated as a 'Monoid' by the
+   -- 'rdBit', 'adBit' and 'cdBit' combinators.  The AD and CD bits are
+   -- typically only useful when recursion is not disabled.
+  , resolvQueryFlags :: QueryFlags
 } deriving Show
 
 -- | Return a default 'ResolvConf':
@@ -86,6 +104,7 @@ data ResolvConf = ResolvConf {
 -- * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
 -- * 'resolvConcurrent' is False.
 -- * 'resolvCache' is Nothing.
+-- * 'resolvQueryFlags' is an empty set of overrides.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo       = RCFilePath "/etc/resolv.conf"
@@ -94,6 +113,7 @@ defaultResolvConf = ResolvConf {
   , resolvEDNS       = [fromEDNS0 defaultEDNS0]
   , resolvConcurrent = False
   , resolvCache      = Nothing
+  , resolvQueryFlags = mempty
 }
 
 ----------------------------------------------------------------

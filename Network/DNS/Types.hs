@@ -52,9 +52,21 @@ module Network.DNS.Types (
   -- ** DNS Header
   , DNSHeader (..)
   , Identifier
-  , QorR (..)
+  -- *** DNS flags
   , DNSFlags (..)
+  , QorR (..)
+  , defaultDNSFlags
+  -- *** Query flags
+  , FlagOp(..)
+  , QueryFlags
+  , rdFlag
+  , adFlag
+  , cdFlag
+  , queryDNSFlags
+  -- **** OPCODE and RCODE
   , OPCODE (..)
+  , fromOPCODE
+  , toOPCODE
   , RCODE (
     NoErr
   , FormatErr
@@ -69,8 +81,6 @@ module Network.DNS.Types (
   , NotZone
   , BadOpt
   )
-  , fromOPCODE
-  , toOPCODE
   , fromRCODE
   , toRCODE
   , fromRCODEforHeader
@@ -104,11 +114,13 @@ module Network.DNS.Types (
   ) where
 
 import Control.Exception (Exception, IOException)
-import qualified Data.ByteString.Base64 as B64 (encode)
+import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
+import qualified Data.List as List
+import qualified Data.Semigroup as Sem
 
 import Network.DNS.Imports
 
@@ -405,8 +417,140 @@ data DNSFlags = DNSFlags {
                            -- available in the name server.
 
   , rcode        :: RCODE  -- ^ Response code.
-  , authenData   :: Bool   -- ^ Authentic Data (RFC4035).
+  , authenData   :: Bool   -- ^ AD bit (RFC4035, Section 3.2.3).
+  , chkDisable   :: Bool   -- ^ CD bit (RFC4035, Section 3.2.2).
   } deriving (Eq, Show)
+
+
+-- | Default 'DNSFlags' record suitable for making recursive queries.  By default
+-- the RD bit is set, and the AD and CD bits are cleared.
+--
+defaultDNSFlags :: DNSFlags
+defaultDNSFlags = DNSFlags
+         { qOrR         = QR_Query
+         , opcode       = OP_STD
+         , authAnswer   = False
+         , trunCation   = False
+         , recDesired   = True
+         , recAvailable = False
+         , authenData   = False
+         , chkDisable   = False
+         , rcode        = NoErr
+         }
+
+-- | Flag operations. This is an instance of 'Monoid'.
+-- If they are used with '(<>)', the left value wins.
+--
+-- >>> mempty :: FlagOp
+-- FlagKeep
+-- >>> FlagSet <> mempty
+-- FlagSet
+-- >>> FlagClear <> FlagSet <> mempty
+-- FlagClear
+-- >>> FlagReset <> FlagClear <> FlagSet <> mempty
+-- FlagKeep
+data FlagOp = FlagSet   -- ^ Flag is set
+            | FlagClear -- ^ Flag is unset
+            | FlagReset -- ^ Flag is reset to the default value (`FlagKeep`)
+            | FlagKeep  -- ^ Flag is not changed
+            deriving (Eq, Show)
+
+instance Sem.Semigroup FlagOp where
+    FlagKeep  <> op2 = op2
+    FlagReset <> _   = FlagKeep
+    op1       <> _   = op1
+
+instance Monoid FlagOp where
+    mempty = FlagKeep
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+-- | Optional overrides of query-related DNS flags.  The 'Monoid' instance
+-- makes it possible to combine the generators 'rdFlag', 'adFlag' and 'cdFlag' to
+-- yield all possible combinations of "set", "clear" and "reset" (to default)
+-- for each of the bits.
+--
+-- >>> adFlag FlagSet <> mempty
+-- ad:1
+-- >>> cdFlag FlagReset <> rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet <> adFlag FlagSet <> mempty
+-- rd:1,ad:0
+--
+data QueryFlags = QueryFlags
+    { rdBit :: !FlagOp
+    , adBit :: !FlagOp
+    , cdBit :: !FlagOp
+    }
+
+instance Sem.Semigroup QueryFlags where
+    (QueryFlags rd1 ad1 cd1) <> (QueryFlags rd2 ad2 cd2) =
+        QueryFlags (rd1 <> rd2) (ad1 <> ad2) (cd1 <> cd2)
+
+instance Monoid QueryFlags where
+    mempty = QueryFlags FlagKeep FlagKeep FlagKeep
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+instance Show QueryFlags where
+    show (QueryFlags rd ad cd) = List.intercalate "," $ List.filter (/= magic) [
+             showFlag "rd" rd
+           , showFlag "ad" ad
+           , showFlag "cd" cd ]
+      where
+        magic = ""
+        showFlag :: String -> FlagOp -> String
+        showFlag nm FlagSet   = nm ++ ":1"
+        showFlag nm FlagClear = nm ++ ":0"
+        showFlag _  FlagReset = magic
+        showFlag _  FlagKeep  = magic
+
+-- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
+-- resulting 'DNSFlags' suitable for making queries with the requested flag
+-- settings.  This is only needed if you're creating your own 'DNSMessage',
+-- the 'Network.DNS.LookupRaw.lookupRaw'' function takes a 'QueryFlags'
+-- argument and handles this conversion internally.
+--
+-- Default overrides can be specified in the resolver configuration by setting
+-- the 'Network.DNS.resolvQueryFlags' field of the
+-- 'Network.DNS.Resolver.ResolvConf' argument to
+-- 'Network.DNS.Resolver.makeResolvSeed'.  These then apply to lookups via
+-- resolvers based on the resulting configuration, with the exception of
+-- 'Network.DNS.LookupRaw.lookupRawAD' which always sets the AD bit, and
+-- 'Network.DNS.LookupRaw.lookupRaw'' which takes an additional 'QueryFlags'
+-- argument to augment the default overrides.
+--
+queryDNSFlags :: QueryFlags -> DNSFlags
+queryDNSFlags (QueryFlags rd ad cd) = d {
+      recDesired = toBool rd $ recDesired d
+    , authenData = toBool ad $ authenData d
+    , chkDisable = toBool cd $ chkDisable d
+    }
+  where
+    d = defaultDNSFlags
+    toBool FlagSet   _ = True
+    toBool FlagClear _ = False
+    toBool FlagReset v = v
+    toBool FlagKeep  v = v
+
+-- | Generator of 'QueryFlags' that manipulates the RD bit.
+--
+rdFlag :: FlagOp -> QueryFlags
+rdFlag rd = mempty { rdBit = rd }
+
+-- | Generator of 'QueryFlags' that manipulates the AD bit.
+--
+adFlag :: FlagOp -> QueryFlags
+adFlag ad = mempty { adBit = ad }
+
+-- | Generator of 'QueryFlags' that manipulates the RD bit.
+--
+cdFlag :: FlagOp -> QueryFlags
+cdFlag cd = mempty { cdBit = cd }
 
 ----------------------------------------------------------------
 
@@ -425,6 +569,8 @@ data OPCODE
   | OP_UPDATE -- ^ An update request (RFC2136)
   deriving (Eq, Show, Enum, Bounded)
 
+-- | Convert a 16-bit DNS OPCODE number to its internal representation
+--
 toOPCODE :: Word16 -> Maybe OPCODE
 toOPCODE i = case i of
   0 -> Just OP_STD
@@ -434,6 +580,9 @@ toOPCODE i = case i of
   5 -> Just OP_UPDATE
   _ -> Nothing
 
+-- | Convert the internal representation of a DNS OPCODE to its 16-bit numeric
+-- value.
+--
 fromOPCODE :: OPCODE -> Word16
 fromOPCODE OP_STD    = 0
 fromOPCODE OP_INV    = 1
@@ -719,16 +868,7 @@ defaultQuery :: DNSMessage
 defaultQuery = DNSMessage {
     header = DNSHeader {
        identifier = 0
-     , flags = DNSFlags {
-           qOrR         = QR_Query
-         , opcode       = OP_STD
-         , authAnswer   = False
-         , trunCation   = False
-         , recDesired   = True
-         , recAvailable = False
-         , rcode        = NoErr
-         , authenData   = False
-         }
+     , flags = defaultDNSFlags
      }
   , question   = []
   , answer     = []

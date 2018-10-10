@@ -1,12 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Network.DNS.LookupRaw (
-  -- * Looking up functions
+  -- * Lookups returning requested RData
     lookup
   , lookupAuth
-  -- * Raw looking up function
+  -- * Lookups returning DNS Messages
   , lookupRaw
-  , lookupRawAD
+  , lookupRawWithFlags
+  -- * DNS Message procesing
   , fromDNSMessage
   , fromDNSFormat
   ) where
@@ -158,9 +159,10 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 
 ----------------------------------------------------------------
 
--- | Look up a name and return the entire DNS Response
+-- | Look up a name and return the entire DNS Response.
+-- Flags: RD: 'True', AD: 'False', CD: 'False'.
 --
---  For a given DNS server, the queries are done:
+-- For a given DNS server, the queries are done:
 --
 --  * A new UDP socket bound to a new local port is created and
 --    a new identifier is created atomically from the cryptographically
@@ -190,6 +192,7 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --    it is an error.
 --
 --  Cache is not used even if 'resolvCache' is 'Just'.
+--
 --
 --   The example code:
 --
@@ -226,21 +229,36 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --             additional = []})
 --  @
 --
-lookupRaw :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRaw rslv dom typ = resolve dom typ rslv False receive
+lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
+          -> Domain     -- ^ Query domain
+          -> TYPE       -- ^ Query RRtype
+          -> IO (Either DNSError DNSMessage)
+lookupRaw rslv dom typ = lookupRawWithFlags rslv dom typ mempty
 
--- | Same as 'lookupRaw' but the query sets the AD bit, which solicits the
---   the authentication status in the server reply.  In most applications
---   (other than diagnostic tools) that want authenticated data It is
---   unwise to trust the AD bit in the responses of non-local servers, this
---   interface should in most cases only be used with a loopback resolver.
+-- | Similar to 'lookupRaw' but the query-related flag bits are specified
+-- via a 'QueryFlags' combination of overrides, which are generated as a
+-- 'Monoid' by the 'rdFlag', 'adFlag' and 'cdFlag' combinators.
 --
-lookupRawAD :: Resolver -> Domain -> TYPE -> IO (Either DNSError DNSMessage)
-lookupRawAD rslv dom typ = resolve dom typ rslv True receive
+lookupRawWithFlags :: Resolver   -- ^ Resolver obtained via 'withResolver'
+                   -> Domain     -- ^ Query domain
+                   -> TYPE       -- ^ Query RRtype
+                   -> QueryFlags -- ^ RD, AD and CD flags
+                   -> IO (Either DNSError DNSMessage)
+lookupRawWithFlags rslv dom typ fl = resolve dom typ rslv fl receive
 
 ----------------------------------------------------------------
 
--- | Extract necessary information from 'DNSMessage'
+-- | Messages with a non-error RCODE are passed to the supplied function
+-- for processing.  Other messages are translated to 'DNSError' instances.
+--
+-- Note that 'NameError' is not a lookup error.  The lookup is successful,
+-- bearing the sad news that the requested domain does not exist.  'NameError'
+-- resposes may return a meaningful AD bit, may contain useful data in the
+-- authority section, and even initial CNAME records that lead to the
+-- ultimately non-existent domain.  Applications that wish to process the
+-- content of 'NameError' (NXDomain) messages will need to implement their
+-- own RCODE handling.
+--
 fromDNSMessage :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
 fromDNSMessage ans conv = case errcode ans of
     NoErr     -> Right $ conv ans

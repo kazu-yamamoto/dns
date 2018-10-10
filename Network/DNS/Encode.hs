@@ -84,6 +84,7 @@ putDNSFlags DNSFlags{..} = put16 word
     st :: State Word16 ()
     st = sequence_
               [ set (fromIntegral $ fromRCODEforHeader rcode)
+              , when chkDisable          $ set (bit 4)
               , when authenData          $ set (bit 5)
               , when recAvailable        $ set (bit 7)
               , when recDesired          $ set (bit 8)
