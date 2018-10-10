@@ -6,6 +6,7 @@ module Network.DNS.LookupRaw (
   , lookupAuth
   -- * Lookups returning DNS Messages
   , lookupRaw
+  , lookupRawWithFlags
   -- * DNS Message procesing
   , fromDNSMessage
   , fromDNSFormat
@@ -77,7 +78,7 @@ lookupFreshSection :: Resolver
                    -> Section
                    -> IO (Either DNSError [RData])
 lookupFreshSection rlv dom typ section = do
-    eans <- lookupRaw rlv dom typ mempty
+    eans <- lookupRaw rlv dom typ
     case eans of
       Left err  -> return $ Left err
       Right ans -> return $ fromDNSMessage ans toRData
@@ -97,7 +98,7 @@ lookupCacheSection rlv dom typ cconf = do
     mx <- lookupCache (dom,typ) c
     case mx of
       Nothing -> do
-          eans <- lookupRaw rlv dom typ mempty
+          eans <- lookupRaw rlv dom typ
           case eans of
             Left  err ->
                 -- Probably a network error happens.
@@ -158,9 +159,10 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 
 ----------------------------------------------------------------
 
--- | Look up a name and return the entire DNS Response
+-- | Look up a name and return the entire DNS Response.
+-- Flags: RD: 'True', AD: 'False', CD: 'False'.
 --
---  For a given DNS server, the queries are done:
+-- For a given DNS server, the queries are done:
 --
 --  * A new UDP socket bound to a new local port is created and
 --    a new identifier is created atomically from the cryptographically
@@ -191,15 +193,12 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --
 --  Cache is not used even if 'resolvCache' is 'Just'.
 --
---  The query-related flag bits are specified
---  via a 'QueryFlags' combination of overrides, which are generated as a
---  'Monoid' by the 'rdBit', 'adBit' and 'cdBit' combinators.
 --
 --   The example code:
 --
 --   @
 --   rs <- makeResolvSeed defaultResolvConf
---   withResolver rs $ \\resolver -> lookupRaw resolver \"www.example.com\" A mempty
+--   withResolver rs $ \\resolver -> lookupRaw resolver \"www.example.com\" A
 --   @
 --
 --   And the (formatted) expected output:
@@ -233,9 +232,19 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
           -> Domain     -- ^ Query domain
           -> TYPE       -- ^ Query RRtype
-          -> QueryFlags -- ^ RD, AD and CD flags
           -> IO (Either DNSError DNSMessage)
-lookupRaw rslv dom typ fl = resolve dom typ rslv fl receive
+lookupRaw rslv dom typ = lookupRawWithFlags rslv dom typ mempty
+
+-- | Similar to 'lookupRaw' but the query-related flag bits are specified
+-- via a 'QueryFlags' combination of overrides, which are generated as a
+-- 'Monoid' by the 'rdFlag', 'adFlag' and 'cdFlag' combinators.
+--
+lookupRawWithFlags :: Resolver   -- ^ Resolver obtained via 'withResolver'
+                   -> Domain     -- ^ Query domain
+                   -> TYPE       -- ^ Query RRtype
+                   -> QueryFlags -- ^ RD, AD and CD flags
+                   -> IO (Either DNSError DNSMessage)
+lookupRawWithFlags rslv dom typ fl = resolve dom typ rslv fl receive
 
 ----------------------------------------------------------------
 
