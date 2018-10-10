@@ -56,12 +56,13 @@ module Network.DNS.Types (
   , DNSFlags (..)
   , QorR (..)
   , defaultDNSFlags
+  -- *** Query flags
   , FlagOp(..)
   , QueryFlags
-  , queryDNSFlags
   , rdFlag
   , adFlag
   , cdFlag
+  , queryDNSFlags
   -- **** OPCODE and RCODE
   , OPCODE (..)
   , fromOPCODE
