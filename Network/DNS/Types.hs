@@ -441,14 +441,13 @@ defaultDNSFlags = DNSFlags
 -- | Flag operations. This is an instance of 'Monoid'.
 -- If they are used with '(<>)', the left value wins.
 --
--- >>> let dflt = mempty :: FlagOp
--- >>> dflt
+-- >>> mempty :: FlagOp
 -- FlagKeep
--- >>> FlagSet <> dflt
+-- >>> FlagSet <> mempty
 -- FlagSet
--- >>> FlagClear <> FlagSet <> dflt
+-- >>> FlagClear <> FlagSet <> mempty
 -- FlagClear
--- >>> FlagReset <> FlagClear <> FlagSet <> dflt
+-- >>> FlagReset <> FlagClear <> FlagSet <> mempty
 -- FlagKeep
 data FlagOp = FlagSet   -- ^ Flag is set
             | FlagClear -- ^ Flag is unset
