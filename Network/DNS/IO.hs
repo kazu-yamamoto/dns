@@ -125,8 +125,8 @@ sendAll sock bs = do
 
 -- | The encoded 'DNSMessage' has the specified request ID.  The default values
 -- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
--- parameter.  A suitable combination of flags can be created via the 'rdBit',
--- 'adBit' and 'cdBit' generators of the 'Network.DNS.Types.QueryFlags'
+-- parameter.  A suitable combination of flags can be created via the 'rdFlag',
+-- 'adFlag' and 'cdFlag' generators of the 'Network.DNS.Types.QueryFlags'
 -- 'Monoid'.
 --
 -- The caller is responsible for generating the ID via a securely seeded
