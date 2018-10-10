@@ -18,7 +18,7 @@ spec = describe "send/receive" $ do
         connect sock $ addrAddress addr
         -- Google's resolvers support the AD and CD bits
         let qry = encodeQuestions 1 [Question "www.mew.org" A] [] $
-                  rdBit FlagSet <> adBit FlagSet <> cdBit FlagSet
+                  rdFlag FlagSet <> adFlag FlagSet <> cdFlag FlagSet
         send sock qry
         ans <- receive sock
         identifier (header ans) `shouldBe` 1
@@ -29,7 +29,7 @@ spec = describe "send/receive" $ do
         sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
         connect sock $ addrAddress addr
         let qry = encodeQuestions 1 [Question "www.mew.org" A] [] $
-                  rdBit FlagSet <> adBit FlagClear <> cdBit FlagSet
+                  rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet
         sendVC sock qry
         ans <- receiveVC sock
         identifier (header ans) `shouldBe` 1

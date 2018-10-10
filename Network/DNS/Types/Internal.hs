@@ -66,15 +66,15 @@ defaultCacheConf = CacheConf 300 10
 --
 -- An example to disable requesting recursive service.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = rdBit FlagClear }
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = rdFlag FlagClear }
 --
 -- An example to set the AD bit in all queries by default.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = adBit FlagSet }
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet }
 --
 -- An example to set the both the AD and CD bits in all queries by default.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = adBit FlagSet <> cdBit FlagSet }
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet <> cdFlag FlagSet }
 --
 data ResolvConf = ResolvConf {
    -- | Server information.

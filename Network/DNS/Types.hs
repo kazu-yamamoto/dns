@@ -59,9 +59,9 @@ module Network.DNS.Types (
   , FlagOp(..)
   , QueryFlags
   , queryDNSFlags
-  , rdBit
-  , adBit
-  , cdBit
+  , rdFlag
+  , adFlag
+  , cdFlag
   -- **** OPCODE and RCODE
   , OPCODE (..)
   , fromOPCODE
@@ -469,30 +469,19 @@ instance Monoid FlagOp where
 #endif
 
 -- | Optional overrides of query-related DNS flags.  The 'Monoid' instance
--- makes it possible to combine the generators 'rdBit', 'adBit' and 'cdBit' to
+-- makes it possible to combine the generators 'rdFlag', 'adFlag' and 'cdFlag' to
 -- yield all possible combinations of "set", "clear" and "reset" (to default)
 -- for each of the bits.
 --
--- ==== __Example__
---
--- >>> :{
--- let setrd = rdBit FlagSet
---     setad = adBit FlagSet
---     setcd = cdBit FlagSet
---     clrrd = rdBit FlagClear
---     clrad = adBit FlagClear
---     clrcd = cdBit FlagClear
---     rstrd = rdBit FlagReset
---     rstad = adBit FlagReset
---     rstcd = cdBit FlagReset
---  in rstcd <> setrd <> clrad <> setcd <> setad
--- :}
+-- >>> adFlag FlagSet <> mempty
+-- ad:1
+-- >>> cdFlag FlagReset <> rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet <> adFlag FlagSet <> mempty
 -- rd:1,ad:0
 --
 data QueryFlags = QueryFlags
-    { _rdBit :: !FlagOp
-    , _adBit :: !FlagOp
-    , _cdBit :: !FlagOp
+    { rdBit :: !FlagOp
+    , adBit :: !FlagOp
+    , cdBit :: !FlagOp
     }
 
 instance Sem.Semigroup QueryFlags where
@@ -508,16 +497,21 @@ instance Monoid QueryFlags where
 #endif
 
 instance Show QueryFlags where
-    show (QueryFlags rd ad cd) = List.intercalate "," $ List.delete "" [
+    show (QueryFlags rd ad cd) = List.intercalate "," $ chop [
              showFlag "rd" rd
            , showFlag "ad" ad
            , showFlag "cd" cd ]
       where
+        magic = ""
+        chop [] = []
+        chop (x:xs)
+          | x == magic = chop xs
+          | otherwise  = x : chop xs
         showFlag :: String -> FlagOp -> String
         showFlag nm FlagSet   = nm ++ ":1"
         showFlag nm FlagClear = nm ++ ":0"
-        showFlag _  FlagReset = ""
-        showFlag _  FlagKeep  = ""
+        showFlag _  FlagReset = magic
+        showFlag _  FlagKeep  = magic
 
 -- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
 -- resulting 'DNSFlags' suitable for making queries with the requested flag
@@ -547,22 +541,20 @@ queryDNSFlags (QueryFlags rd ad cd) = d {
     toBool FlagReset v = v
     toBool FlagKeep  v = v
 
-rdBit, adBit, cdBit :: FlagOp -> QueryFlags
-
--- | To reset the RD bit to the default state pass 'Nothing', otherwise
--- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
+-- | Generating 'QueryFlags' to manipulate the RD bit
 --
-rdBit rd = mempty { _rdBit = rd }
+rdFlag :: FlagOp -> QueryFlags
+rdFlag rd = mempty { rdBit = rd }
 
--- | To reset the AD bit to the default state pass 'Nothing', otherwise
--- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
+-- | Generating 'QueryFlags' to manipulate the AD bit
 --
-adBit ad = mempty { _adBit = ad }
+adFlag :: FlagOp -> QueryFlags
+adFlag ad = mempty { adBit = ad }
 
--- | To reset the CD bit to the default state pass 'Nothing', otherwise
--- pass @'Just' 'True'@ to set, or @'Just' 'False'@ to clear.
+-- | Generating 'QueryFlags' to manipulate the CD bit
 --
-cdBit cd = mempty { _cdBit = cd }
+cdFlag :: FlagOp -> QueryFlags
+cdFlag cd = mempty { cdBit = cd }
 
 ----------------------------------------------------------------
 
