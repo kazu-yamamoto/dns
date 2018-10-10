@@ -537,17 +537,17 @@ queryDNSFlags (QueryFlags rd ad cd) = d {
     toBool FlagReset v = v
     toBool FlagKeep  v = v
 
--- | Generating 'QueryFlags' to manipulate the RD bit
+-- | Generator of 'QueryFlags' that manipulates the RD bit.
 --
 rdFlag :: FlagOp -> QueryFlags
 rdFlag rd = mempty { rdBit = rd }
 
--- | Generating 'QueryFlags' to manipulate the AD bit
+-- | Generator of 'QueryFlags' that manipulates the AD bit.
 --
 adFlag :: FlagOp -> QueryFlags
 adFlag ad = mempty { adBit = ad }
 
--- | Generating 'QueryFlags' to manipulate the CD bit
+-- | Generator of 'QueryFlags' that manipulates the RD bit.
 --
 cdFlag :: FlagOp -> QueryFlags
 cdFlag cd = mempty { cdBit = cd }
