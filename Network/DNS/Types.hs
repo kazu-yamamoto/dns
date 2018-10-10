@@ -546,7 +546,7 @@ rdFlag rd = mempty { rdBit = rd }
 adFlag :: FlagOp -> QueryFlags
 adFlag ad = mempty { adBit = ad }
 
--- | Generator of 'QueryFlags' that manipulates the RD bit.
+-- | Generator of 'QueryFlags' that manipulates the CD bit.
 --
 cdFlag :: FlagOp -> QueryFlags
 cdFlag cd = mempty { cdBit = cd }
