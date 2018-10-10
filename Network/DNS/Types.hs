@@ -497,16 +497,12 @@ instance Monoid QueryFlags where
 #endif
 
 instance Show QueryFlags where
-    show (QueryFlags rd ad cd) = List.intercalate "," $ chop [
+    show (QueryFlags rd ad cd) = List.intercalate "," $ List.filter (/= magic) [
              showFlag "rd" rd
            , showFlag "ad" ad
            , showFlag "cd" cd ]
       where
         magic = ""
-        chop [] = []
-        chop (x:xs)
-          | x == magic = chop xs
-          | otherwise  = x : chop xs
         showFlag :: String -> FlagOp -> String
         showFlag nm FlagSet   = nm ++ ":1"
         showFlag nm FlagClear = nm ++ ":0"
