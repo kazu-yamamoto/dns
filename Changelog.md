@@ -1,3 +1,11 @@
+# 3.1.0
+
+* Breaking change: lookupRawAD, composeQuery, composeQueryAD are removed.
+* A new API: lookupRawWithFlags, QueryFlags, FlagOp, rdFlag, adFlag, cdFlag,
+  and resolvQueryFlags. [#116](https://github.com/kazu-yamamoto/dns/pull/116)
+* New OP codes: OP_NOTIFY and OP_UPDATE.
+  [#113](https://github.com/kazu-yamamoto/dns/pull/113)
+
 # 3.0.4
 
 - Drop unexpected UDP answers [#112](https://github.com/kazu-yamamoto/dns/pull/112)
