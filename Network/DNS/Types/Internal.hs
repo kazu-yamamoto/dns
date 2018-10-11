@@ -94,6 +94,9 @@ data ResolvConf = ResolvConf {
    -- 'rdFlag', 'adFlag' and 'cdFlag' combinators.  The AD and CD bits are
    -- typically only useful when recursion is not disabled.
   , resolvQueryFlags :: QueryFlags
+    -- | If 'True', only numeric hosts are allowed in \"\/etc\/hosts\" on Unix.
+    -- Otherwise, host names such ash \"localhost\" are allowed.
+  , resolvNumericHostOnly :: Bool
 } deriving Show
 
 -- | Return a default 'ResolvConf':
@@ -102,9 +105,10 @@ data ResolvConf = ResolvConf {
 -- * 'resolvTimeout' is 3,000,000 micro seconds.
 -- * 'resolvRetry' is 3.
 -- * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
--- * 'resolvConcurrent' is False.
+-- * 'resolvConcurrent' is 'False'.
 -- * 'resolvCache' is Nothing.
 -- * 'resolvQueryFlags' is an empty set of overrides.
+-- * 'resolvNumericHostOnly' is 'False'.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo       = RCFilePath "/etc/resolv.conf"
@@ -114,6 +118,7 @@ defaultResolvConf = ResolvConf {
   , resolvConcurrent = False
   , resolvCache      = Nothing
   , resolvQueryFlags = mempty
+  , resolvNumericHostOnly = False
 }
 
 ----------------------------------------------------------------
