@@ -15,6 +15,7 @@ module Network.DNS.Resolver (
   , resolvConcurrent
   , resolvCache
   , resolvQueryFlags
+  , resolvNumericHostOnly
   -- ** Specifying DNS servers
   , FileOrNumericHost(..)
   -- ** Configuring cache
@@ -75,14 +76,15 @@ import Network.DNS.Types.Internal
 makeResolvSeed :: ResolvConf -> IO ResolvSeed
 makeResolvSeed conf = ResolvSeed conf <$> findAddresses
   where
+    nhonly = resolvNumericHostOnly conf
     findAddresses :: IO (NonEmpty AddrInfo)
     findAddresses = case resolvInfo conf of
-        RCHostName numhost       -> (:| []) <$> makeAddrInfo numhost Nothing
-        RCHostPort numhost mport -> (:| []) <$> makeAddrInfo numhost (Just mport)
+        RCHostName numhost       -> (:| []) <$> makeAddrInfo nhonly numhost Nothing
+        RCHostPort numhost mport -> (:| []) <$> makeAddrInfo nhonly numhost (Just mport)
         RCHostNames nss          -> mkAddrs nss
         RCFilePath file          -> getDefaultDnsServers file >>= mkAddrs
     mkAddrs []     = E.throwIO BadConfiguration
-    mkAddrs (l:ls) = (:|) <$> makeAddrInfo l Nothing <*> forM ls (`makeAddrInfo` Nothing)
+    mkAddrs (l:ls) = (:|) <$> makeAddrInfo nhonly l Nothing <*> forM ls (\x -> makeAddrInfo nhonly x Nothing)
 
 getDefaultDnsServers :: FilePath -> IO [String]
 #if defined(WIN)
@@ -105,9 +107,11 @@ getDefaultDnsServers file = toAddresses <$> readFile file
     extract = reverse . dropWhile isSpace . reverse . dropWhile isSpace . drop 11
 #endif
 
-makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
-makeAddrInfo addr mport = do
-    let flgs = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
+makeAddrInfo :: Bool -> HostName -> Maybe PortNumber -> IO AddrInfo
+makeAddrInfo nhonly addr mport = do
+    let flgs
+          | nhonly    = [AI_ADDRCONFIG, AI_PASSIVE, AI_NUMERICHOST]
+          | otherwise = [AI_ADDRCONFIG, AI_PASSIVE]
         hints = defaultHints {
             addrFlags = if isJust mport then AI_NUMERICSERV : flgs else flgs
           , addrSocketType = Datagram
