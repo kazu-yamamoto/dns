@@ -233,12 +233,10 @@ lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
           -> Domain     -- ^ Query domain
           -> TYPE       -- ^ Query RRtype
           -> IO (Either DNSError DNSMessage)
-lookupRaw rslv dom typ = lookupRawWithFlags rslv dom typ mempty
+lookupRaw rslv dom typ = lookupRawWithFlags rslv dom typ defaultQueryFlags
 
 -- | Similar to 'lookupRaw' but the query-related flag bits are specified
--- via a 'QueryFlags' combination of overrides, which are generated as a
--- 'Monoid' by the 'rdFlag', 'adFlag' and 'cdFlag' combinators.
---
+-- via a 'QueryFlags'.
 lookupRawWithFlags :: Resolver   -- ^ Resolver obtained via 'withResolver'
                    -> Domain     -- ^ Query domain
                    -> TYPE       -- ^ Query RRtype
