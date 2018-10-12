@@ -402,23 +402,23 @@ data DNSHeader = DNSHeader {
 data DNSFlags = DNSFlags {
     qOrR         :: QorR   -- ^ Query or response.
   , opcode       :: OPCODE -- ^ Kind of query.
-  , authAnswer   :: Bool   -- ^ Authoritative Answer - this bit is valid in responses,
+  , authAnswer   :: Bool   -- ^ AA (Authoritative Answer) bit - this bit is valid in responses,
                            -- and specifies that the responding name server is an
                            -- authority for the domain name in question section.
-  , trunCation   :: Bool   -- ^ TrunCation - specifies that this message was truncated
+  , trunCation   :: Bool   -- ^ TC (Truncated Response) bit - specifies that this message was truncated
                            -- due to length greater than that permitted on the
                            -- transmission channel.
-  , recDesired   :: Bool   -- ^ Recursion Desired - this bit may be set in a query and
+  , recDesired   :: Bool   -- ^ RD (Recursion Desired) bit - this bit may be set in a query and
                            -- is copied into the response.  If RD is set, it directs
                            -- the name server to pursue the query recursively.
                            -- Recursive query support is optional.
-  , recAvailable :: Bool   -- ^ Recursion Available - this be is set or cleared in a
+  , recAvailable :: Bool   -- ^ RA (Recursion Available) bit - this be is set or cleared in a
                            -- response, and denotes whether recursive query support is
                            -- available in the name server.
 
   , rcode        :: RCODE  -- ^ Response code.
-  , authenData   :: Bool   -- ^ AD bit (RFC4035, Section 3.2.3).
-  , chkDisable   :: Bool   -- ^ CD bit (RFC4035, Section 3.2.2).
+  , authenData   :: Bool   -- ^ AD (Authentic Data) bit - (RFC4035, Section 3.2.3).
+  , chkDisable   :: Bool   -- ^ CD (Checking Disabled) bit - (RFC4035, Section 3.2.2).
   } deriving (Eq, Show)
 
 
