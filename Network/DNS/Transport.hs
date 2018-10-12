@@ -80,8 +80,8 @@ resolve dom typ rlv qfl rcv
     seed    = resolvseed rlv
     nss     = NE.toList $ nameservers seed
     onlyOne = length nss == 1
-    fl      = qfl <> resolvQueryFlags (resolvconf $ resolvseed rlv)
-
+    qfl0    = resolvQueryFlags (resolvconf $ resolvseed rlv)
+    fl      = qfl0 `combineQueryFlags` qfl
     conf       = resolvconf seed
     concurrent = resolvConcurrent conf
     tm         = resolvTimeout conf

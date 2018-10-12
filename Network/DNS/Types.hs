@@ -57,12 +57,14 @@ module Network.DNS.Types (
   , QorR (..)
   , defaultDNSFlags
   -- *** Query flags
-  , FlagOp(..)
   , QueryFlags
-  , rdFlag
-  , adFlag
-  , cdFlag
+  , defaultQueryFlags
   , queryDNSFlags
+  , combineQueryFlags
+  , QueryFlag(..)
+  , flagSet
+  , flagClear
+  , flagReset
   -- **** OPCODE and RCODE
   , OPCODE (..)
   , fromOPCODE
@@ -120,7 +122,6 @@ import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
 import Data.IP (IP, IPv4, IPv6)
 import qualified Data.List as List
-import qualified Data.Semigroup as Sem
 
 import Network.DNS.Imports
 
@@ -438,76 +439,47 @@ defaultDNSFlags = DNSFlags
          , rcode        = NoErr
          }
 
--- | Flag operations. This is an instance of 'Monoid'.
--- If they are used with '(<>)', the left value wins.
---
--- >>> mempty :: FlagOp
--- FlagKeep
--- >>> FlagSet <> mempty
--- FlagSet
--- >>> FlagClear <> FlagSet <> mempty
--- FlagClear
--- >>> FlagReset <> FlagClear <> FlagSet <> mempty
--- FlagKeep
-data FlagOp = FlagSet   -- ^ Flag is set
-            | FlagClear -- ^ Flag is unset
-            | FlagReset -- ^ Flag is reset to the default value (`FlagKeep`)
-            | FlagKeep  -- ^ Flag is not changed
-            deriving (Eq, Show)
+data BitOp = BitSet   -- ^ Bit is set
+           | BitClear -- ^ Bit is unset
+           | BitReset -- ^ Bit is reset to the default value (BitKeep)
+           | BitKeep  -- ^ Bit is not changed
+           deriving (Eq, Show)
 
-instance Sem.Semigroup FlagOp where
-    FlagKeep  <> op2 = op2
-    FlagReset <> _   = FlagKeep
-    op1       <> _   = op1
-
-instance Monoid FlagOp where
-    mempty = FlagKeep
-#if !(MIN_VERSION_base(4,11,0))
-    -- this is redundant starting with base-4.11 / GHC 8.4
-    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
-    mappend = (Sem.<>)
-#endif
-
--- | Optional overrides of query-related DNS flags.  The 'Monoid' instance
--- makes it possible to combine the generators 'rdFlag', 'adFlag' and 'cdFlag' to
--- yield all possible combinations of "set", "clear" and "reset" (to default)
--- for each of the bits.
+-- | Query-related DNS flags including RD, AD and CD flags.
+--   The AD and CD bits are
+--   typically only useful when recursion is not disabled.
 --
--- >>> adFlag FlagSet <> mempty
--- ad:1
--- >>> cdFlag FlagReset <> rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet <> adFlag FlagSet <> mempty
--- rd:1,ad:0
---
+--   - '_' -- the value of 'defaultDNSFlags' is used
+--   - '1' -- flag is set
+--   - '0' -- flag is cleared
 data QueryFlags = QueryFlags
-    { rdBit :: !FlagOp
-    , adBit :: !FlagOp
-    , cdBit :: !FlagOp
+    { rdBit :: !BitOp
+    , adBit :: !BitOp
+    , cdBit :: !BitOp
     }
 
-instance Sem.Semigroup QueryFlags where
-    (QueryFlags rd1 ad1 cd1) <> (QueryFlags rd2 ad2 cd2) =
-        QueryFlags (rd1 <> rd2) (ad1 <> ad2) (cd1 <> cd2)
-
-instance Monoid QueryFlags where
-    mempty = QueryFlags FlagKeep FlagKeep FlagKeep
-#if !(MIN_VERSION_base(4,11,0))
-    -- this is redundant starting with base-4.11 / GHC 8.4
-    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
-    mappend = (Sem.<>)
-#endif
+-- | Default query-related DNS flags.
+--
+-- >>> defaultQueryFlags
+-- rd:_,ad:_,cd:_
+-- >>> defaultQueryFlags `flagSet` FlagRD `flagClear` FlagAD
+-- rd:1,ad:0,cd:_
+-- >>> defaultQueryFlags `flagSet` FlagRD `flagClear` FlagAD `flagReset` FlagAD
+-- rd:1,ad:_,cd:_
+--
+defaultQueryFlags :: QueryFlags
+defaultQueryFlags = QueryFlags BitKeep BitKeep BitKeep
 
 instance Show QueryFlags where
-    show (QueryFlags rd ad cd) = List.intercalate "," $ List.filter (/= magic) [
-             showFlag "rd" rd
-           , showFlag "ad" ad
-           , showFlag "cd" cd ]
+    show (QueryFlags rd ad cd) = List.intercalate "," [
+             showBit "rd" rd
+           , showBit "ad" ad
+           , showBit "cd" cd ]
       where
-        magic = ""
-        showFlag :: String -> FlagOp -> String
-        showFlag nm FlagSet   = nm ++ ":1"
-        showFlag nm FlagClear = nm ++ ":0"
-        showFlag _  FlagReset = magic
-        showFlag _  FlagKeep  = magic
+        showBit :: String -> BitOp -> String
+        showBit nm BitSet   = nm ++ ":1"
+        showBit nm BitClear = nm ++ ":0"
+        showBit nm  _       = nm ++ ":_"
 
 -- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
 -- resulting 'DNSFlags' suitable for making queries with the requested flag
@@ -531,25 +503,45 @@ queryDNSFlags (QueryFlags rd ad cd) = d {
     }
   where
     d = defaultDNSFlags
-    toBool FlagSet   _ = True
-    toBool FlagClear _ = False
-    toBool FlagReset v = v
-    toBool FlagKeep  v = v
+    toBool BitSet   _ = True
+    toBool BitClear _ = False
+    toBool BitReset v = v
+    toBool BitKeep  v = v
 
--- | Generator of 'QueryFlags' that manipulates the RD bit.
---
-rdFlag :: FlagOp -> QueryFlags
-rdFlag rd = mempty { rdBit = rd }
+-- | Query-related flag.
+data QueryFlag = FlagRD -- ^ Recursion Desired flag
+               | FlagAD -- ^ Authenticated Aata flag
+               | FlagCD -- ^ Checking Disabled flag
+               deriving (Eq, Show)
 
--- | Generator of 'QueryFlags' that manipulates the AD bit.
---
-adFlag :: FlagOp -> QueryFlags
-adFlag ad = mempty { adBit = ad }
+-- | Setting query flag.
+flagSet :: QueryFlags -> QueryFlag -> QueryFlags
+flagSet flgs FlagRD = flgs { rdBit = BitSet }
+flagSet flgs FlagAD = flgs { adBit = BitSet }
+flagSet flgs FlagCD = flgs { cdBit = BitSet }
 
--- | Generator of 'QueryFlags' that manipulates the CD bit.
---
-cdFlag :: FlagOp -> QueryFlags
-cdFlag cd = mempty { cdBit = cd }
+-- | Clearing query flag.
+flagClear :: QueryFlags -> QueryFlag -> QueryFlags
+flagClear flgs FlagRD = flgs { rdBit = BitClear }
+flagClear flgs FlagAD = flgs { adBit = BitClear }
+flagClear flgs FlagCD = flgs { cdBit = BitClear }
+
+-- | Resetting query flag.
+flagReset :: QueryFlags -> QueryFlag -> QueryFlags
+flagReset flgs FlagRD = flgs { rdBit = BitReset }
+flagReset flgs FlagAD = flgs { adBit = BitReset }
+flagReset flgs FlagCD = flgs { cdBit = BitReset }
+
+combineQueryFlags :: QueryFlags -> QueryFlags -> QueryFlags
+combineQueryFlags q1 q2 = QueryFlags rd ad cd
+  where
+    rd = rdBit q1 `comb` rdBit q2
+    ad = adBit q1 `comb` adBit q2
+    cd = cdBit q1 `comb` cdBit q2
+    -- right wins
+    o `comb` BitKeep  = o
+    _ `comb` BitReset = BitKeep
+    _ `comb` o        = o
 
 ----------------------------------------------------------------
 

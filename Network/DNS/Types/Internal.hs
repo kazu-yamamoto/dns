@@ -66,15 +66,15 @@ defaultCacheConf = CacheConf 300 10
 --
 -- An example to disable requesting recursive service.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = rdFlag FlagClear }
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = defaultQueryFlags `flagClear` FlagRD }
 --
 -- An example to set the AD bit in all queries by default.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet }
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = defaultQueryFlags `flagSet` FlagAD }
 --
 -- An example to set the both the AD and CD bits in all queries by default.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet <> cdFlag FlagSet }
+--  >>> let conf = defaultResolvConf { resolvQueryFlags = defaultQueryFlags `flagSet` FlagAD `flagSet` FlagCD }
 --
 data ResolvConf = ResolvConf {
    -- | Server information.
@@ -90,9 +90,7 @@ data ResolvConf = ResolvConf {
    -- | Cache configuration.
   , resolvCache      :: Maybe CacheConf
    -- | Overrides for the default flags used for queries via resolvers that use
-   -- this configuration.  The overrides are generated as a 'Monoid' by the
-   -- 'rdFlag', 'adFlag' and 'cdFlag' combinators.  The AD and CD bits are
-   -- typically only useful when recursion is not disabled.
+   -- this configuration.
   , resolvQueryFlags :: QueryFlags
 } deriving Show
 
@@ -113,7 +111,7 @@ defaultResolvConf = ResolvConf {
   , resolvEDNS       = [fromEDNS0 defaultEDNS0]
   , resolvConcurrent = False
   , resolvCache      = Nothing
-  , resolvQueryFlags = mempty
+  , resolvQueryFlags = defaultQueryFlags
 }
 
 ----------------------------------------------------------------
