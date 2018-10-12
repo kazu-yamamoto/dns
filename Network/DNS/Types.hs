@@ -448,17 +448,23 @@ defaultDNSFlags = DNSFlags
 -- >>> FlagClear <> FlagSet <> mempty
 -- FlagClear
 -- >>> FlagReset <> FlagClear <> FlagSet <> mempty
--- FlagKeep
+-- FlagReset
 data FlagOp = FlagSet   -- ^ Flag is set
             | FlagClear -- ^ Flag is unset
-            | FlagReset -- ^ Flag is reset to the default value (`FlagKeep`)
+            | FlagReset -- ^ Flag is reset to the default value
             | FlagKeep  -- ^ Flag is not changed
             deriving (Eq, Show)
 
+-- $
+-- Test associativity of the semigroup operation:
+--
+-- >>> let ops = [FlagSet, FlagClear, FlagReset, FlagKeep]
+-- >>> foldl (&&) True [(a<>b)<>c == a<>(b<>c) | a <- ops, b <- ops, c <- ops]
+-- True
+--
 instance Sem.Semigroup FlagOp where
-    FlagKeep  <> op2 = op2
-    FlagReset <> _   = FlagKeep
-    op1       <> _   = op1
+    FlagKeep <> op = op
+    op       <> _  = op
 
 instance Monoid FlagOp where
     mempty = FlagKeep
@@ -533,8 +539,7 @@ queryDNSFlags (QueryFlags rd ad cd) = d {
     d = defaultDNSFlags
     toBool FlagSet   _ = True
     toBool FlagClear _ = False
-    toBool FlagReset v = v
-    toBool FlagKeep  v = v
+    toBool _         v = v
 
 -- | Generator of 'QueryFlags' that manipulates the RD bit.
 --
