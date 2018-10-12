@@ -417,7 +417,7 @@ data DNSFlags = DNSFlags {
                            -- available in the name server.
 
   , rcode        :: RCODE  -- ^ Response code.
-  , authenData   :: Bool   -- ^ AD (Authentic Data) bit - (RFC4035, Section 3.2.3).
+  , authenData   :: Bool   -- ^ AD (Authenticated Data) bit - (RFC4035, Section 3.2.3).
   , chkDisable   :: Bool   -- ^ CD (Checking Disabled) bit - (RFC4035, Section 3.2.2).
   } deriving (Eq, Show)
 
