@@ -139,16 +139,11 @@ encodeQuestions :: Identifier
                 -> ByteString
 encodeQuestions idt qs adds fs = encode qry
   where
-      qry = DNSMessage {
-          header = DNSHeader {
-              identifier = idt
-            , flags = queryDNSFlags fs
-            }
-        , question = qs
-        , answer     = []
-        , authority  = []
-        , additional = adds
-        }
+    empqry = makeEmptyQuery adds fs
+    qry = empqry {
+        header = (header empqry) { identifier = idt }
+      , question = qs
+      }
 
 ----------------------------------------------------------------
 

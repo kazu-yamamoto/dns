@@ -48,6 +48,7 @@ module Network.DNS.Types (
   , DNSMessage (..)
   , defaultQuery
   , defaultResponse
+  , makeEmptyQuery
   , DNSFormat
   -- ** DNS Header
   , DNSHeader (..)
@@ -62,7 +63,6 @@ module Network.DNS.Types (
   , rdFlag
   , adFlag
   , cdFlag
-  , queryDNSFlags
   -- **** OPCODE and RCODE
   , OPCODE (..)
   , fromOPCODE
@@ -895,6 +895,20 @@ defaultResponse =
             }
         }
       }
+
+-- | Making a template query filled with ENDS additional RRs and
+--   query flags.
+makeEmptyQuery :: [ResourceRecord] -- ^ Additional RRs for EDNS.
+               -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+               -> DNSMessage
+makeEmptyQuery adds fs = defaultQuery {
+      header = header'
+    , additional = adds
+    }
+  where
+    -- fixme :: DO bit in "adds" should be overridden when
+    --          QueryFlags supports it.
+    header' = (header defaultQuery) { flags = queryDNSFlags fs }
 
 ----------------------------------------------------------------
 -- EDNS0 (RFC 6891)
