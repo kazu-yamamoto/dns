@@ -439,15 +439,15 @@ defaultDNSFlags = DNSFlags
          }
 
 -- | Flag operations. This is an instance of 'Monoid'.
--- If they are used with '(<>)', the left value wins.
+-- If they are used with '(<>)', the right value wins.
 --
 -- >>> mempty :: FlagOp
 -- FlagKeep
--- >>> FlagSet <> mempty
+-- >>> mempty <> FlagSet
 -- FlagSet
--- >>> FlagClear <> FlagSet <> mempty
+-- >>> mempty <> FlagSet <> FlagClear
 -- FlagClear
--- >>> FlagReset <> FlagClear <> FlagSet <> mempty
+-- >>> mempty <> FlagSet <> FlagClear <> FlagReset
 -- FlagReset
 data FlagOp = FlagSet   -- ^ Flag is set
             | FlagClear -- ^ Flag is unset
@@ -463,8 +463,8 @@ data FlagOp = FlagSet   -- ^ Flag is set
 -- True
 --
 instance Sem.Semigroup FlagOp where
-    FlagKeep <> op = op
-    op       <> _  = op
+    op <> FlagKeep = op
+    _  <> op       = op
 
 instance Monoid FlagOp where
     mempty = FlagKeep
@@ -479,9 +479,11 @@ instance Monoid FlagOp where
 -- yield all possible combinations of "set", "clear" and "reset" (to default)
 -- for each of the bits.
 --
--- >>> adFlag FlagSet <> mempty
+-- >>> mempty <> adFlag FlagSet
 -- ad:1
--- >>> cdFlag FlagReset <> rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet <> adFlag FlagSet <> mempty
+-- >>> adFlag FlagSet <> cdFlag FlagClear
+-- ad:1,cd:0
+-- >>> adFlag FlagSet <> cdFlag FlagSet <> adFlag FlagClear <> rdFlag FlagSet <> cdFlag FlagReset
 -- rd:1,ad:0
 --
 data QueryFlags = QueryFlags
