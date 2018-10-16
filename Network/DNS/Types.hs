@@ -53,6 +53,7 @@ module Network.DNS.Types (
   , makeQuery
   -- ** Response
   , defaultResponse
+  , makeResponse
   -- ** DNS Header
   , DNSHeader (..)
   , Identifier
@@ -925,6 +926,19 @@ makeQuery idt qs adds fs = empqry {
     }
   where
     empqry = makeEmptyQuery adds fs
+
+-- | Making a response.
+makeResponse :: Identifier
+             -> [Question]
+             -> [ResourceRecord] -- ^ Answers
+             -> DNSMessage
+makeResponse idt qs as = defaultResponse {
+      header = header' { identifier = idt }
+    , question = qs
+    , answer   = as
+    }
+  where
+    header' = header defaultResponse
 
 ----------------------------------------------------------------
 -- EDNS0 (RFC 6891)
