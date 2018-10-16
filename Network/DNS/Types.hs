@@ -46,10 +46,13 @@ module Network.DNS.Types (
   , RData (..)
   -- * DNS Message
   , DNSMessage (..)
-  , defaultQuery
-  , defaultResponse
-  , makeEmptyQuery
   , DNSFormat
+  -- ** Query
+  , defaultQuery
+  , makeEmptyQuery
+  , makeQuery
+  -- ** Response
+  , defaultResponse
   -- ** DNS Header
   , DNSHeader (..)
   , Identifier
@@ -909,6 +912,19 @@ makeEmptyQuery adds fs = defaultQuery {
     -- fixme :: DO bit in "adds" should be overridden when
     --          QueryFlags supports it.
     header' = (header defaultQuery) { flags = queryDNSFlags fs }
+
+-- | Making a query.
+makeQuery :: Identifier
+          -> [Question]
+          -> [ResourceRecord] -- ^ Additional RRs for EDNS.
+          -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+          -> DNSMessage
+makeQuery idt qs adds fs = empqry {
+      header = (header empqry) { identifier = idt }
+    , question = qs
+    }
+  where
+    empqry = makeEmptyQuery adds fs
 
 ----------------------------------------------------------------
 -- EDNS0 (RFC 6891)

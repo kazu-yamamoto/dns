@@ -137,13 +137,7 @@ encodeQuestions :: Identifier
                 -> [ResourceRecord] -- ^ Additional RRs for EDNS.
                 -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
-encodeQuestions idt qs adds fs = encode qry
-  where
-    empqry = makeEmptyQuery adds fs
-    qry = empqry {
-        header = (header empqry) { identifier = idt }
-      , question = qs
-      }
+encodeQuestions idt qs adds fs = encode $ makeQuery idt qs adds fs
 
 ----------------------------------------------------------------
 
