@@ -130,12 +130,12 @@ sendAll sock bs = do
 -- 'Monoid'.
 --
 -- The caller is responsible for generating the ID via a securely seeded
--- CSPRNG).
+-- CSPRNG.
 --
 encodeQuestions :: Identifier
                 -> [Question]
                 -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-                -> QueryFlags       -- ^ Custom RD/AD/CD flags?
+                -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
 encodeQuestions idt qs adds fs = encode qry
   where
