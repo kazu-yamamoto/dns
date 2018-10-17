@@ -143,14 +143,14 @@ encodeQuestions idt qs adds fs = encode $ makeQuery idt qs adds fs
 
 -- | Composing a response from IPv4 addresses
 responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
-responseA idt q ips = makeResponse idt [q] as
+responseA idt q ips = makeResponse idt q as
   where
     dom = qname q
     as  = ResourceRecord dom A classIN 300 . RD_A <$> ips
 
 -- | Composing a response from IPv6 addresses
 responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
-responseAAAA idt q ips = makeResponse idt [q] as
+responseAAAA idt q ips = makeResponse idt q as
   where
     dom = qname q
     as  = ResourceRecord dom AAAA classIN 300 . RD_AAAA <$> ips

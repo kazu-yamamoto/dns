@@ -929,12 +929,12 @@ makeQuery idt qs adds fs = empqry {
 
 -- | Making a response.
 makeResponse :: Identifier
-             -> [Question]
+             -> Question
              -> [ResourceRecord] -- ^ Answers
              -> DNSMessage
-makeResponse idt qs as = defaultResponse {
+makeResponse idt q as = defaultResponse {
       header = header' { identifier = idt }
-    , question = qs
+    , question = [q]
     , answer   = as
     }
   where
