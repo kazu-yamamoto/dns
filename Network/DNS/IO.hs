@@ -138,7 +138,7 @@ encodeQuestion :: Identifier
                 -> AdditionalRecords -- ^ Additional RRs for EDNS.
                 -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
-encodeQuestion idt q adds fs = encode $ makeQuery idt [q] adds fs
+encodeQuestion idt q adds fs = encode $ makeQuery idt q adds fs
 
 -- | The encoded 'DNSMessage' has the specified request ID.  The default values
 -- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
@@ -154,7 +154,13 @@ encodeQuestions :: Identifier
                 -> AdditionalRecords -- ^ Additional RRs for EDNS.
                 -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
-encodeQuestions idt qs adds fs = encode $ makeQuery idt qs adds fs
+encodeQuestions idt qs adds fs = encode $ empqry {
+      header = (header empqry) { identifier = idt }
+    , question = qs
+    }
+  where
+    empqry = makeEmptyQuery adds fs
+
 {-# DEPRECATED encodeQuestions "Use encodeQuestion instead" #-}
 
 ----------------------------------------------------------------

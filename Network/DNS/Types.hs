@@ -924,13 +924,13 @@ makeEmptyQuery adds fs = defaultQuery {
 
 -- | Making a query.
 makeQuery :: Identifier
-          -> [Question]
+          -> Question
           -> AdditionalRecords -- ^ Additional RRs for EDNS.
           -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
           -> DNSMessage
-makeQuery idt qs adds fs = empqry {
+makeQuery idt q adds fs = empqry {
       header = (header empqry) { identifier = idt }
-    , question = qs
+    , question = [q]
     }
   where
     empqry = makeEmptyQuery adds fs
