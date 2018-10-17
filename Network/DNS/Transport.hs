@@ -22,9 +22,9 @@ import Network.DNS.Types.Internal
 -- | Check response for a matching identifier and question.  If we ever do
 -- pipelined TCP, we'll need to handle out of order responses.  See:
 -- https://tools.ietf.org/html/rfc7766#section-7
-checkResp :: [Question] -> Identifier -> DNSMessage -> Bool
+checkResp :: Question -> Identifier -> DNSMessage -> Bool
 checkResp q seqno resp =
-   identifier (header resp) == seqno && q == question resp
+   identifier (header resp) == seqno && [q] == question resp
 
 ----------------------------------------------------------------
 
@@ -34,13 +34,13 @@ instance Exception TCPFallback
 type Rslv0 = QueryFlags -> (Socket -> IO DNSMessage)
            -> IO (Either DNSError DNSMessage)
 
-type Rslv1 = [Question]
+type Rslv1 = Question
           -> [ResourceRecord]
           -> Int -- Timeout
           -> Int -- Retry
           -> Rslv0
 
-type TcpRslv = Identifier -> AddrInfo -> [Question] -> Int -- Timeout
+type TcpRslv = Identifier -> AddrInfo -> Question -> Int -- Timeout
             -> QueryFlags -> IO DNSMessage
 
 type UdpRslv = [ResourceRecord] -> Int -- Retry
@@ -72,8 +72,8 @@ resolve dom typ rlv qfl rcv
   | otherwise     = resolveSequential nss        gens        q edns tm retry fl rcv
   where
     q = case BS.last dom of
-          '.' -> [Question dom typ]
-          _   -> [Question (dom <> ".") typ]
+          '.' -> Question dom typ
+          _   -> Question (dom <> ".") typ
 
     gens = NE.toList $ genIds rlv
 
@@ -137,7 +137,7 @@ udpOpen ai = do
 -- This throws DNSError or TCPFallback.
 udpLookup :: UdpRslv
 udpLookup edns retry rcv ident ai q tm fl = do
-    let qry = encodeQuestions ident q edns fl
+    let qry = encodeQuestion ident q edns fl
         ednsRetry = not $ null edns
     E.handle (ioErrorToDNSError ai "UDP") $
       bracket (udpOpen ai) close (loop qry ednsRetry 0 RetryLimitExceeded)
@@ -155,7 +155,7 @@ udpLookup edns retry rcv ident ai q tm fl = do
                       if truncated then
                           E.throwIO TCPFallback
                       else if ednsRetry && rc == FormatErr then
-                          let nonednsQuery = encodeQuestions ident q [] fl
+                          let nonednsQuery = encodeQuestion ident q [] fl
                           in loop nonednsQuery False cnt RetryLimitExceeded sock
                       else
                           return res
@@ -191,7 +191,7 @@ tcpLookup ident ai q tm fl =
   where
     addr = addrAddress ai
     perform vc = do
-        let qry = encodeQuestions ident q [] fl
+        let qry = encodeQuestion ident q [] fl
         mres <- timeout tm $ do
             connect vc addr
             sendVC vc qry

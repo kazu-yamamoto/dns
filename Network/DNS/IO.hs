@@ -9,6 +9,7 @@ module Network.DNS.IO (
   , send
   , sendVC
     -- ** Encoding queries for transmission
+  , encodeQuestion
   , encodeQuestions
     -- ** Creating query response messages
   , responseA
@@ -132,12 +133,29 @@ sendAll sock bs = do
 -- The caller is responsible for generating the ID via a securely seeded
 -- CSPRNG.
 --
+encodeQuestion :: Identifier
+                -> Question
+                -> [ResourceRecord] -- ^ Additional RRs for EDNS.
+                -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+                -> ByteString
+encodeQuestion idt q adds fs = encode $ makeQuery idt [q] adds fs
+
+-- | The encoded 'DNSMessage' has the specified request ID.  The default values
+-- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
+-- parameter.  A suitable combination of flags can be created via the 'rdFlag',
+-- 'adFlag' and 'cdFlag' generators of the 'Network.DNS.Types.QueryFlags'
+-- 'Monoid'.
+--
+-- The caller is responsible for generating the ID via a securely seeded
+-- CSPRNG.
+--
 encodeQuestions :: Identifier
                 -> [Question]
                 -> [ResourceRecord] -- ^ Additional RRs for EDNS.
                 -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
 encodeQuestions idt qs adds fs = encode $ makeQuery idt qs adds fs
+{-# DEPRECATED encodeQuestions "Use encodeQuestion instead" #-}
 
 ----------------------------------------------------------------
 
