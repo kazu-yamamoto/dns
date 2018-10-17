@@ -9,6 +9,8 @@
 module Network.DNS.Types (
   -- * Resource Records
     ResourceRecord (..)
+  , Answers
+  , AdditionalRecords
   -- ** Types
   , Domain
   , CLASS
@@ -46,9 +48,14 @@ module Network.DNS.Types (
   , RData (..)
   -- * DNS Message
   , DNSMessage (..)
-  , defaultQuery
-  , defaultResponse
   , DNSFormat
+  -- ** Query
+  , defaultQuery
+  , makeEmptyQuery
+  , makeQuery
+  -- ** Response
+  , defaultResponse
+  , makeResponse
   -- ** DNS Header
   , DNSHeader (..)
   , Identifier
@@ -62,7 +69,6 @@ module Network.DNS.Types (
   , rdFlag
   , adFlag
   , cdFlag
-  , queryDNSFlags
   -- **** OPCODE and RCODE
   , OPCODE (..)
   , fromOPCODE
@@ -377,11 +383,11 @@ instance Exception DNSError
 
 -- | Raw data format for DNS Query and Response.
 data DNSMessage = DNSMessage {
-    header     :: DNSHeader        -- ^ Header
-  , question   :: [Question]       -- ^ The question for the name server
-  , answer     :: [ResourceRecord] -- ^ RRs answering the question
-  , authority  :: [ResourceRecord] -- ^ RRs pointing toward an authority
-  , additional :: [ResourceRecord] -- ^ RRs holding additional information
+    header     :: DNSHeader         -- ^ Header
+  , question   :: [Question]        -- ^ The question for the name server
+  , answer     :: Answers           -- ^ RRs answering the question
+  , authority  :: [ResourceRecord]  -- ^ RRs pointing toward an authority
+  , additional :: AdditionalRecords -- ^ RRs holding additional information
   } deriving (Eq, Show)
 
 {-# DEPRECATED DNSFormat "Use DNSMessage instead" #-}
@@ -865,6 +871,12 @@ hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
 b64encode :: ByteString -> String
 b64encode = BS.unpack . B64.encode
 
+-- | Type for resource records in the answer section.
+type Answers = [ResourceRecord]
+
+-- | Type for resource records in the additional section.
+type AdditionalRecords = [ResourceRecord]
+
 ----------------------------------------------------------------
 
 -- | Default query.
@@ -895,6 +907,46 @@ defaultResponse =
             }
         }
       }
+
+-- | Making a template query filled with ENDS additional RRs and
+--   query flags.
+makeEmptyQuery :: AdditionalRecords -- ^ Additional RRs for EDNS.
+               -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+               -> DNSMessage
+makeEmptyQuery adds fs = defaultQuery {
+      header = header'
+    , additional = adds
+    }
+  where
+    -- fixme :: DO bit in "adds" should be overridden when
+    --          QueryFlags supports it.
+    header' = (header defaultQuery) { flags = queryDNSFlags fs }
+
+-- | Making a query.
+makeQuery :: Identifier
+          -> Question
+          -> AdditionalRecords -- ^ Additional RRs for EDNS.
+          -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+          -> DNSMessage
+makeQuery idt q adds fs = empqry {
+      header = (header empqry) { identifier = idt }
+    , question = [q]
+    }
+  where
+    empqry = makeEmptyQuery adds fs
+
+-- | Making a response.
+makeResponse :: Identifier
+             -> Question
+             -> Answers
+             -> DNSMessage
+makeResponse idt q as = defaultResponse {
+      header = header' { identifier = idt }
+    , question = [q]
+    , answer   = as
+    }
+  where
+    header' = header defaultResponse
 
 ----------------------------------------------------------------
 -- EDNS0 (RFC 6891)

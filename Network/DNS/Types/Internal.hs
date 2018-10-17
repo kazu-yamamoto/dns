@@ -84,7 +84,7 @@ data ResolvConf = ResolvConf {
    -- | The number of retries including the first try.
   , resolvRetry      :: Int
    -- | Additional resource records to specify EDNS.
-  , resolvEDNS       :: [ResourceRecord]
+  , resolvEDNS       :: AdditionalRecords
    -- | Concurrent queries if multiple DNS servers are specified.
   , resolvConcurrent :: Bool
    -- | Cache configuration.

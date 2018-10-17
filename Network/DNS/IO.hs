@@ -9,6 +9,7 @@ module Network.DNS.IO (
   , send
   , sendVC
     -- ** Encoding queries for transmission
+  , encodeQuestion
   , encodeQuestions
     -- ** Creating query response messages
   , responseA
@@ -132,46 +133,48 @@ sendAll sock bs = do
 -- The caller is responsible for generating the ID via a securely seeded
 -- CSPRNG.
 --
+encodeQuestion :: Identifier
+                -> Question
+                -> AdditionalRecords -- ^ Additional RRs for EDNS.
+                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+                -> ByteString
+encodeQuestion idt q adds fs = encode $ makeQuery idt q adds fs
+
+-- | The encoded 'DNSMessage' has the specified request ID.  The default values
+-- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
+-- parameter.  A suitable combination of flags can be created via the 'rdFlag',
+-- 'adFlag' and 'cdFlag' generators of the 'Network.DNS.Types.QueryFlags'
+-- 'Monoid'.
+--
+-- The caller is responsible for generating the ID via a securely seeded
+-- CSPRNG.
+--
 encodeQuestions :: Identifier
                 -> [Question]
-                -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-                -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+                -> AdditionalRecords -- ^ Additional RRs for EDNS.
+                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
-encodeQuestions idt qs adds fs = encode qry
+encodeQuestions idt qs adds fs = encode $ empqry {
+      header = (header empqry) { identifier = idt }
+    , question = qs
+    }
   where
-      qry = DNSMessage {
-          header = DNSHeader {
-              identifier = idt
-            , flags = queryDNSFlags fs
-            }
-        , question = qs
-        , answer     = []
-        , authority  = []
-        , additional = adds
-        }
+    empqry = makeEmptyQuery adds fs
+
+{-# DEPRECATED encodeQuestions "Use encodeQuestion instead" #-}
 
 ----------------------------------------------------------------
 
 -- | Composing a response from IPv4 addresses
 responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
-responseA ident q ips =
-  let hd = header defaultResponse
-      dom = qname q
-      an = ResourceRecord dom A classIN 300 . RD_A <$> ips
-  in  defaultResponse {
-          header = hd { identifier=ident }
-        , question = [q]
-        , answer = an
-      }
+responseA idt q ips = makeResponse idt q as
+  where
+    dom = qname q
+    as  = ResourceRecord dom A classIN 300 . RD_A <$> ips
 
 -- | Composing a response from IPv6 addresses
 responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
-responseAAAA ident q ips =
-  let hd = header defaultResponse
-      dom = qname q
-      an = ResourceRecord dom AAAA classIN 300 . RD_AAAA <$> ips
-  in  defaultResponse {
-          header = hd { identifier=ident }
-        , question = [q]
-        , answer = an
-      }
+responseAAAA idt q ips = makeResponse idt q as
+  where
+    dom = qname q
+    as  = ResourceRecord dom AAAA classIN 300 . RD_AAAA <$> ips
