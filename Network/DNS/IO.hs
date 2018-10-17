@@ -135,8 +135,8 @@ sendAll sock bs = do
 --
 encodeQuestion :: Identifier
                 -> Question
-                -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-                -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+                -> AdditionalRecords -- ^ Additional RRs for EDNS.
+                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
 encodeQuestion idt q adds fs = encode $ makeQuery idt [q] adds fs
 
@@ -151,8 +151,8 @@ encodeQuestion idt q adds fs = encode $ makeQuery idt [q] adds fs
 --
 encodeQuestions :: Identifier
                 -> [Question]
-                -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-                -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+                -> AdditionalRecords -- ^ Additional RRs for EDNS.
+                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
 encodeQuestions idt qs adds fs = encode $ makeQuery idt qs adds fs
 {-# DEPRECATED encodeQuestions "Use encodeQuestion instead" #-}

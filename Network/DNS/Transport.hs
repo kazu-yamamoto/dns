@@ -35,7 +35,7 @@ type Rslv0 = QueryFlags -> (Socket -> IO DNSMessage)
            -> IO (Either DNSError DNSMessage)
 
 type Rslv1 = Question
-          -> [ResourceRecord]
+          -> AdditionalRecords
           -> Int -- Timeout
           -> Int -- Retry
           -> Rslv0
@@ -43,7 +43,7 @@ type Rslv1 = Question
 type TcpRslv = Identifier -> AddrInfo -> Question -> Int -- Timeout
             -> QueryFlags -> IO DNSMessage
 
-type UdpRslv = [ResourceRecord] -> Int -- Retry
+type UdpRslv = AdditionalRecords -> Int -- Retry
             -> (Socket -> IO DNSMessage) -> TcpRslv
 
 -- In lookup loop, we try UDP until we get a response.  If the response

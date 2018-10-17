@@ -9,6 +9,8 @@
 module Network.DNS.Types (
   -- * Resource Records
     ResourceRecord (..)
+  , Answers
+  , AdditionalRecords
   -- ** Types
   , Domain
   , CLASS
@@ -381,11 +383,11 @@ instance Exception DNSError
 
 -- | Raw data format for DNS Query and Response.
 data DNSMessage = DNSMessage {
-    header     :: DNSHeader        -- ^ Header
-  , question   :: [Question]       -- ^ The question for the name server
-  , answer     :: [ResourceRecord] -- ^ RRs answering the question
-  , authority  :: [ResourceRecord] -- ^ RRs pointing toward an authority
-  , additional :: [ResourceRecord] -- ^ RRs holding additional information
+    header     :: DNSHeader         -- ^ Header
+  , question   :: [Question]        -- ^ The question for the name server
+  , answer     :: Answers           -- ^ RRs answering the question
+  , authority  :: [ResourceRecord]  -- ^ RRs pointing toward an authority
+  , additional :: AdditionalRecords -- ^ RRs holding additional information
   } deriving (Eq, Show)
 
 {-# DEPRECATED DNSFormat "Use DNSMessage instead" #-}
@@ -869,6 +871,12 @@ hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
 b64encode :: ByteString -> String
 b64encode = BS.unpack . B64.encode
 
+-- | Type for resource records in the answer section.
+type Answers = [ResourceRecord]
+
+-- | Type for resource records in the additional section.
+type AdditionalRecords = [ResourceRecord]
+
 ----------------------------------------------------------------
 
 -- | Default query.
@@ -902,8 +910,8 @@ defaultResponse =
 
 -- | Making a template query filled with ENDS additional RRs and
 --   query flags.
-makeEmptyQuery :: [ResourceRecord] -- ^ Additional RRs for EDNS.
-               -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+makeEmptyQuery :: AdditionalRecords -- ^ Additional RRs for EDNS.
+               -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
                -> DNSMessage
 makeEmptyQuery adds fs = defaultQuery {
       header = header'
@@ -917,8 +925,8 @@ makeEmptyQuery adds fs = defaultQuery {
 -- | Making a query.
 makeQuery :: Identifier
           -> [Question]
-          -> [ResourceRecord] -- ^ Additional RRs for EDNS.
-          -> QueryFlags       -- ^ Custom RD\/AD\/CD flags.
+          -> AdditionalRecords -- ^ Additional RRs for EDNS.
+          -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
           -> DNSMessage
 makeQuery idt qs adds fs = empqry {
       header = (header empqry) { identifier = idt }
@@ -930,7 +938,7 @@ makeQuery idt qs adds fs = empqry {
 -- | Making a response.
 makeResponse :: Identifier
              -> Question
-             -> [ResourceRecord] -- ^ Answers
+             -> Answers
              -> DNSMessage
 makeResponse idt q as = defaultResponse {
       header = header' { identifier = idt }
