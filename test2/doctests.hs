@@ -5,6 +5,7 @@ import Test.DocTest
 main :: IO ()
 main = doctest [
     "-XOverloadedStrings"
+  , "-XCPP"
   {-
     Both 'iproute' and 'network-data' provide
     ‘Data.IP’ package:
