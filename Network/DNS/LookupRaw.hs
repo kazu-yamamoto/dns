@@ -168,15 +168,15 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --    a new identifier is created atomically from the cryptographically
 --    secure pseudo random number generator for the target DNS server.
 --    Then UDP queries are tried with the limitation of 'resolvRetry'
---    (use EDNS0 if specifiecd).
---    If it appear that the target DNS server does not support EDNS0,
+--    (use EDNS if specifiecd).
+--    If it appears that the target DNS server does not support EDNS,
 --    it falls back to traditional queries.
 --
 --  * If the response is truncated, a new TCP socket bound to a new
---    locla port is created. Then exactly one TCP query is retried.
+--    local port is created. Then exactly one TCP query is retried.
 --
 --
--- If multiple DNS server are specified 'ResolvConf' ('RCHostNames ')
+-- If multiple DNS servers are specified 'ResolvConf' ('RCHostNames ')
 -- or found ('RCFilePath'), either sequential lookup or
 -- concurrent lookup is carried out:
 --

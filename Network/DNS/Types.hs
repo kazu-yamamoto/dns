@@ -95,20 +95,15 @@ module Network.DNS.Types (
   , Question (..)
   -- * DNS Error
   , DNSError (..)
-  -- * EDNS0
-  , EDNS0
-  , defaultEDNS0
+  -- * EDNS
+  , EDNS(..)
+  , defaultEDNS
   , maxUdpSize
   , minUdpSize
-  -- ** Accessors
-  , udpSize
-  , extRCODE
-  , dnssecOk
-  , options
   -- ** Converters
-  , fromEDNS0
-  , toEDNS0
-  -- * EDNS0 option data
+  , fromEDNS
+  , toEDNS
+  -- * EDNS option data
   , OData (..)
   , OptCode (
     ClientSubnet
@@ -603,7 +598,8 @@ fromOPCODE OP_UPDATE = 5
 ----------------------------------------------------------------
 
 #if __GLASGOW_HASKELL__ >= 802
--- | Response code including EDNS0's 12bit ones.
+-- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
+-- bits.
 newtype RCODE = RCODE {
     -- | From rcode to number.
     fromRCODE :: Word16
@@ -949,56 +945,55 @@ makeResponse idt q as = defaultResponse {
     header' = header defaultResponse
 
 ----------------------------------------------------------------
--- EDNS0 (RFC 6891)
+-- EDNS (RFC 6891, EDNS(0))
 ----------------------------------------------------------------
 
--- | EDNS0 infromation defined in RFC 6891.
-data EDNS0 = EDNS0 {
+-- | EDNS information defined in RFC 6891.
+data EDNS = EDNS {
     -- | UDP payload size.
     udpSize  :: Word16
     -- | Extended RCODE.
   , extRCODE :: RCODE
     -- | Is DNSSEC OK?
   , dnssecOk :: Bool
-    -- | EDNS0 option data.
+    -- | EDNS option data.
   , options  :: [OData]
   } deriving (Eq, Show)
 
 #if __GLASGOW_HASKELL__ >= 802
--- | Default information for EDNS0.
+-- | Default information for EDNS.
 --
--- >>> defaultEDNS0
--- EDNS0 {udpSize = 4096, extRCODE = NoError, dnssecOk = False, options = []}
+-- >>> defaultEDNS
+-- EDNS {udpSize = 4096, extRCODE = NoError, dnssecOk = False, options = []}
 #else
--- | Default information for EDNS0.
+-- | Default information for EDNS.
 --
--- >>> defaultEDNS0
--- EDNS0 {udpSize = 4096, extRCODE = NoErr, dnssecOk = False, options = []}
+-- >>> defaultEDNS
+-- EDNS {udpSize = 4096, extRCODE = NoErr, dnssecOk = False, options = []}
 #endif
-defaultEDNS0 :: EDNS0
-defaultEDNS0 = EDNS0 4096 NoErr False []
+defaultEDNS :: EDNS
+defaultEDNS = EDNS 4096 NoErr False []
 
--- | Maximum UDP size. If 'udpSize' of 'EDNS0' is larger than this,
---   'fromEDNS0' uses this value instead.
+-- | Maximum UDP size. If 'udpSize' of 'EDNS' is larger than this,
+--   'fromEDNS' uses this value instead.
 --
 -- >>> maxUdpSize
 -- 16384
 maxUdpSize :: Word16
 maxUdpSize = 16384
 
--- | Minimum UDP size. If 'udpSize' of 'EDNS0' is smaller than this,
---   'fromEDNS0' uses this value instead.
+-- | Minimum UDP size. If 'udpSize' of 'EDNS' is smaller than this,
+--   'fromEDNS' uses this value instead.
 --
 -- >>> minUdpSize
 -- 512
 minUdpSize :: Word16
 minUdpSize = 512
 
--- | Generating a resource record for the additional section based on EDNS0.
--- 'DNSFlags' is not generated.
--- Just set the same 'RCODE' to 'DNSFlags'.
-fromEDNS0 :: EDNS0 -> ResourceRecord
-fromEDNS0 edns = ResourceRecord name' type' class' ttl' rdata'
+-- | Generate a resource record for the additional section based on EDNS.
+--
+fromEDNS :: EDNS -> ResourceRecord
+fromEDNS edns = ResourceRecord name' type' class' ttl' rdata'
   where
     name'  = "."
     type'  = OPT
@@ -1009,21 +1004,21 @@ fromEDNS0 edns = ResourceRecord name' type' class' ttl' rdata'
       | otherwise     = ttl0'
     rdata' = RD_OPT $ options edns
 
--- | Generating EDNS0 information from the OPT RR.
-toEDNS0 :: DNSFlags -> ResourceRecord -> Maybe EDNS0
-toEDNS0 flgs (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
-    Just $ EDNS0 udpsiz (toRCODE erc) secok opts
+-- | Extract EDNS information from the OPT RR.
+toEDNS :: DNSFlags -> ResourceRecord -> Maybe EDNS
+toEDNS flgs (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
+    Just $ EDNS udpsiz (toRCODE erc) secok opts
   where
     lp = fromRCODEforHeader $ rcode flgs
     up = shiftR (ttl' .&. 0xff000000) 20
     erc = fromIntegral up .|. lp
     secok = ttl' `testBit` 15
-toEDNS0 _ _ = Nothing
+toEDNS _ _ = Nothing
 
 ----------------------------------------------------------------
 
 #if __GLASGOW_HASKELL__ >= 802
--- | EDNS0 Option Code (RFC 6891).
+-- | EDNS Option Code (RFC 6891).
 newtype OptCode = OptCode {
     -- | From option code to number.
     fromOptCode :: Word16

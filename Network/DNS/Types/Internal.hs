@@ -52,13 +52,13 @@ defaultCacheConf = CacheConf 300 10
 --
 --  >>> let conf = defaultResolvConf { resolvInfo = RCHostNames ["8.8.8.8","8.8.4.4"], resolvConcurrent = True }
 --
---  An example to disable EDNS0:
+--  An example to disable EDNS:
 --
 --  >>> let conf = defaultResolvConf { resolvEDNS = [] }
 --
---  An example to enable EDNS0 with a 1,280-bytes buffer:
+--  An example to enable EDNS(0) with a 1,280-bytes buffer:
 --
---  >>> let conf = defaultResolvConf { resolvEDNS = [fromEDNS0 defaultEDNS0 { udpSize = 1280 }] }
+--  >>> let conf = defaultResolvConf { resolvEDNS = [fromEDNS defaultEDNS { udpSize = 1280 }] }
 --
 --  An example to enable cache:
 --
@@ -101,7 +101,7 @@ data ResolvConf = ResolvConf {
 -- * 'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
 -- * 'resolvTimeout' is 3,000,000 micro seconds.
 -- * 'resolvRetry' is 3.
--- * 'resolvEDNS' is EDNS0 with a 4,096-bytes buffer.
+-- * 'resolvEDNS' is EDNS(0) with a 4,096-bytes buffer.
 -- * 'resolvConcurrent' is False.
 -- * 'resolvCache' is Nothing.
 -- * 'resolvQueryFlags' is an empty set of overrides.
@@ -110,7 +110,7 @@ defaultResolvConf = ResolvConf {
     resolvInfo       = RCFilePath "/etc/resolv.conf"
   , resolvTimeout    = 3 * 1000 * 1000
   , resolvRetry      = 3
-  , resolvEDNS       = [fromEDNS0 defaultEDNS0]
+  , resolvEDNS       = [fromEDNS defaultEDNS]
   , resolvConcurrent = False
   , resolvCache      = Nothing
   , resolvQueryFlags = mempty

@@ -1,5 +1,6 @@
 # 3.1.0
 
+* Breaking change: EDNS0 is renamed to EDNS.
 * Breaking change: lookupRawAD, composeQuery, composeQueryAD are removed.
 * A new API: lookupRawWithFlags, QueryFlags, FlagOp, rdFlag, adFlag, cdFlag,
   and resolvQueryFlags. [#116](https://github.com/kazu-yamamoto/dns/pull/116)

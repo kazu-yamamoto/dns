@@ -60,12 +60,12 @@ spec = do
     prop "DNSMessage" . forAll genDNSMessage $ \ msg ->
         decode (encode msg) `shouldBe` Right msg
 
-    prop "EDNS0" . forAll genEDNS0Header $ \(edns0,hdr) -> do
-        let rr0 = fromEDNS0 edns0
-            msg0 = DNSMessage hdr [] [] [] [rr0]
-            Right msg1 = decode $ encode msg0
-            medns1 = toEDNS0 (flags $ header msg0) (head $ additional msg1)
-        medns1 `shouldBe` Just edns0
+    prop "EDNS" . forAll genEDNSHeader $ \(edns,hdr) -> do
+        let rr = fromEDNS edns
+            msg = DNSMessage hdr [] [] [] [rr]
+            Right msg' = decode $ encode msg
+            medns = toEDNS (flags hdr) (head $ additional msg')
+        medns `shouldBe` Just edns
 
 ----------------------------------------------------------------
 
@@ -171,12 +171,12 @@ genOPCODE  = elements [OP_STD, OP_INV, OP_SSR, OP_NOTIFY, OP_UPDATE]
 genRCODE :: Gen RCODE
 genRCODE = elements $ map toRCODE [0..15]
 
-genEDNS0 :: Gen EDNS0
-genEDNS0 = do
+genEDNS :: Gen EDNS
+genEDNS = do
     erc <- genExtRCODE
     ok <- genBool
     od <- genOData
-    return $ defaultEDNS0 {
+    return $ defaultEDNS {
         extRCODE = erc
       , dnssecOk = ok
       , options  = [od]
@@ -196,9 +196,9 @@ genOData = oneof
 genExtRCODE :: Gen RCODE
 genExtRCODE = elements $ map toRCODE [0..4095]
 
-genEDNS0Header :: Gen (EDNS0, DNSHeader)
-genEDNS0Header = do
-    edns <- genEDNS0
+genEDNSHeader :: Gen (EDNS, DNSHeader)
+genEDNSHeader = do
+    edns <- genEDNS
     hdr <- genDNSHeader
     let flg = flags hdr
     return (edns, hdr { flags =  flg { rcode = extRCODE edns } })
