@@ -208,6 +208,10 @@ getRData NSEC3PARAM len = RD_NSEC3PARAM <$> decodeHashAlg
 getRData _  len = UnknownRData <$> getNByteString len
 
 getOData :: OptCode -> Int -> SGet OData
+getOData NSID len = OD_NSID          <$> getNByteString len
+getOData DAU  len = OD_DAU. B.unpack <$> getNByteString len
+getOData DHU  len = OD_DHU. B.unpack <$> getNByteString len
+getOData N3U  len = OD_N3U. B.unpack <$> getNByteString len
 getOData ClientSubnet len = do
         family  <- get16
         srcBits <- get8

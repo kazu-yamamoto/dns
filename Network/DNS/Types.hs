@@ -107,6 +107,10 @@ module Network.DNS.Types (
   , OData (..)
   , OptCode (
     ClientSubnet
+  , DAU
+  , DHU
+  , N3U
+  , NSID
   )
   , fromOptCode
   , toOptCode
@@ -1024,48 +1028,109 @@ newtype OptCode = OptCode {
     fromOptCode :: Word16
   } deriving (Eq,Ord)
 
+-- | NSID (RFC5001, section 2.3)
+pattern NSID :: OptCode
+pattern NSID = OptCode 3
+
+-- | DNSSEC algorithm support (RFC6974, section 3)
+pattern DAU :: OptCode
+pattern DAU = OptCode 5
+pattern DHU :: OptCode
+pattern DHU = OptCode 6
+pattern N3U :: OptCode
+pattern N3U = OptCode 7
+
 -- | Client subnet (RFC7871)
 pattern ClientSubnet :: OptCode
 pattern ClientSubnet = OptCode 8
 
 instance Show OptCode where
+    show NSID         = "NSID"
+    show DAU          = "DAU"
+    show DHU          = "DHU"
+    show N3U          = "N3U"
     show ClientSubnet = "ClientSubnet"
-    show x            = "OptCode " ++ (show $ fromOptCode x)
+    show x            = "OptCode" ++ (show $ fromOptCode x)
 
 -- | From number to option code.
 toOptCode :: Word16 -> OptCode
 toOptCode = OptCode
 #else
 -- | Option Code (RFC 6891).
-data OptCode = ClientSubnet          -- ^ Client subnet (RFC7871)
+data OptCode = NSID                  -- ^ Name Server Identifier (RFC5001)
+             | DAU                   -- ^ DNSSEC Algorithm understood (RFC6975)
+             | DHU                   -- ^ DNSSEC Hash Understood (RFC6975)
+             | N3U                   -- ^ NSEC3 Hash Understood (RFC6975)
+             | ClientSubnet          -- ^ Client subnet (RFC7871)
              | UnknownOptCode Word16 -- ^ Unknown option code
     deriving (Eq, Ord, Show)
 
 -- | From option code to number.
 fromOptCode :: OptCode -> Word16
+fromOptCode NSID         = 3
+fromOptCode DAU          = 5
+fromOptCode DHU          = 6
+fromOptCode N3U          = 7
 fromOptCode ClientSubnet = 8
 fromOptCode (UnknownOptCode x) = x
 
 -- | From number to option code.
 toOptCode :: Word16 -> OptCode
+toOptCode 3 = NSID
+toOptCode 5 = DAU
+toOptCode 6 = DHU
+toOptCode 7 = N3U
 toOptCode 8 = ClientSubnet
 toOptCode x = UnknownOptCode x
 #endif
 
 ----------------------------------------------------------------
 
--- | Optional resource data.
-data OData = OD_ClientSubnet Word8 Word8 IP   -- ^ Client subnet (RFC7871)
-           | OD_ECSgeneric Word16 Word8 Word8 ByteString -- ^ Non-IP Client subnet
-           | UnknownOData Word16 ByteString   -- ^ Unknown optional type
+-- | RData formats for a few EDNS options, and an opaque catcall
+data OData =
+      -- | Name Server Identifier (RFC5001).  Bidirectional, empty from client.
+      -- (opaque octet-string).  May contain binary data
+      OD_NSID ByteString
+      -- | DNSSEC Algorithm Understood (RFC6975).  Client to server.
+      -- (array of 8-bit numbers). Lists supported DNSKEY algorithms.
+    | OD_DAU [Word8]
+      -- | DS Hash Understood (RFC6975).  Client to server.
+      -- (array of 8-bit numbers). Lists supported DS hash algorithms.
+    | OD_DHU [Word8]
+      -- | NSEC3 Hash Understood (RFC6975).  Client to server.
+      -- (array of 8-bit numbers). Lists supported NSEC3 hash algorithms.
+    | OD_N3U [Word8]
+      -- | Client subnet (RFC7871).  Bidirectional.
+      -- (source bits, scope bits, address).
+      -- The address is masked and truncated per the specification when encoding.
+      -- The address is zero-padded when decoding.
+    | OD_ClientSubnet Word8 Word8 IP
+      -- | Unsupported or malformed IP client subnet option.  Bidirectional.
+      -- (address family, source bits, scope bits, opaque address).
+    | OD_ECSgeneric Word16 Word8 Word8 ByteString
+      -- | Generic EDNS option.
+      -- (numeric 'OptCode', opaque content)
+    | UnknownOData Word16 ByteString
     deriving (Eq,Ord)
 
 
 instance Show OData where
+    show (OD_NSID nsid) = showNSID nsid
+    show (OD_DAU as)    = showAlgList "DAU" as
+    show (OD_DHU hs)    = showAlgList "DHU" hs
+    show (OD_N3U hs)    = showAlgList "N3U" hs
     show (OD_ClientSubnet b1 b2 ip@(IPv4 _)) = showECS 1 b1 b2 $ show ip
     show (OD_ClientSubnet b1 b2 ip@(IPv6 _)) = showECS 2 b1 b2 $ show ip
     show (OD_ECSgeneric fam b1 b2 a) = showECS fam b1 b2 $ hexencode a
     show (UnknownOData code bs) = showUnknown code bs
+
+showAlgList :: String -> [Word8] -> String
+showAlgList nm ws = nm ++ " " ++ (List.intercalate "," $ map show ws)
+
+showNSID :: ByteString -> String
+showNSID nsid = "NSID" ++ " " ++ hexencode nsid ++ ";" ++ printable nsid
+  where
+    printable = BS.unpack. BS.map (\c -> if c < ' ' || c > '~' then '?' else c)
 
 showECS :: Word16 -> Word8 -> Word8 -> String -> String
 showECS family srcBits scpBits address =

@@ -74,6 +74,7 @@ copy (UnknownRData is)    = UnknownRData $ B.copy is
 copyOData :: OData -> OData
 copyOData (OD_ECSgeneric family srcBits scpBits bs) =
     OD_ECSgeneric family srcBits scpBits $ B.copy bs
+copyOData (OD_NSID nsid) = OD_NSID $ B.copy nsid
 copyOData (UnknownOData c b)        = UnknownOData c $ B.copy b
 
 -- No copying required for the rest, but avoiding a wildcard pattern match
@@ -81,3 +82,6 @@ copyOData (UnknownOData c b)        = UnknownOData c $ B.copy b
 -- complain about a partial function.
 --
 copyOData o@(OD_ClientSubnet {}) = o
+copyOData o@(OD_DAU {}) = o
+copyOData o@(OD_DHU {}) = o
+copyOData o@(OD_N3U {}) = o

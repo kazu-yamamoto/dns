@@ -175,6 +175,14 @@ putRData rd = case rd of
         ]
     UnknownRData bytes -> putByteString bytes
 
+-- | Encode EDNS OPTION consisting of a list of octets.
+putODWords :: Word16 -> [Word8] -> SPut
+putODWords code ws =
+     mconcat [ put16 code
+             , putInt16 $ length ws
+             , mconcat $ map put8 ws
+             ]
+
 -- | Encode an EDNS OPTION byte string.
 putODBytes :: Word16 -> ByteString -> SPut
 putODBytes code bs =
@@ -184,6 +192,10 @@ putODBytes code bs =
             ]
 
 putOData :: OData -> SPut
+putOData (OD_NSID nsid) = putODBytes (fromOptCode NSID) nsid
+putOData (OD_DAU as) = putODWords (fromOptCode DAU) as
+putOData (OD_DHU hs) = putODWords (fromOptCode DHU) hs
+putOData (OD_N3U hs) = putODWords (fromOptCode N3U) hs
 putOData (OD_ClientSubnet srcBits scpBits ip) =
     -- https://tools.ietf.org/html/rfc7871#section-6
     --

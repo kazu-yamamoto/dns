@@ -1,5 +1,6 @@
 # 3.1.0
 
+* Added EDNS OPTIONS: NSID, DAU, DHU, N3U
 * Decoding of the ClientSubnet option is now a total function,
   provided the RDATA is structurally sound.  Unexpected values
   just yield OD_ECSgeneric results.
