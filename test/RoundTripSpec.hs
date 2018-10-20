@@ -3,7 +3,9 @@
 module RoundTripSpec where
 
 import Control.Monad (replicateM)
-import Data.IP (IP (..), IPv4, IPv6, toIPv4, toIPv6)
+import qualified Data.IP
+import Data.IP (Addr, IP(..), IPv4, IPv6, toIPv4, toIPv6, makeAddrRange)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import Network.DNS.Decode
 import Network.DNS.Encode
@@ -185,13 +187,55 @@ genEDNS = do
 genOData :: Gen OData
 genOData = oneof
     [ genOD_Unknown
-    , OD_ClientSubnet <$> genWord8 <*> genWord8 <*> oneof [ IPv4 <$> genIPv4, IPv6 <$> genIPv6 ]
+    , genOD_ECS
     ]
   where
+    -- | Choose from the range reserved for local use
+    -- https://tools.ietf.org/html/rfc6891#section-9
     genOD_Unknown = do
+      opc <- elements [65001, 65534]
       bs <- genByteString
-      let opc = toOptCode $ fromIntegral $ BS.length bs
       pure $ UnknownOData opc bs
+
+    -- | Only valid ECS prefixes round-trip, make sure the prefix is
+    -- is consistent with the mask.
+    genOD_ECS = do
+        usev4 <- genBool
+        if usev4
+        then genFuzzed genIPv4 IPv4 Data.IP.fromIPv4  1 32
+        else genFuzzed genIPv6 IPv6 Data.IP.fromIPv6b 2 128
+      where
+        genFuzzed :: Addr a
+                  => Gen a
+                  -> (a -> IP)
+                  -> (a -> [Int])
+                  -> Word16
+                  -> Word8
+                  -> Gen OData
+        genFuzzed gen toIP toBytes fam alen = do
+            ip <- gen
+            bits1 <- elements [1 .. alen]
+            bits2 <- elements [0 .. alen]
+            fuzzSrcBits <- genBool
+            fuzzScpBits <- genBool
+            srcBits <- if not fuzzSrcBits
+                       then pure bits1
+                       else flip mod alen. (+) bits1 <$> elements [1..alen-1]
+            scpBits <- if not fuzzScpBits
+                       then pure bits2
+                       else elements [alen+1 .. 0xFF]
+            let addr  = Data.IP.addr. makeAddrRange ip $ fromIntegral bits1
+                bytes = map fromIntegral $ toBytes addr
+                len   = (fromIntegral bits1 + 7) `div` 8
+                less  = take (len - 1) bytes
+                more  = less ++ [0xFF]
+            if srcBits == bits1
+            then if scpBits == bits2
+                 then pure $ OD_ClientSubnet bits1 scpBits $ toIP addr
+                 else pure $ OD_ECSgeneric fam bits1 scpBits $ B.pack bytes
+            else if (srcBits < bits1)
+                 then pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack more
+                 else pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack less
 
 genExtRCODE :: Gen RCODE
 genExtRCODE = elements $ map toRCODE [0..4095]

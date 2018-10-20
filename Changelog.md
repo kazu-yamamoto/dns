@@ -1,5 +1,13 @@
 # 3.1.0
 
+* Decoding of the ClientSubnet option is now a total function,
+  provided the RDATA is structurally sound.  Unexpected values
+  just yield OD_ECSgeneric results.
+* Breaking change: New OD_ECSgeneric EDNS constructor, represents
+  ClientSubnet values whose address family is not IP or that violate
+  the specification.  The "family" field distinguishes the two cases.
+* The ClientSubnet EDNS option is now encoded correctly even when the
+  source bits match some trailing all-zero bytes.
 * Breaking change: EDNS0 is renamed to EDNS.
 * Breaking change: lookupRawAD, composeQuery, composeQueryAD are removed.
 * A new API: lookupRawWithFlags, QueryFlags, FlagOp, rdFlag, adFlag, cdFlag,

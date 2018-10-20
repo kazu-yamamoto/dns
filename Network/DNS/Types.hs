@@ -119,7 +119,7 @@ import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
-import Data.IP (IP, IPv4, IPv6)
+import Data.IP (IP(..), IPv4, IPv6)
 import qualified Data.List as List
 import qualified Data.Semigroup as Sem
 
@@ -1056,5 +1056,21 @@ toOptCode x = UnknownOptCode x
 
 -- | Optional resource data.
 data OData = OD_ClientSubnet Word8 Word8 IP   -- ^ Client subnet (RFC7871)
-           | UnknownOData OptCode ByteString  -- ^ Unknown optional type
-    deriving (Eq,Show,Ord)
+           | OD_ECSgeneric Word16 Word8 Word8 ByteString -- ^ Non-IP Client subnet
+           | UnknownOData Word16 ByteString   -- ^ Unknown optional type
+    deriving (Eq,Ord)
+
+
+instance Show OData where
+    show (OD_ClientSubnet b1 b2 ip@(IPv4 _)) = showECS 1 b1 b2 $ show ip
+    show (OD_ClientSubnet b1 b2 ip@(IPv6 _)) = showECS 2 b1 b2 $ show ip
+    show (OD_ECSgeneric fam b1 b2 a) = showECS fam b1 b2 $ hexencode a
+    show (UnknownOData code bs) = showUnknown code bs
+
+showECS :: Word16 -> Word8 -> Word8 -> String -> String
+showECS family srcBits scpBits address =
+    show family ++ " " ++ show srcBits
+                ++ " " ++ show scpBits ++ " " ++ address
+
+showUnknown :: Word16 -> ByteString -> String
+showUnknown code bs = "UnknownOData " ++ show code ++ " " ++ hexencode bs

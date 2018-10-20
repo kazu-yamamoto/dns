@@ -16,7 +16,8 @@ import Control.Monad.State (State, modify, execState, gets)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.IP (IP(..), fromIPv4, fromIPv6b)
+import qualified Data.IP
+import Data.IP (IP(..), fromIPv4, fromIPv6b, makeAddrRange)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
@@ -174,25 +175,51 @@ putRData rd = case rd of
         ]
     UnknownRData bytes -> putByteString bytes
 
-putOData :: OData -> SPut
-putOData (OD_ClientSubnet srcNet scpNet ip) =
-    let dropZeroes = dropWhileEnd (==0)
-        (fam,raw) = case ip of
-                        IPv4 ip4 -> (1,dropZeroes $ fromIPv4 ip4)
-                        IPv6 ip6 -> (2,dropZeroes $ fromIPv6b ip6)
-        dataLen = 2 + 2 + length raw
-     in mconcat [ put16 $ fromOptCode ClientSubnet
-                , putInt16 dataLen
-                , putInt16 fam
-                , put8 srcNet
-                , put8 scpNet
-                , mconcat $ fmap putInt8 raw
-                ]
-putOData (UnknownOData code bs) =
-    mconcat [ put16 $ fromOptCode code
+-- | Encode an EDNS OPTION byte string.
+putODBytes :: Word16 -> ByteString -> SPut
+putODBytes code bs =
+    mconcat [ put16 code
             , putInt16 $ BS.length bs
             , putByteString bs
             ]
+
+putOData :: OData -> SPut
+putOData (OD_ClientSubnet srcBits scpBits ip) =
+    -- https://tools.ietf.org/html/rfc7871#section-6
+    --
+    -- o  ADDRESS, variable number of octets, contains either an IPv4 or
+    --    IPv6 address, depending on FAMILY, which MUST be truncated to the
+    --    number of bits indicated by the SOURCE PREFIX-LENGTH field,
+    --    padding with 0 bits to pad to the end of the last octet needed.
+    --
+    -- o  A server receiving an ECS option that uses either too few or too
+    --    many ADDRESS octets, or that has non-zero ADDRESS bits set beyond
+    --    SOURCE PREFIX-LENGTH, SHOULD return FORMERR to reject the packet,
+    --    as a signal to the software developer making the request to fix
+    --    their implementation.
+    --
+    let octets = fromIntegral $ (srcBits + 7) `div` 8
+        prefix addr = Data.IP.addr $ makeAddrRange addr $ fromIntegral srcBits
+        (family, raw) = case ip of
+                        IPv4 ip4 -> (1, take octets $ fromIPv4  $ prefix ip4)
+                        IPv6 ip6 -> (2, take octets $ fromIPv6b $ prefix ip6)
+        dataLen = 2 + 2 + octets
+     in mconcat [ put16 $ fromOptCode ClientSubnet
+                , putInt16 dataLen
+                , put16 family
+                , put8 srcBits
+                , put8 scpBits
+                , mconcat $ fmap putInt8 raw
+                ]
+putOData (OD_ECSgeneric family srcBits scpBits addr) =
+    mconcat [ put16 $ fromOptCode ClientSubnet
+            , putInt16 $ 4 + BS.length addr
+            , put16 family
+            , put8 srcBits
+            , put8 scpBits
+            , putByteString addr
+            ]
+putOData (UnknownOData code bs) = putODBytes code bs
 
 -- In the case of the TXT record, we need to put the string length
 -- fixme : What happens with the length > 256 ?
