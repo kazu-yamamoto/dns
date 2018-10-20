@@ -54,11 +54,11 @@ defaultCacheConf = CacheConf 300 10
 --
 --  An example to disable EDNS:
 --
---  >>> let conf = defaultResolvConf { resolvEDNS = [] }
+--  >>> let conf = defaultResolvConf { resolvEDNS = NoEDNS }
 --
 --  An example to enable EDNS(0) with a 1,280-bytes buffer:
 --
---  >>> let conf = defaultResolvConf { resolvEDNS = [fromEDNS defaultEDNS { udpSize = 1280 }] }
+--  >>> let conf = defaultResolvConf { resolvEDNS = EDNSheader $ defaultEDNS { ednsUdpSize = 1280 } }
 --
 --  An example to enable cache:
 --
@@ -84,7 +84,7 @@ data ResolvConf = ResolvConf {
    -- | The number of retries including the first try.
   , resolvRetry      :: Int
    -- | Additional resource records to specify EDNS.
-  , resolvEDNS       :: AdditionalRecords
+  , resolvEDNS       :: EDNSheader
    -- | Concurrent queries if multiple DNS servers are specified.
   , resolvConcurrent :: Bool
    -- | Cache configuration.
@@ -110,7 +110,7 @@ defaultResolvConf = ResolvConf {
     resolvInfo       = RCFilePath "/etc/resolv.conf"
   , resolvTimeout    = 3 * 1000 * 1000
   , resolvRetry      = 3
-  , resolvEDNS       = [fromEDNS defaultEDNS]
+  , resolvEDNS       = EDNSheader defaultEDNS
   , resolvConcurrent = False
   , resolvCache      = Nothing
   , resolvQueryFlags = mempty

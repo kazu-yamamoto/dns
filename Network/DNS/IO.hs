@@ -135,10 +135,10 @@ sendAll sock bs = do
 --
 encodeQuestion :: Identifier
                 -> Question
-                -> AdditionalRecords -- ^ Additional RRs for EDNS.
-                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+                -> EDNSheader -- ^ Optional EDNS
+                -> QueryFlags -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
-encodeQuestion idt q adds fs = encode $ makeQuery idt q adds fs
+encodeQuestion idt q eh fs = encode $ makeQuery idt q eh fs
 
 -- | The encoded 'DNSMessage' has the specified request ID.  The default values
 -- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
@@ -151,15 +151,15 @@ encodeQuestion idt q adds fs = encode $ makeQuery idt q adds fs
 --
 encodeQuestions :: Identifier
                 -> [Question]
-                -> AdditionalRecords -- ^ Additional RRs for EDNS.
-                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+                -> EDNSheader -- ^ Optional EDNS
+                -> QueryFlags -- ^ Custom RD\/AD\/CD flags.
                 -> ByteString
-encodeQuestions idt qs adds fs = encode $ empqry {
+encodeQuestions idt qs eh fs = encode $ empqry {
       header = (header empqry) { identifier = idt }
     , question = qs
     }
   where
-    empqry = makeEmptyQuery adds fs
+    empqry = makeEmptyQuery eh fs
 
 {-# DEPRECATED encodeQuestions "Use encodeQuestion instead" #-}
 

@@ -10,6 +10,7 @@ module Network.DNS.Types (
   -- * Resource Records
     ResourceRecord (..)
   , Answers
+  , AuthorityRecords
   , AdditionalRecords
   -- ** Types
   , Domain
@@ -48,6 +49,9 @@ module Network.DNS.Types (
   , RData (..)
   -- * DNS Message
   , DNSMessage (..)
+  , EDNSheader(..)
+  , ifEDNS
+  , mapEDNS
   , DNSFormat
   -- ** Query
   , defaultQuery
@@ -85,12 +89,18 @@ module Network.DNS.Types (
   , NXRRSet
   , NotAuth
   , NotZone
-  , BadOpt
+  , BadVers
+  , BadKey
+  , BadTime
+  , BadMode
+  , BadName
+  , BadAlg
+  , BadTrunc
+  , BadCookie
+  , BadRCODE
   )
   , fromRCODE
   , toRCODE
-  , fromRCODEforHeader
-  , toRCODEforHeader
   -- ** DNS Body
   , Question (..)
   -- * DNS Error
@@ -100,9 +110,6 @@ module Network.DNS.Types (
   , defaultEDNS
   , maxUdpSize
   , minUdpSize
-  -- ** Converters
-  , fromEDNS
-  , toEDNS
   -- * EDNS option data
   , OData (..)
   , OptCode (
@@ -367,7 +374,7 @@ data DNSError =
     --   or a name server may not wish to perform
     --   a particular operation (e.g., zone transfer) for particular data.
   | OperationRefused
-    -- | The server detected a malformed OPT RR.
+    -- | The server does not support the OPT RR version or content
   | BadOptRecord
     -- | Configuration is wrong.
   | BadConfiguration
@@ -380,12 +387,76 @@ data DNSError =
 
 instance Exception DNSError
 
--- | Raw data format for DNS Query and Response.
+
+-- | Data type representing the optional EDNS pseudo-header of a 'DNSMessage'
+-- When a single well-formed @OPT@ 'ResourceRecord' was present in the
+-- message's additional section, it is decoded to an 'EDNS' record and and
+-- stored in the message 'ednsHeader' field.  The corresponding @OPT RR@ is
+-- then removed from the additional section.
+--
+-- When the constructor is 'NoEDNS', no @EDNS OPT@ record was present in the
+-- message additional section.  When 'InvalidEDNS', the message holds either a
+-- malformed OPT record or more than one OPT record, which can still be found
+-- in (have not been removed from) the message additional section.
+--
+-- The EDNS OPT record augments the message error status with an 8-bit field
+-- that forms 12-bit extended RCODE when combined with the 4-bit RCODE from the
+-- unextended DNS header.  In EDNS messages it is essential to not use just the
+-- bare 4-bit 'RCODE' from the original DNS header.  Therefore, in order to
+-- avoid potential misinterpretation of the response 'RCODE', when the OPT
+-- record is decoded, the upper eight bits of the error status are
+-- automatically combined with the 'rcode' of the message header, so that there
+-- is only one place in which to find the full 12-bit result.  Therefore, the
+-- decoded 'EDNS' pseudo-header, does not hold any error status bits.
+--
+-- The reverse process occurs when encoding messages.  The low four bits of the
+-- message header 'rcode' are encoded into the wire-form DNS header, while the
+-- upper eight bits are encoded as part of the OPT record.  In DNS responses with
+-- an 'rcode' larger than 15, EDNS extensions SHOULD be enabled by providing a
+-- value for 'ednsHeader' with a constructor of 'EDNSheader'.  If EDNS is not
+-- enabled in such a message, in order to avoid truncation of 'RCODE' values
+-- that don't fit in the non-extended DNS header, the encoded wire-form 'RCODE'
+-- is set to 'FormatErr'.
+--
+-- When encoding messages for transmission, the 'ednsHeader' is used to
+-- generate the additional OPT record.  Do not add explicit @OPT@ records
+-- to the aditional section, configure EDNS via the 'EDNSheader' instead.
+--
+data EDNSheader = EDNSheader EDNS -- ^ A valid EDNS message
+                | NoEDNS          -- ^ A valid non-EDNS message
+                | InvalidEDNS     -- ^ Multiple or bad additional @OPT@ RRs
+    deriving (Eq, Show)
+
+
+-- | Return the second argument for EDNS messages, otherwise the third.
+ifEDNS :: EDNSheader -- ^ EDNS pseudo-header
+       -> a          -- ^ Value to return for EDNS messages
+       -> a          -- ^ Value to return for non-EDNS messages
+       -> a
+ifEDNS (EDNSheader _) a _ = a
+ifEDNS             _  _ b = b
+{-# INLINE ifEDNS #-}
+
+
+-- | Return the output of a function applied to the EDNS pseudo-header if EDNS
+--   is enabled, otherwise return a default value.
+mapEDNS :: EDNSheader  -- ^ EDNS pseudo-header
+        -> (EDNS -> a) -- ^ Function to apply to 'EDNS' value
+        -> a           -- ^ Default result for non-EDNS messages
+        -> a
+mapEDNS (EDNSheader eh) f _ = f eh
+mapEDNS               _ _ a = a
+{-# INLINE mapEDNS #-}
+
+
+-- | DNS message format for queries and replies.
+--
 data DNSMessage = DNSMessage {
-    header     :: DNSHeader         -- ^ Header
+    header     :: DNSHeader         -- ^ Header with extended 'RCODE'
+  , ednsHeader :: EDNSheader        -- ^ EDNS pseudo-header
   , question   :: [Question]        -- ^ The question for the name server
   , answer     :: Answers           -- ^ RRs answering the question
-  , authority  :: [ResourceRecord]  -- ^ RRs pointing toward an authority
+  , authority  :: AuthorityRecords  -- ^ RRs pointing toward an authority
   , additional :: AdditionalRecords -- ^ RRs holding additional information
   } deriving (Eq, Show)
 
@@ -421,7 +492,13 @@ data DNSFlags = DNSFlags {
                            -- response, and denotes whether recursive query support is
                            -- available in the name server.
 
-  , rcode        :: RCODE  -- ^ Response code.
+  , rcode        :: RCODE  -- ^ The full 12-bit extended RCODE when EDNS is in use.
+                           -- Should always be zero in well-formed requests.
+                           -- When decoding replies, the high eight bits from
+                           -- any EDNS response are combined with the 4-bit
+                           -- RCODE from the DNS header.  When encoding
+                           -- replies, if EDNS no EDNS OPT record is provided,
+                           -- RCODE values > 15 are mapped to FormErr.
   , authenData   :: Bool   -- ^ AD (Authenticated Data) bit - (RFC4035, Section 3.2.3).
   , chkDisable   :: Bool   -- ^ CD (Checking Disabled) bit - (RFC4035, Section 3.2.2).
   } deriving (Eq, Show)
@@ -442,6 +519,8 @@ defaultDNSFlags = DNSFlags
          , chkDisable   = False
          , rcode        = NoErr
          }
+
+----------------------------------------------------------------
 
 -- | Flag operations. This is an instance of 'Monoid'.
 -- If they are used with '(<>)', the left value wins.
@@ -603,9 +682,10 @@ fromOPCODE OP_UPDATE = 5
 
 #if __GLASGOW_HASKELL__ >= 802
 -- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
--- bits.
+-- bits.  With EDNS this stores the combined error code from the DNS header and
+-- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
 newtype RCODE = RCODE {
-    -- | From rcode to number.
+    -- | Convert an 'RCODE' to its numeric value.
     fromRCODE :: Word16
   } deriving (Eq)
 
@@ -667,9 +747,37 @@ pattern NotAuth   = RCODE 9
 -- Update Section is not within the zone denoted by the Zone Section.
 pattern NotZone  :: RCODE
 pattern NotZone   = RCODE 10
--- | Bad OPT Version (RFC 6891) or TSIG Signature Failure (RFC2845).
-pattern BadOpt    :: RCODE
-pattern BadOpt     = RCODE 16
+-- | Bad OPT Version (BADVERS, RFC 6891).
+pattern BadVers   :: RCODE
+pattern BadVers    = RCODE 16
+-- | Key not recognized [RFC2845]
+pattern BadKey    :: RCODE
+pattern BadKey     = RCODE 17
+-- | Signature out of time window [RFC2845]
+pattern BadTime   :: RCODE
+pattern BadTime    = RCODE 18
+-- | Bad TKEY Mode [RFC2930]
+pattern BadMode   :: RCODE
+pattern BadMode    = RCODE 19
+-- | Duplicate key name [RFC2930]
+pattern BadName   :: RCODE
+pattern BadName    = RCODE 20
+-- | Algorithm not supported [RFC2930]
+pattern BadAlg    :: RCODE
+pattern BadAlg     = RCODE 21
+-- | Bad Truncation [RFC4635]
+pattern BadTrunc  :: RCODE
+pattern BadTrunc   = RCODE 22
+-- | Bad/missing Server Cookie [RFC7873]
+pattern BadCookie :: RCODE
+pattern BadCookie  = RCODE 23
+-- | Malformed (peer) EDNS message, no RCODE available.  This is not an RCODE
+-- that can be sent by a peer.  It lies outside the 12-bit range expressible
+-- via EDNS.  The low 12-bits are chosen to coincide with 'FormatErr'.  When
+-- an EDNS message is malformed, and we're unable to extract the extended RCODE,
+-- the header 'rcode' is set to 'BadRCODE'.
+pattern BadRCODE  :: RCODE
+pattern BadRCODE   = RCODE 0x1001
 
 -- | Use https://tools.ietf.org/html/rfc2929#section-2.3 names for DNS RCODEs
 instance Show RCODE where
@@ -683,22 +791,26 @@ instance Show RCODE where
     show YXRRSet   = "YXRRSet"
     show NotAuth   = "NotAuth"
     show NotZone   = "NotZone"
-    show BadOpt    = "BADVERS"
+    show BadVers   = "BadVers"
+    show BadKey    = "BadKey"
+    show BadTime   = "BadTime"
+    show BadMode   = "BadMode"
+    show BadName   = "BadName"
+    show BadAlg    = "BadAlg"
+    show BadTrunc  = "BadTrunc"
+    show BadCookie = "BadCookie"
     show x         = "RCODE " ++ (show $ fromRCODE x)
 
--- | From number to rcode.
+-- | Convert a numeric value to a corresponding 'RCODE'.  The behaviour is
+-- undefined for values outside the range @[0 .. 0xFFF]@ since the EDNS
+-- extended RCODE is a 12-bit value.  Values in the range @[0xF01 .. 0xFFF]@
+-- are reserved for private use.
 toRCODE :: Word16 -> RCODE
 toRCODE = RCODE
-
--- | From rcode to number for header (4bits only).
-fromRCODEforHeader :: RCODE -> Word16
-fromRCODEforHeader (RCODE w) = w .&. 0x0f
-
--- | From number in header to rcode (4bits only).
-toRCODEforHeader :: Word16 -> RCODE
-toRCODEforHeader w = RCODE (w .&. 0x0f)
 #else
--- | Response code.
+-- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
+-- bits.  With EDNS this stores the combined error code from the DNS header and
+-- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
 data RCODE
   = NoErr     -- ^ No error condition.
   | FormatErr -- ^ Format error - The name server was
@@ -732,12 +844,24 @@ data RCODE
   | NotZone   -- ^ Dynamic update response, a name used in the
               --   Prerequisite or Update Section is not within the zone
               --   denoted by the Zone Section.
-  | BadOpt    -- ^ Bad OPT Version (RFC 6891) or TSIG Signature
-              --   Failure (RFC2845).
+  | BadVers   -- ^ Bad OPT Version (RFC 6891)
+  | BadKey    -- ^ Key not recognized [RFC2845]
+  | BadTime   -- ^ Signature out of time window [RFC2845]
+  | BadMode   -- ^ Bad TKEY Mode [RFC2930]
+  | BadName   -- ^ Duplicate key name [RFC2930]
+  | BadAlg    -- ^ Algorithm not supported [RFC2930]
+  | BadTrunc  -- ^ Bad Truncation [RFC4635]
+  | BadCookie -- ^ Bad/missing Server Cookie [RFC7873]
+  | BadRCODE  -- ^ Malformed (peer) EDNS message, no RCODE available.  This is
+              -- not an RCODE that can be sent by a peer.  It lies outside the
+              -- 12-bit range expressible via EDNS.  The low bits are chosen to
+              -- coincide with 'FormatErr'.  When an EDNS message is malformed,
+              -- and we're unable to extract the extended RCODE, the header
+              -- 'rcode' is set to 'BadRCODE'.
   | UnknownRCODE Word16
   deriving (Eq, Ord, Show)
 
--- | From rcode to number.
+-- | Convert an 'RCODE' to its numeric value.
 fromRCODE :: RCODE -> Word16
 fromRCODE NoErr     =  0
 fromRCODE FormatErr =  1
@@ -750,10 +874,22 @@ fromRCODE YXRRSet   =  7
 fromRCODE NXRRSet   =  8
 fromRCODE NotAuth   =  9
 fromRCODE NotZone   = 10
-fromRCODE BadOpt    = 16
+fromRCODE BadVers   = 16
+fromRCODE BadKey    = 17
+fromRCODE BadTime   = 18
+fromRCODE BadMode   = 19
+fromRCODE BadName   = 20
+fromRCODE BadAlg    = 21
+fromRCODE BadTrunc  = 22
+fromRCODE BadCookie = 23
+fromRCODE BadRCODE  = 0x1001
 fromRCODE (UnknownRCODE x) = x
 
--- | From number to rcode.
+-- | Convert a numeric value to a corresponding 'RCODE'.  The behaviour
+-- is undefined for values outside the range @[0 .. 0xFFF]@ since the
+-- EDNS extended RCODE is a 12-bit value.  Values in the range
+-- @[0xF01 .. 0xFFF]@ are reserved for private use.
+--
 toRCODE :: Word16 -> RCODE
 toRCODE  0 = NoErr
 toRCODE  1 = FormatErr
@@ -766,16 +902,16 @@ toRCODE  7 = YXRRSet
 toRCODE  8 = NXRRSet
 toRCODE  9 = NotAuth
 toRCODE 10 = NotZone
-toRCODE 16 = BadOpt
+toRCODE 16 = BadVers
+toRCODE 17 = BadKey
+toRCODE 18 = BadTime
+toRCODE 19 = BadMode
+toRCODE 20 = BadName
+toRCODE 21 = BadAlg
+toRCODE 22 = BadTrunc
+toRCODE 23 = BadCookie
+toRCODE 0x1001 = BadRCODE
 toRCODE  x = UnknownRCODE x
-
--- | From rcode to number for header (4bits only).
-fromRCODEforHeader :: RCODE -> Word16
-fromRCODEforHeader rc = fromRCODE rc .&. 0x0f
-
--- | From number in header to rcode (4bits only).
-toRCODEforHeader :: Word16 -> RCODE
-toRCODEforHeader w = toRCODE (w .&. 0x0f)
 #endif
 
 ----------------------------------------------------------------
@@ -871,8 +1007,11 @@ hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
 b64encode :: ByteString -> String
 b64encode = BS.unpack . B64.encode
 
--- | Type for resource records in the answer section.
+-- | Type alias for resource records in the answer section.
 type Answers = [ResourceRecord]
+
+-- | Type alias for resource records in the answer section.
+type AuthorityRecords = [ResourceRecord]
 
 -- | Type for resource records in the additional section.
 type AdditionalRecords = [ResourceRecord]
@@ -886,54 +1025,70 @@ defaultQuery = DNSMessage {
        identifier = 0
      , flags = defaultDNSFlags
      }
+  , ednsHeader = EDNSheader defaultEDNS
   , question   = []
   , answer     = []
   , authority  = []
   , additional = []
   }
 
--- | Default response.
+-- | Default response.  When responding to EDNS queries, the response must
+-- either be an EDNS response, or else FormatErr must be returned.  The default
+-- response message has EDNS disabled ('ednsHeader' set to 'NoEDNS'), it should
+-- be updated as appropriate.
+--
+-- Do not explicitly add OPT RRs to the additional section, instead let the
+-- encoder compute and add the OPT record based on the EDNS pseudo-header.
+--
+-- The 'RCODE' in the 'DNSHeader' should be set to the appropriate 12-bit
+-- extended value, which will be split between the primary header and EDNS OPT
+-- record during message encoding (low 4 bits in DNS header, high 8 bits in
+-- EDNS OPT record).  See 'EDNSheader' for more details.
+--
 defaultResponse :: DNSMessage
-defaultResponse =
-  let hd = header defaultQuery
-      flg = flags hd
-  in  defaultQuery {
-        header = hd {
-          flags = flg {
+defaultResponse = DNSMessage {
+    header = DNSHeader {
+       identifier = 0
+     , flags = defaultDNSFlags {
               qOrR = QR_Response
             , authAnswer = True
             , recAvailable = True
             , authenData = False
-            }
-        }
-      }
+       }
+     }
+  , ednsHeader = NoEDNS
+  , question   = []
+  , answer     = []
+  , authority  = []
+  , additional = []
+  }
 
 -- | Making a template query filled with ENDS additional RRs and
 --   query flags.
-makeEmptyQuery :: AdditionalRecords -- ^ Additional RRs for EDNS.
-               -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+makeEmptyQuery :: EDNSheader -- ^ Optional EDNS
+               -> QueryFlags -- ^ Custom RD\/AD\/CD flags.
                -> DNSMessage
-makeEmptyQuery adds fs = defaultQuery {
+makeEmptyQuery eh fs = defaultQuery {
       header = header'
-    , additional = adds
+    , ednsHeader = eh
     }
   where
-    -- fixme :: DO bit in "adds" should be overridden when
+    -- fixme :: DO bit in "eh" should be overridden when
     --          QueryFlags supports it.
     header' = (header defaultQuery) { flags = queryDNSFlags fs }
 
 -- | Making a query.
 makeQuery :: Identifier
           -> Question
-          -> AdditionalRecords -- ^ Additional RRs for EDNS.
+          -> EDNSheader        -- ^ Optional EDNS
           -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
           -> DNSMessage
-makeQuery idt q adds fs = empqry {
+makeQuery idt q eh fs = empqry {
       header = (header empqry) { identifier = idt }
     , question = [q]
     }
   where
-    empqry = makeEmptyQuery adds fs
+    empqry = makeEmptyQuery eh fs
 
 -- | Making a response.
 makeResponse :: Identifier
@@ -954,70 +1109,57 @@ makeResponse idt q as = defaultResponse {
 
 -- | EDNS information defined in RFC 6891.
 data EDNS = EDNS {
-    -- | UDP payload size.
-    udpSize  :: Word16
-    -- | Extended RCODE.
-  , extRCODE :: RCODE
-    -- | Is DNSSEC OK?
-  , dnssecOk :: Bool
-    -- | EDNS option data.
-  , options  :: [OData]
+    -- | EDNS version, presently only version 0 is defined.
+    ednsVersion :: !Word8
+    -- | Supported UDP payload size.
+  , ednsUdpSize  :: !Word16
+    -- | Request DNSSEC replies (with RRSIG and NSEC records as as appropriate)
+    -- from the server.  Generally, not needed (except for diagnostic purposes)
+    -- unless the signatures will be validated.  Just setting the 'AD' bit in
+    -- the query and checking it in the response is sufficient (but often
+    -- subject to man-in-the-middle forgery) if all that's wanted is whether
+    -- the server validated the response.
+  , ednsDnssecOk :: Bool
+    -- | EDNS options (e.g. 'OD_NSID', 'OD_ClientSubnet', ...)
+  , ednsOptions  :: [OData]
   } deriving (Eq, Show)
 
-#if __GLASGOW_HASKELL__ >= 802
 -- | Default information for EDNS.
 --
--- >>> defaultEDNS
--- EDNS {udpSize = 4096, extRCODE = NoError, dnssecOk = False, options = []}
-#else
--- | Default information for EDNS.
+-- @
+-- defaultEDNS = EDNS
+--     { ednsVersion = 0      -- The default EDNS version is 0
+--     , ednsUdpSize = 1216   -- IPv6-safe UDP MTU
+--     , ednsDnssecOk = False -- We don't do DNSSEC validation
+--     , ednsOptions = []     -- No EDNS options by default
+--     }
+-- @
 --
--- >>> defaultEDNS
--- EDNS {udpSize = 4096, extRCODE = NoErr, dnssecOk = False, options = []}
-#endif
 defaultEDNS :: EDNS
-defaultEDNS = EDNS 4096 NoErr False []
+defaultEDNS = EDNS
+    { ednsVersion = 0      -- The default EDNS version is 0
+    , ednsUdpSize = 1216   -- IPv6-safe UDP MTU
+    , ednsDnssecOk = False -- We don't do DNSSEC validation
+    , ednsOptions = []     -- No EDNS options by default
+    }
 
--- | Maximum UDP size. If 'udpSize' of 'EDNS' is larger than this,
---   'fromEDNS' uses this value instead.
+-- | Maximum UDP size that can be advertised.  If the 'ednsUdpSize' of 'EDNS'
+--   is larger, then this value is sent instead.  This value is likely to work
+--   only for local nameservers on the loopback network.  Servers may enforce
+--   a smaller limit.
 --
 -- >>> maxUdpSize
 -- 16384
 maxUdpSize :: Word16
 maxUdpSize = 16384
 
--- | Minimum UDP size. If 'udpSize' of 'EDNS' is smaller than this,
---   'fromEDNS' uses this value instead.
+-- | Minimum UDP size to advertise. If 'ednsUdpSize' of 'EDNS' is smaller,
+--   then this value is sent instead.
 --
 -- >>> minUdpSize
 -- 512
 minUdpSize :: Word16
 minUdpSize = 512
-
--- | Generate a resource record for the additional section based on EDNS.
---
-fromEDNS :: EDNS -> ResourceRecord
-fromEDNS edns = ResourceRecord name' type' class' ttl' rdata'
-  where
-    name'  = "."
-    type'  = OPT
-    class' = maxUdpSize `min` (minUdpSize `max` udpSize edns)
-    ttl0'   = fromIntegral (fromRCODE (extRCODE edns) .&. 0x0ff0) `shiftL` 20
-    ttl'
-      | dnssecOk edns = ttl0' `setBit` 15
-      | otherwise     = ttl0'
-    rdata' = RD_OPT $ options edns
-
--- | Extract EDNS information from the OPT RR.
-toEDNS :: DNSFlags -> ResourceRecord -> Maybe EDNS
-toEDNS flgs (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
-    Just $ EDNS udpsiz (toRCODE erc) secok opts
-  where
-    lp = fromRCODEforHeader $ rcode flgs
-    up = shiftR (ttl' .&. 0xff000000) 20
-    erc = fromIntegral up .|. lp
-    secok = ttl' `testBit` 15
-toEDNS _ _ = Nothing
 
 ----------------------------------------------------------------
 

@@ -267,7 +267,8 @@ fromDNSMessage ans conv = case errcode ans of
     NameErr   -> Left NameError
     NotImpl   -> Left NotImplemented
     Refused   -> Left OperationRefused
-    BadOpt    -> Left BadOptRecord
+    BadVers   -> Left BadOptRecord
+    BadRCODE  -> Left $ DecodeError "Malformed EDNS message"
     _         -> Left UnknownDNSError
   where
     errcode = rcode . flags . header

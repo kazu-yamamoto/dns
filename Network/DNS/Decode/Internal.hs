@@ -14,6 +14,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.IP
 import Data.IP (IP(..), toIPv4, toIPv6b, makeAddrRange)
+import Data.List (partition)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
@@ -23,15 +24,45 @@ import Network.DNS.Types
 
 getResponse :: SGet DNSMessage
 getResponse = do
-    hd <- getHeader
+    hm <- getHeader
     qdCount <- getInt16
     anCount <- getInt16
     nsCount <- getInt16
     arCount <- getInt16
-    DNSMessage hd <$> getQueries qdCount
-                  <*> getResourceRecords anCount
-                  <*> getResourceRecords nsCount
-                  <*> getResourceRecords arCount
+    queries <- getQueries qdCount
+    answers <- getResourceRecords anCount
+    authrrs <- getResourceRecords nsCount
+    addnrrs <- getResourceRecords arCount
+    let (opts, rest) = partition ((==) OPT. rrtype) addnrrs
+        flgs         = flags hm
+        rc           = fromRCODE $ rcode flgs
+        (eh, erc)    = getEDNS rc opts
+        hd           = hm { flags = flgs { rcode = erc } }
+    pure $ DNSMessage hd eh queries answers authrrs $ ifEDNS eh rest addnrrs
+
+  where
+
+    -- | Get EDNS pseudo-header and the high eight bits of the extended RCODE.
+    --
+    getEDNS :: Word16 -> AdditionalRecords -> (EDNSheader, RCODE)
+    getEDNS rc rrs = case rrs of
+        rr : [] | Just (edns, erc) <- optEDNS rr
+               -> (EDNSheader edns, toRCODE erc)
+        []     -> (NoEDNS, toRCODE rc)
+        _      -> (InvalidEDNS, BadRCODE)
+
+      where
+
+        -- | Extract EDNS information from an OPT RR.
+        --
+        optEDNS :: ResourceRecord -> Maybe (EDNS, Word16)
+        optEDNS (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
+            let hrc      = fromIntegral rc .&. 0x0f
+                erc      = shiftR (ttl' .&. 0xff000000) 20 .|. hrc
+                secok    = ttl' `testBit` 15
+                vers     = fromIntegral $ shiftR (ttl' .&. 0x00ff0000) 16
+             in Just (EDNS vers udpsiz secok opts, fromIntegral erc)
+        optEDNS _ = Nothing
 
 ----------------------------------------------------------------
 
@@ -43,14 +74,13 @@ getDNSFlags = do
     toFlags :: Word16 -> Maybe DNSFlags
     toFlags flgs = do
       oc <- getOpcode flgs
-      let rc = getRcode flgs
       return $ DNSFlags (getQorR flgs)
                         oc
                         (getAuthAnswer flgs)
                         (getTrunCation flgs)
                         (getRecDesired flgs)
                         (getRecAvailable flgs)
-                        rc
+                        (getRcode flgs)
                         (getAuthenData flgs)
                         (getChkDisable flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
@@ -59,7 +89,7 @@ getDNSFlags = do
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8
     getRecAvailable w = testBit w 7
-    getRcode w = toRCODEforHeader $ fromIntegral w
+    getRcode w = toRCODE $ w .&. 0x0f
     getAuthenData w = testBit w 5
     getChkDisable w = testBit w 4
 

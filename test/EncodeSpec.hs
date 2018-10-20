@@ -71,6 +71,7 @@ testResponseA = DNSMessage {
          , chkDisable = False
          }
        }
+  , ednsHeader = NoEDNS
   , question = [Question {
                      qname = "492056364.qzone.qq.com."
                    , qtype = A
@@ -114,6 +115,7 @@ testResponseTXT = DNSMessage {
          , chkDisable = False
          }
        }
+  , ednsHeader = EDNSheader defaultEDNS
   , question = [Question {
                      qname = "492056364.qzone.qq.com."
                    , qtype = TXT

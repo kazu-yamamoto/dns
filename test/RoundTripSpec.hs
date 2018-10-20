@@ -46,7 +46,7 @@ spec = do
         decodeMailbox bs `shouldBe` Right dom
         fmap encodeMailbox (decodeMailbox bs) `shouldBe` Right bs
 
-    prop "DNSFlags" . forAll genDNSFlags $ \ flgs -> do
+    prop "DNSFlags" . forAll (genDNSFlags 0x0f) $ \ flgs -> do
         let bs = encodeDNSFlags flgs
         decodeDNSFlags bs `shouldBe` Right flgs
         fmap encodeDNSFlags (decodeDNSFlags bs) `shouldBe` Right bs
@@ -56,25 +56,29 @@ spec = do
         decodeResourceRecord bs `shouldBe` Right rr
         fmap encodeResourceRecord (decodeResourceRecord bs) `shouldBe` Right bs
 
-    prop "DNSHeader" . forAll genDNSHeader $ \ hdr ->
+    prop "DNSHeader" . forAll (genDNSHeader 0x0f) $ \ hdr ->
         decodeDNSHeader (encodeDNSHeader hdr) `shouldBe` Right hdr
 
     prop "DNSMessage" . forAll genDNSMessage $ \ msg ->
         decode (encode msg) `shouldBe` Right msg
 
-    prop "EDNS" . forAll genEDNSHeader $ \(edns,hdr) -> do
-        let rr = fromEDNS edns
-            msg = DNSMessage hdr [] [] [] [rr]
-            Right msg' = decode $ encode msg
-            medns = toEDNS (flags hdr) (head $ additional msg')
-        medns `shouldBe` Just edns
+    prop "EDNS" . forAll genEDNSHeader $ \(edns, hdr) -> do
+        let eh = EDNSheader edns
+            Right m = decode. encode $ DNSMessage hdr eh [] [] [] []
+        ednsHeader m `shouldBe` eh
 
 ----------------------------------------------------------------
 
 genDNSMessage :: Gen DNSMessage
 genDNSMessage =
-    DNSMessage <$> genDNSHeader <*> listOf genQuestion <*> listOf genResourceRecord
-                <*> listOf genResourceRecord <*> listOf genResourceRecord
+    DNSMessage <$> genDNSHeader 0x0f <*> makeEDNS <*> listOf genQuestion
+               <*> listOf genResourceRecord  <*> listOf genResourceRecord
+               <*> listOf genResourceRecord
+  where
+    makeEDNS :: Gen EDNSheader
+    makeEDNS = genBool >>= \t ->
+        if t then EDNSheader <$> genEDNS
+             else pure $ NoEDNS
 
 
 genQuestion :: Gen Question
@@ -144,13 +148,13 @@ genMailbox = do
     bs <- genMboxString
     pure $ bs <> "."
 
-genDNSHeader :: Gen DNSHeader
-genDNSHeader = DNSHeader <$> genWord16 <*> genDNSFlags
+genDNSHeader :: Word16 -> Gen DNSHeader
+genDNSHeader maxrc = DNSHeader <$> genWord16 <*> genDNSFlags maxrc
 
-genDNSFlags :: Gen DNSFlags
-genDNSFlags =
-  DNSFlags <$> genQorR <*> genOPCODE <*> genBool <*> genBool
-           <*> genBool <*> genBool <*> genRCODE <*> genBool <*> genBool
+genDNSFlags :: Word16 -> Gen DNSFlags
+genDNSFlags maxrc =
+  DNSFlags <$> genQorR <*> genOPCODE <*> genBool        <*> genBool
+           <*> genBool <*> genBool   <*> genRCODE maxrc <*> genBool <*> genBool
 
 genWord16 :: Gen Word16
 genWord16 = arbitrary
@@ -170,18 +174,20 @@ genQorR = elements [minBound .. maxBound]
 genOPCODE :: Gen OPCODE
 genOPCODE  = elements [OP_STD, OP_INV, OP_SSR, OP_NOTIFY, OP_UPDATE]
 
-genRCODE :: Gen RCODE
-genRCODE = elements $ map toRCODE [0..15]
+genRCODE :: Word16 -> Gen RCODE
+genRCODE maxrc = elements $ map toRCODE [0..maxrc]
 
 genEDNS :: Gen EDNS
 genEDNS = do
-    erc <- genExtRCODE
+    vers <- genWord8
     ok <- genBool
     od <- genOData
+    us <- elements [minUdpSize..maxUdpSize]
     return $ defaultEDNS {
-        extRCODE = erc
-      , dnssecOk = ok
-      , options  = [od]
+        ednsVersion = vers
+      , ednsUdpSize = us
+      , ednsDnssecOk = ok
+      , ednsOptions  = [od]
       }
 
 genOData :: Gen OData
@@ -243,6 +249,5 @@ genExtRCODE = elements $ map toRCODE [0..4095]
 genEDNSHeader :: Gen (EDNS, DNSHeader)
 genEDNSHeader = do
     edns <- genEDNS
-    hdr <- genDNSHeader
-    let flg = flags hdr
-    return (edns, hdr { flags =  flg { rcode = extRCODE edns } })
+    hdr <- genDNSHeader 0xF00
+    return (edns, hdr)
