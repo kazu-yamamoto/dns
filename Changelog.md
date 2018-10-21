@@ -1,5 +1,23 @@
 # 3.1.0
 
+- TCP queries now also use EDNS, since the DO bit and other options
+  may be relevant, even when the UDP buffer size is not.  Therefore,
+  TCP now also does a non-EDNS fallback.
+- The resolvEDNS field is subsumed in resolvQueryControls and
+  removed.  The encodeQuestion function changes to no longer take
+  an explicit "EDNSheader" argument, instead the EDNS record is
+  built based on the supplied options.  Also the encodeQuestions
+  function has been removed, since we're deprecating it, but the
+  legacy interface can no longer be maintained.
+- New API: doFlag, ednsEnable, ednsSetVersion, ednsSetSize and
+  ednsSetOptions makes it possible for 'QueryControls' to adjust
+  EDNS settings.
+- Renamed:
+
+    resolvQueryFlags   -> resolvQueryControls,
+    lookupRawWithFlags -> lookupRawCtl
+    QueryFlags         -> QueryControls
+
 - Breaking change: the decoded EDNS record no longer contains
   an error field.  Instead the header of decoded messages is
   updated hold the extended error code when valid EDNS OPT records

@@ -31,20 +31,23 @@ checkResp q seqno resp =
 data TCPFallback = TCPFallback deriving (Show, Typeable)
 instance Exception TCPFallback
 
-type Rslv0 = QueryFlags -> (Socket -> IO DNSMessage)
+type Rslv0 = QueryControls -> (Socket -> IO DNSMessage)
            -> IO (Either DNSError DNSMessage)
 
 type Rslv1 = Question
-          -> EDNSheader
           -> Int -- Timeout
           -> Int -- Retry
           -> Rslv0
 
-type TcpRslv = Identifier -> AddrInfo -> Question -> Int -- Timeout
-            -> QueryFlags -> IO DNSMessage
+type TcpRslv = AddrInfo
+            -> Question
+            -> Int -- Timeout
+            -> QueryControls
+            -> IO DNSMessage
 
-type UdpRslv = EDNSheader -> Int -- Retry
-            -> (Socket -> IO DNSMessage) -> TcpRslv
+type UdpRslv = Int -- Retry
+            -> (Socket -> IO DNSMessage)
+            -> TcpRslv
 
 -- In lookup loop, we try UDP until we get a response.  If the response
 -- is truncated, we try TCP once, with no further UDP retries.
@@ -65,11 +68,11 @@ type UdpRslv = EDNSheader -> Int -- Retry
 -- configuration with any additional overrides from the caller.
 --
 resolve :: Domain -> TYPE -> Resolver -> Rslv0
-resolve dom typ rlv qfl rcv
+resolve dom typ rlv qctls rcv
   | isIllegal dom = return $ Left IllegalDomain
-  | onlyOne       = resolveOne        (head nss) (head gens) q eh tm retry fl rcv
-  | concurrent    = resolveConcurrent nss        gens        q eh tm retry fl rcv
-  | otherwise     = resolveSequential nss        gens        q eh tm retry fl rcv
+  | onlyOne       = resolveOne        (head nss) (head gens) q tm retry ctls rcv
+  | concurrent    = resolveConcurrent nss        gens        q tm retry ctls rcv
+  | otherwise     = resolveSequential nss        gens        q tm retry ctls rcv
   where
     q = case BS.last dom of
           '.' -> Question dom typ
@@ -80,44 +83,46 @@ resolve dom typ rlv qfl rcv
     seed    = resolvseed rlv
     nss     = NE.toList $ nameservers seed
     onlyOne = length nss == 1
-    fl      = qfl <> resolvQueryFlags (resolvconf $ resolvseed rlv)
+    ctls    = qctls <> resolvQueryControls (resolvconf $ resolvseed rlv)
 
     conf       = resolvconf seed
     concurrent = resolvConcurrent conf
     tm         = resolvTimeout conf
     retry      = resolvRetry conf
-    eh         = resolvEDNS conf
 
 
 resolveSequential :: [AddrInfo] -> [IO Identifier] -> Rslv1
-resolveSequential nss gs q eh tm retry fl rcv = loop nss gs
+resolveSequential nss gs q tm retry ctls rcv = loop nss gs
   where
-    loop [ai]     [gen] = resolveOne ai gen q eh tm retry fl rcv
+    loop [ai]     [gen] = resolveOne ai gen q tm retry ctls rcv
     loop (ai:ais) (gen:gens) = do
-        eres <- resolveOne ai gen q eh tm retry fl rcv
+        eres <- resolveOne ai gen q tm retry ctls rcv
         case eres of
           Left  _ -> loop ais gens
           res     -> return res
     loop _  _     = error "resolveSequential:loop"
 
 resolveConcurrent :: [AddrInfo] -> [IO Identifier] -> Rslv1
-resolveConcurrent nss gens q eh tm retry fl rcv = do
+resolveConcurrent nss gens q tm retry ctls rcv = do
     asyncs <- mapM mkAsync $ zip nss gens
     snd <$> waitAnyCancel asyncs
   where
-    mkAsync (ai,gen) = async $ resolveOne ai gen q eh tm retry fl rcv
+    mkAsync (ai,gen) = async $ resolveOne ai gen q tm retry ctls rcv
 
 resolveOne :: AddrInfo -> IO Identifier -> Rslv1
-resolveOne ai gen q eh tm retry fl rcv = do
-    ident <- gen
-    E.try $ udpTcpLookup eh retry rcv ident ai q tm fl
+resolveOne ai gen q tm retry ctls rcv =
+    E.try $ udpTcpLookup gen retry rcv ai q tm ctls
 
 ----------------------------------------------------------------
 
-udpTcpLookup :: UdpRslv
-udpTcpLookup eh retry rcv ident ai q tm fl =
-    udpLookup eh retry rcv ident ai q tm fl `E.catch` \TCPFallback ->
-        tcpLookup ident ai q tm fl
+-- UDP attempts must use the same ID and accept delayed answers
+-- but we use a fresh ID for each TCP lookup.
+--
+udpTcpLookup :: IO Identifier -> UdpRslv
+udpTcpLookup gen retry rcv ai q tm ctls = do
+    ident <- gen
+    udpLookup ident retry rcv ai q tm ctls `E.catch`
+            \TCPFallback -> tcpLookup gen ai q tm ctls
 
 ----------------------------------------------------------------
 
@@ -135,30 +140,29 @@ udpOpen ai = do
     return sock
 
 -- This throws DNSError or TCPFallback.
-udpLookup :: UdpRslv
-udpLookup eh retry rcv ident ai q tm fl = do
-    let qry = encodeQuestion ident q eh fl
-        ednsRetry = ifEDNS eh True False
+udpLookup :: Identifier -> UdpRslv
+udpLookup ident retry rcv ai q tm ctls = do
+    let qry = encodeQuestion ident q ctls
     E.handle (ioErrorToDNSError ai "UDP") $
-      bracket (udpOpen ai) close (loop qry ednsRetry 0 RetryLimitExceeded)
+      bracket (udpOpen ai) close (loop qry ctls 0 RetryLimitExceeded)
   where
-    loop qry ednsRetry cnt err sock
+    loop qry lctls cnt err sock
       | cnt == retry = E.throwIO err
       | otherwise    = do
           mres <- timeout tm (send sock qry >> getAns sock)
           case mres of
-              Nothing  -> loop qry ednsRetry (cnt + 1) RetryLimitExceeded sock
+              Nothing  -> loop qry lctls (cnt + 1) RetryLimitExceeded sock
               Just res -> do
-                      let flgs = flags$ header res
-                          truncated = trunCation flgs
-                          rc = rcode flgs
-                      if truncated then
-                          E.throwIO TCPFallback
-                      else if ednsRetry && rc == FormatErr then
-                          let nonednsQuery = encodeQuestion ident q NoEDNS fl
-                          in loop nonednsQuery False cnt RetryLimitExceeded sock
-                      else
-                          return res
+                      let fl = flags $ header res
+                          tc = trunCation fl
+                          rc = rcode fl
+                          eh = ednsHeader res
+                          cs = ednsEnabled FlagClear <> lctls
+                      if tc then E.throwIO TCPFallback
+                      else if rc == FormatErr && eh == NoEDNS && cs /= lctls
+                      then let qry' = encodeQuestion ident q cs
+                            in loop qry' cs cnt RetryLimitExceeded sock
+                      else return res
 
     -- | Closed UDP ports are occasionally re-used for a new query, with
     -- the nameserver returning an unexpected answer to the wrong socket.
@@ -185,13 +189,22 @@ tcpOpen peer = case peer of
 -- Perform a DNS query over TCP, if we were successful in creating
 -- the TCP socket.
 -- This throws DNSError only.
-tcpLookup :: TcpRslv
-tcpLookup ident ai q tm fl =
-    E.handle (ioErrorToDNSError ai "TCP") $ bracket (tcpOpen addr) close perform
+tcpLookup :: IO Identifier -> TcpRslv
+tcpLookup gen ai q tm ctls =
+    E.handle (ioErrorToDNSError ai "TCP") $ do
+        res <- bracket (tcpOpen addr) close (perform ctls)
+        let rc = rcode $ flags $ header res
+            eh = ednsHeader res
+            cs = ednsEnabled FlagClear <> ctls
+        -- If we first tried with EDNS, retry without on FormatErr.
+        if rc == FormatErr && eh == NoEDNS && cs /= ctls
+        then bracket (tcpOpen addr) close (perform cs)
+        else return res
   where
     addr = addrAddress ai
-    perform vc = do
-        let qry = encodeQuestion ident q NoEDNS fl
+    perform cs vc = do
+        ident <- gen
+        let qry = encodeQuestion ident q cs
         mres <- timeout tm $ do
             connect vc addr
             sendVC vc qry

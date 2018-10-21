@@ -49,14 +49,28 @@ module Network.DNS.Types (
   , RData (..)
   -- * DNS Message
   , DNSMessage (..)
-  , EDNSheader(..)
-  , ifEDNS
-  , mapEDNS
   , DNSFormat
   -- ** Query
-  , defaultQuery
-  , makeEmptyQuery
   , makeQuery
+  , makeEmptyQuery
+  , defaultQuery
+  -- ** Query Controls
+  , QueryControls
+  -- *** Header Controls
+  , HeaderControls
+  , rdFlag
+  , adFlag
+  , cdFlag
+  -- *** EDNS Controls
+  , EdnsControls
+  , ednsEnabled
+  , ednsSetVersion
+  , ednsSetUdpSize
+  , doFlag
+  , ednsSetOptions
+  -- *** Flag and OData control operations
+  , FlagOp(..)
+  , ODataOp(..)
   -- ** Response
   , defaultResponse
   , makeResponse
@@ -67,13 +81,7 @@ module Network.DNS.Types (
   , DNSFlags (..)
   , QorR (..)
   , defaultDNSFlags
-  -- *** Query flags
-  , FlagOp(..)
-  , QueryFlags
-  , rdFlag
-  , adFlag
-  , cdFlag
-  -- **** OPCODE and RCODE
+  -- *** OPCODE and RCODE
   , OPCODE (..)
   , fromOPCODE
   , toOPCODE
@@ -101,16 +109,16 @@ module Network.DNS.Types (
   )
   , fromRCODE
   , toRCODE
-  -- ** DNS Body
-  , Question (..)
-  -- * DNS Error
-  , DNSError (..)
-  -- * EDNS
+  -- ** EDNS Pseudo-Header
+  , EDNSheader(..)
+  , ifEDNS
+  , mapEDNS
+  -- *** EDNS record
   , EDNS(..)
   , defaultEDNS
   , maxUdpSize
   , minUdpSize
-  -- * EDNS option data
+  -- *** EDNS options
   , OData (..)
   , OptCode (
     ClientSubnet
@@ -121,17 +129,24 @@ module Network.DNS.Types (
   )
   , fromOptCode
   , toOptCode
+  -- ** DNS Body
+  , Question (..)
+  -- * DNS Error
+  , DNSError (..)
   -- * Other types
   , Mailbox
   ) where
 
 import Control.Exception (Exception, IOException)
+import Control.Applicative ((<|>))
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
+import Data.Function (on)
 import Data.IP (IP(..), IPv4, IPv6)
 import qualified Data.List as List
+import           Data.Maybe (fromMaybe)
 import qualified Data.Semigroup as Sem
 
 import Network.DNS.Imports
@@ -522,8 +537,9 @@ defaultDNSFlags = DNSFlags
 
 ----------------------------------------------------------------
 
--- | Flag operations. This is an instance of 'Monoid'.
--- If they are used with '(<>)', the left value wins.
+-- | Boolean flag operations. These form a 'Monoid'.  When combined via
+-- `mappend`, as with function composition, the left-most value has
+-- the last say.
 --
 -- >>> mempty :: FlagOp
 -- FlagKeep
@@ -533,11 +549,19 @@ defaultDNSFlags = DNSFlags
 -- FlagClear
 -- >>> FlagReset <> FlagClear <> FlagSet <> mempty
 -- FlagReset
-data FlagOp = FlagSet   -- ^ Flag is set
-            | FlagClear -- ^ Flag is unset
-            | FlagReset -- ^ Flag is reset to the default value
-            | FlagKeep  -- ^ Flag is not changed
+data FlagOp = FlagSet   -- ^ Set the flag to 1
+            | FlagClear -- ^ Clear the flag to 0
+            | FlagReset -- ^ Reset the flag to its default value
+            | FlagKeep  -- ^ Leave the flag unchanged
             deriving (Eq, Show)
+
+-- | Apply the given 'FlagOp' to a default boolean value to produce the final
+-- setting.
+--
+applyFlag :: FlagOp -> Bool -> Bool
+applyFlag FlagSet   _ = True
+applyFlag FlagClear _ = False
+applyFlag _         v = v
 
 -- $
 -- Test associativity of the semigroup operation:
@@ -558,87 +582,305 @@ instance Monoid FlagOp where
     mappend = (Sem.<>)
 #endif
 
--- | Optional overrides of query-related DNS flags.  The 'Monoid' instance
--- makes it possible to combine the generators 'rdFlag', 'adFlag' and 'cdFlag' to
+-- | We don't show options left at their default value.
+--
+skipDefault :: String
+skipDefault = ""
+
+-- | Show non-default flag values
+--
+showFlag :: String -> FlagOp -> String
+showFlag nm FlagSet   = nm ++ ":1"
+showFlag nm FlagClear = nm ++ ":0"
+showFlag _  FlagReset = skipDefault
+showFlag _  FlagKeep  = skipDefault
+
+-- | Combine a list of options for display, skipping default values
+--
+showOpts :: [String] -> String
+showOpts os = List.intercalate "," $ List.filter (/= skipDefault) os
+
+----------------------------------------------------------------
+
+-- | Control over query-related DNS header flags.  The 'Monoid' instance makes
+-- it possible to combine the generators 'rdFlag', 'adFlag' and 'cdFlag' to
 -- yield all possible combinations of "set", "clear" and "reset" (to default)
--- for each of the bits.
+-- for each of the bits.  As with function composition, the left-most value has
+-- the last say.
 --
 -- >>> adFlag FlagSet <> mempty
 -- ad:1
--- >>> cdFlag FlagReset <> rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet <> adFlag FlagSet <> mempty
+-- >>> :{
+-- mconcat [ cdFlag FlagReset
+--         , rdFlag FlagSet
+--         , adFlag FlagClear
+--         , cdFlag FlagSet
+--         , adFlag FlagSet
+--         ]
+-- :}
 -- rd:1,ad:0
 --
-data QueryFlags = QueryFlags
+data HeaderControls = HeaderControls
     { rdBit :: !FlagOp
     , adBit :: !FlagOp
     , cdBit :: !FlagOp
     }
+    deriving (Eq)
 
-instance Sem.Semigroup QueryFlags where
-    (QueryFlags rd1 ad1 cd1) <> (QueryFlags rd2 ad2 cd2) =
-        QueryFlags (rd1 <> rd2) (ad1 <> ad2) (cd1 <> cd2)
+instance Sem.Semigroup HeaderControls where
+    (HeaderControls rd1 ad1 cd1) <> (HeaderControls rd2 ad2 cd2) =
+        HeaderControls (rd1 <> rd2) (ad1 <> ad2) (cd1 <> cd2)
 
-instance Monoid QueryFlags where
-    mempty = QueryFlags FlagKeep FlagKeep FlagKeep
+instance Monoid HeaderControls where
+    mempty = HeaderControls FlagKeep FlagKeep FlagKeep
 #if !(MIN_VERSION_base(4,11,0))
     -- this is redundant starting with base-4.11 / GHC 8.4
     -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
     mappend = (Sem.<>)
 #endif
 
-instance Show QueryFlags where
-    show (QueryFlags rd ad cd) = List.intercalate "," $ List.filter (/= magic) [
-             showFlag "rd" rd
-           , showFlag "ad" ad
-           , showFlag "cd" cd ]
-      where
-        magic = ""
-        showFlag :: String -> FlagOp -> String
-        showFlag nm FlagSet   = nm ++ ":1"
-        showFlag nm FlagClear = nm ++ ":0"
-        showFlag _  FlagReset = magic
-        showFlag _  FlagKeep  = magic
+instance Show HeaderControls where
+    show (HeaderControls rd ad cd) =
+        showOpts
+             [ showFlag "rd" rd
+             , showFlag "ad" ad
+             , showFlag "cd" cd ]
 
 -- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
 -- resulting 'DNSFlags' suitable for making queries with the requested flag
 -- settings.  This is only needed if you're creating your own 'DNSMessage',
--- the 'Network.DNS.LookupRaw.lookupRawWithFlags' function takes a 'QueryFlags'
+-- the 'Network.DNS.LookupRaw.lookupRawCtl' function takes a 'QueryControls'
 -- argument and handles this conversion internally.
 --
 -- Default overrides can be specified in the resolver configuration by setting
--- the 'Network.DNS.resolvQueryFlags' field of the
+-- the 'Network.DNS.resolvQueryControls' field of the
 -- 'Network.DNS.Resolver.ResolvConf' argument to
 -- 'Network.DNS.Resolver.makeResolvSeed'.  These then apply to lookups via
 -- resolvers based on the resulting configuration, with the exception of
--- 'Network.DNS.LookupRaw.lookupRawWithFlags' which takes an additional 'QueryFlags'
--- argument to augment the default overrides.
+-- 'Network.DNS.LookupRaw.lookupRawCtl' which takes an additional
+-- 'QueryControls' argument to augment the default overrides.
 --
-queryDNSFlags :: QueryFlags -> DNSFlags
-queryDNSFlags (QueryFlags rd ad cd) = d {
-      recDesired = toBool rd $ recDesired d
-    , authenData = toBool ad $ authenData d
-    , chkDisable = toBool cd $ chkDisable d
+queryDNSFlags :: HeaderControls -> DNSFlags
+queryDNSFlags (HeaderControls rd ad cd) = d {
+      recDesired = applyFlag rd $ recDesired d
+    , authenData = applyFlag ad $ authenData d
+    , chkDisable = applyFlag cd $ chkDisable d
     }
   where
     d = defaultDNSFlags
-    toBool FlagSet   _ = True
-    toBool FlagClear _ = False
-    toBool _         v = v
 
--- | Generator of 'QueryFlags' that manipulates the RD bit.
---
-rdFlag :: FlagOp -> QueryFlags
-rdFlag rd = mempty { rdBit = rd }
+----------------------------------------------------------------
 
--- | Generator of 'QueryFlags' that manipulates the AD bit.
+-- | The default EDNS Option list is empty.  We define two operations, one to
+-- prepend a list of options, and another to set a specific list of options.
 --
-adFlag :: FlagOp -> QueryFlags
-adFlag ad = mempty { adBit = ad }
+data ODataOp = ODataAdd [OData] -- ^ Add the specified options to the list.
+             | ODataSet [OData] -- ^ Set the option list as specified.
+             deriving (Eq)
 
--- | Generator of 'QueryFlags' that manipulates the CD bit.
+-- | Since any given option code can appear at most once in the list, we
+-- de-duplicate by the OPTION CODE when combining lists.
 --
-cdFlag :: FlagOp -> QueryFlags
-cdFlag cd = mempty { cdBit = cd }
+odataDedup :: ODataOp -> [OData]
+odataDedup op =
+    List.nubBy ((==) `on` odataToOptCode) $
+        case op of
+            ODataAdd os -> os
+            ODataSet os -> os
+
+-- $
+-- Test associativity of the OData semigroup operation:
+--
+-- >>> let ip1 = IPv4 $ read "127.0.0.0"
+-- >>> let ip2 = IPv4 $ read "192.0.2.0"
+-- >>> let cs1 = OD_ClientSubnet 8 0 ip1
+-- >>> let cs2 = OD_ClientSubnet 24 0 ip2
+-- >>> let cs3 = OD_ECSgeneric 0 24 0 "foo"
+-- >>> let dau1 = OD_DAU [3,5,7,8]
+-- >>> let dau2 = OD_DAU [13,14]
+-- >>> let dhu1 = OD_DHU [1,2]
+-- >>> let dhu2 = OD_DHU [3,4]
+-- >>> let nsid = OD_NSID "nsa.example.com"
+-- >>> let ops1 = [ODataAdd [dau1, dau2, cs1], ODataAdd [dau2, cs2, dhu1]]
+-- >>> let ops2 = [ODataSet [], ODataSet [dhu2, cs3], ODataSet [nsid]]
+-- >>> let ops = ops1 ++ ops2
+-- >>> foldl (&&) True [(a<>b)<>c == a<>(b<>c) | a <- ops, b <- ops, c <- ops]
+-- True
+
+instance Sem.Semigroup ODataOp where
+    ODataAdd as <> ODataAdd bs = ODataAdd $ as ++ bs
+    ODataAdd as <> ODataSet bs = ODataSet $ as ++ bs
+    ODataSet as <> _ = ODataSet as
+
+instance Monoid ODataOp where
+    mempty = ODataAdd []
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+----------------------------------------------------------------
+
+-- | EDNS query controls.  These support enabling or disabling EDNS, selecting
+-- the EDNS version, the supported UDP buffer size, setting the DO bit and
+-- adding EDNS options.  When EDNS is disabled via @ednsEnabled FlagClear@,
+-- all the other EDNS-related overrides have no effect.
+--
+-- >>> :{
+-- mconcat [ ednsEnabled FlagSet -- this is the default
+--         , ednsSetVersion (Just 1)
+--         , ednsSetUdpSize (Just 2048)
+--         , doFlag FlagSet
+--         , ednsSetOptions (ODataAdd [OD_NSID ""])
+--         , ednsSetOptions (ODataAdd [OD_ClientSubnet 24 0 (read "192.0.2.1")])
+--         ]
+-- :}
+-- edns.enabled:1,edns.version:1,edns.udpsize:2048,edns.dobit:1,edns.options:[NSID,ClientSubnet]
+data EdnsControls = EdnsControls
+    { extEn :: !FlagOp         -- ^ Enabled
+    , extVn :: !(Maybe Word8)  -- ^ Version
+    , extSz :: !(Maybe Word16) -- ^ UDP Size
+    , extDO :: !FlagOp         -- ^ DNSSEC OK (DO) bit
+    , extOd :: !ODataOp        -- ^ EDNS option list tweaks
+    }
+    deriving (Eq)
+
+-- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
+
+instance Sem.Semigroup EdnsControls where
+    (EdnsControls en1 vn1 sz1 do1 od1) <> (EdnsControls en2 vn2 sz2 do2 od2) =
+        EdnsControls (en1 <> en2) (vn1 <|> vn2) (sz1 <|> sz2)
+                    (do1 <> do2) (od1 <> od2)
+
+instance Monoid EdnsControls where
+    mempty = EdnsControls FlagKeep Nothing Nothing FlagKeep mempty
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+instance Show EdnsControls where
+    show (EdnsControls en vn sz d0 od) =
+        showOpts
+            [ showFlag "edns.enabled" en
+            , showWord "edns.version" vn
+            , showWord "edns.udpsize" sz
+            , showFlag "edns.dobit"   d0
+            , showOdOp "edns.options" $ map (show. odataToOptCode)
+                                      $ odataDedup od ]
+      where
+        showWord :: Show a => String -> Maybe a -> String
+        showWord nm w = maybe skipDefault (\s -> nm ++ ":" ++ show s) w
+
+        showOdOp :: String -> [String] -> String
+        showOdOp nm os = case os of
+            [] -> ""
+            _  -> nm ++ ":[" ++ List.intercalate "," os ++ "]"
+
+-- | Construct a list of 0 or 1 EDNS OPT RRs based on EdnsControls setting.
+--
+queryEdns :: EdnsControls -> EDNSheader
+queryEdns (EdnsControls en vn sz d0 od) =
+    let d  = defaultEDNS
+     in if en == FlagClear
+        then NoEDNS
+        else EDNSheader $ d { ednsVersion = fromMaybe (ednsVersion d) vn
+                            , ednsUdpSize = fromMaybe (ednsUdpSize d) sz
+                            , ednsDnssecOk = applyFlag d0 (ednsDnssecOk d)
+                            , ednsOptions  = odataDedup od
+                            }
+
+----------------------------------------------------------------
+
+-- | Query controls.  A composable combination of 'HeaderControls' and
+-- 'EdnsControls'.  Query controls form a 'Monoid', as with function
+-- composition, the left-most value has the last say.
+--
+data QueryControls = QueryControls
+    { qctlHeader :: !HeaderControls
+    , qctlEdns   :: !EdnsControls
+    }
+    deriving (Eq)
+
+instance Sem.Semigroup QueryControls where
+    (QueryControls fl1 ex1) <> (QueryControls fl2 ex2) =
+        QueryControls (fl1 <> fl2) (ex1 <> ex2)
+
+instance Monoid QueryControls where
+    mempty = QueryControls mempty mempty
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+instance Show QueryControls where
+    show (QueryControls fl ex) = showOpts [ show fl, show ex ]
+
+----------------------------------------------------------------
+
+-- | Generator of 'QueryControls' that adjusts the RD bit.
+--
+-- >>> rdFlag FlagClear
+-- rd:0
+rdFlag :: FlagOp -> QueryControls
+rdFlag rd = mempty { qctlHeader = mempty { rdBit = rd } }
+
+-- | Generator of 'QueryControls' that adjusts the AD bit.
+--
+-- >>> adFlag FlagSet
+-- ad:1
+adFlag :: FlagOp -> QueryControls
+adFlag ad = mempty { qctlHeader = mempty { adBit = ad } }
+
+-- | Generator of 'QueryControls' that adjusts the CD bit.
+--
+-- >>> cdFlag FlagSet
+-- cd:1
+cdFlag :: FlagOp -> QueryControls
+cdFlag cd = mempty { qctlHeader = mempty { cdBit = cd } }
+
+-- | Generator of 'QueryControls' that enables or disables EDNS support
+--   When EDNS is disabled, the rest of the 'EDNS' controls are ignored.
+--
+-- >>> ednsEnabled FlagClear
+-- edns.enabled:0
+ednsEnabled :: FlagOp -> QueryControls
+ednsEnabled en = mempty { qctlEdns = mempty { extEn = en } }
+
+-- | Generator of 'QueryControls' that adjusts the 'EDNS' version.
+-- A value of 'Nothing' makes no changes, while 'Just' @v@ sets
+-- the EDNS version to @v@.
+--
+-- >>> ednsSetVersion (Just 1)
+-- edns.version:1
+ednsSetVersion :: Maybe Word8 -> QueryControls
+ednsSetVersion vn = mempty { qctlEdns = mempty { extVn = vn } }
+
+-- | Generator of 'QueryControls' that adjusts the 'EDNS' UDP buffer size.
+-- A value of 'Nothing' makes no changes, while 'Just' @n@ sets the EDNS UDP
+-- buffer size to @n@.
+--
+-- >>> ednsSetUdpSize (Just 2048)
+-- edns.udpsize:2048
+ednsSetUdpSize :: Maybe Word16 -> QueryControls
+ednsSetUdpSize sz = mempty { qctlEdns = mempty { extSz = sz } }
+
+-- | Generator of 'QueryControls' that adjusts the 'EDNS' DnssecOk (DO) bit.
+--
+-- >>> doFlag FlagSet
+-- edns.dobit:1
+doFlag :: FlagOp -> QueryControls
+doFlag d0 = mempty { qctlEdns = mempty { extDO = d0 } }
+
+-- | Generator of 'QueryControls' that adjusts the list of 'EDNS' options.
+--
+-- >>> ednsSetOptions (ODataAdd [OD_NSID ""])
+-- edns.options:[NSID]
+ednsSetOptions :: ODataOp -> QueryControls
+ednsSetOptions od = mempty { qctlEdns = mempty { extOd = od } }
 
 ----------------------------------------------------------------
 
@@ -650,9 +892,8 @@ data QorR = QR_Query    -- ^ Query.
 -- | Kind of query.
 data OPCODE
   = OP_STD -- ^ A standard query.
-  | OP_INV -- ^ An inverse query.
+  | OP_INV -- ^ An inverse query (inverse queries are deprecated).
   | OP_SSR -- ^ A server status request.
-  -- OPCODE 3 is unassigned
   | OP_NOTIFY -- ^ A zone change notification (RFC1996)
   | OP_UPDATE -- ^ An update request (RFC2136)
   deriving (Eq, Show, Enum, Bounded)
@@ -664,6 +905,7 @@ toOPCODE i = case i of
   0 -> Just OP_STD
   1 -> Just OP_INV
   2 -> Just OP_SSR
+  -- OPCODE 3 is unassigned
   4 -> Just OP_NOTIFY
   5 -> Just OP_UPDATE
   _ -> Nothing
@@ -1018,7 +1260,10 @@ type AdditionalRecords = [ResourceRecord]
 
 ----------------------------------------------------------------
 
--- | Default query.
+-- | A 'DNSMessage' template for queries with default settings for
+-- the message 'DNSHeader' and 'EDNSheader'.  This is the initial
+-- query message state, before customization via 'QueryControls'.
+--
 defaultQuery :: DNSMessage
 defaultQuery = DNSMessage {
     header = DNSHeader {
@@ -1063,34 +1308,41 @@ defaultResponse = DNSMessage {
   , additional = []
   }
 
--- | Making a template query filled with ENDS additional RRs and
---   query flags.
-makeEmptyQuery :: EDNSheader -- ^ Optional EDNS
-               -> QueryFlags -- ^ Custom RD\/AD\/CD flags.
+-- | A query template with 'QueryControls' overrides applied,
+-- with just the 'Question' and query 'Identifier' remaining
+-- to be filled in.
+--
+makeEmptyQuery :: QueryControls -- ^ Flag and EDNS overrides
                -> DNSMessage
-makeEmptyQuery eh fs = defaultQuery {
+makeEmptyQuery ctls = defaultQuery {
       header = header'
-    , ednsHeader = eh
+    , ednsHeader = queryEdns ehctls
     }
   where
-    -- fixme :: DO bit in "eh" should be overridden when
-    --          QueryFlags supports it.
-    header' = (header defaultQuery) { flags = queryDNSFlags fs }
+    hctls = qctlHeader ctls
+    ehctls = qctlEdns ctls
+    header' = (header defaultQuery) { flags = queryDNSFlags hctls }
 
--- | Making a query.
-makeQuery :: Identifier
-          -> Question
-          -> EDNSheader        -- ^ Optional EDNS
-          -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+-- | Construct a complete query 'DNSMessage', by combining the 'defaultQuery'
+-- template with the specified 'Identifier', and 'Question'.  The
+-- 'QueryControls' can be 'mempty' to leave all header and EDNS settings at
+-- their default values, or some combination of overrides.  A default set of
+-- overrides can be enabled via the 'Network.DNS.Resolver.resolvQueryControls'
+-- field of 'Network.DNS.Resolver.ResolvConf'.  Per-query overrides are
+-- possible by using 'Network.DNS.LookupRaw.loookupRawCtl'.
+--
+makeQuery :: Identifier        -- ^ Crypto random request id
+          -> Question          -- ^ Question name and type
+          -> QueryControls     -- ^ Custom RD\/AD\/CD flags and EDNS settings
           -> DNSMessage
-makeQuery idt q eh fs = empqry {
+makeQuery idt q ctls = empqry {
       header = (header empqry) { identifier = idt }
     , question = [q]
     }
   where
-    empqry = makeEmptyQuery eh fs
+    empqry = makeEmptyQuery ctls
 
--- | Making a response.
+-- | Construct a query response 'DNSMessage'.
 makeResponse :: Identifier
              -> Question
              -> Answers
@@ -1124,7 +1376,12 @@ data EDNS = EDNS {
   , ednsOptions  :: [OData]
   } deriving (Eq, Show)
 
--- | Default information for EDNS.
+-- | The default EDNS pseudo-header for queries.  The UDP buffer size is set to
+--   1216 bytes, which should result in replies that fit into the 1280 byte
+--   IPv6 minimum MTU.  Since IPv6 only supports fragmentation at the source,
+--   and even then not all gateways forward IPv6 pre-fragmented IPv6 packets,
+--   it is best to keep DNS packet sizes below this limit when using IPv6
+--   nameservers.  A larger value may be practical when using IPv4 exclusively.
 --
 -- @
 -- defaultEDNS = EDNS
@@ -1255,6 +1512,17 @@ data OData =
     | UnknownOData Word16 ByteString
     deriving (Eq,Ord)
 
+
+-- | Recover the (often implicit) 'OptCode' from a value of the 'OData' sum
+-- type.
+odataToOptCode :: OData -> OptCode
+odataToOptCode (OD_NSID {})          = NSID
+odataToOptCode (OD_DAU {})           = DAU
+odataToOptCode (OD_DHU {})           = DHU
+odataToOptCode (OD_N3U {})           = N3U
+odataToOptCode (OD_ClientSubnet {})  = ClientSubnet
+odataToOptCode (OD_ECSgeneric {})    = ClientSubnet
+odataToOptCode (UnknownOData code _) = toOptCode code
 
 instance Show OData where
     show (OD_NSID nsid) = showNSID nsid

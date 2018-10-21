@@ -54,27 +54,28 @@ defaultCacheConf = CacheConf 300 10
 --
 --  An example to disable EDNS:
 --
---  >>> let conf = defaultResolvConf { resolvEDNS = NoEDNS }
+--  >>> let conf = defaultResolvConf { resolvQueryControls = ednsEnabled FlagClear }
 --
---  An example to enable EDNS(0) with a 1,280-bytes buffer:
---
---  >>> let conf = defaultResolvConf { resolvEDNS = EDNSheader $ defaultEDNS { ednsUdpSize = 1280 } }
---
---  An example to enable cache:
+--  An example to enable query result caching:
 --
 --  >>> let conf = defaultResolvConf { resolvCache = Just defaultCacheConf }
 --
 -- An example to disable requesting recursive service.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = rdFlag FlagClear }
+--  >>> let conf = defaultResolvConf { resolvQueryControls = rdFlag FlagClear }
 --
 -- An example to set the AD bit in all queries by default.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet }
+--  >>> let conf = defaultResolvConf { resolvQueryControls = adFlag FlagSet }
 --
 -- An example to set the both the AD and CD bits in all queries by default.
 --
---  >>> let conf = defaultResolvConf { resolvQueryFlags = adFlag FlagSet <> cdFlag FlagSet }
+--  >>> let conf = defaultResolvConf { resolvQueryControls = adFlag FlagSet <> cdFlag FlagSet }
+--
+-- An example with an EDNS buffer size of 1216 bytes, which is more robust with
+-- IPv6, and the DO bit set to request DNSSEC responses.
+--
+--  >>> let conf = defaultResolvConf { resolvQueryControls = ednsSetUdpSize (Just 1216) <> doFlag FlagSet }
 --
 data ResolvConf = ResolvConf {
    -- | Server information.
@@ -83,17 +84,13 @@ data ResolvConf = ResolvConf {
   , resolvTimeout    :: Int
    -- | The number of retries including the first try.
   , resolvRetry      :: Int
-   -- | Additional resource records to specify EDNS.
-  , resolvEDNS       :: EDNSheader
    -- | Concurrent queries if multiple DNS servers are specified.
   , resolvConcurrent :: Bool
    -- | Cache configuration.
   , resolvCache      :: Maybe CacheConf
    -- | Overrides for the default flags used for queries via resolvers that use
-   -- this configuration.  The overrides are generated as a 'Monoid' by the
-   -- 'rdFlag', 'adFlag' and 'cdFlag' combinators.  The AD and CD bits are
-   -- typically only useful when recursion is not disabled.
-  , resolvQueryFlags :: QueryFlags
+   -- this configuration.
+  , resolvQueryControls :: QueryControls
 } deriving Show
 
 -- | Return a default 'ResolvConf':
@@ -101,19 +98,17 @@ data ResolvConf = ResolvConf {
 -- * 'resolvInfo' is 'RCFilePath' \"\/etc\/resolv.conf\".
 -- * 'resolvTimeout' is 3,000,000 micro seconds.
 -- * 'resolvRetry' is 3.
--- * 'resolvEDNS' is EDNS(0) with a 4,096-bytes buffer.
 -- * 'resolvConcurrent' is False.
 -- * 'resolvCache' is Nothing.
--- * 'resolvQueryFlags' is an empty set of overrides.
+-- * 'resolvQueryControls' is an empty set of overrides.
 defaultResolvConf :: ResolvConf
 defaultResolvConf = ResolvConf {
     resolvInfo       = RCFilePath "/etc/resolv.conf"
   , resolvTimeout    = 3 * 1000 * 1000
   , resolvRetry      = 3
-  , resolvEDNS       = EDNSheader defaultEDNS
   , resolvConcurrent = False
   , resolvCache      = Nothing
-  , resolvQueryFlags = mempty
+  , resolvQueryControls = mempty
 }
 
 ----------------------------------------------------------------

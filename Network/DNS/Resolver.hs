@@ -11,10 +11,9 @@ module Network.DNS.Resolver (
   , resolvInfo
   , resolvTimeout
   , resolvRetry
-  , resolvEDNS
   , resolvConcurrent
   , resolvCache
-  , resolvQueryFlags
+  , resolvQueryControls
   -- ** Specifying DNS servers
   , FileOrNumericHost(..)
   -- ** Configuring cache
