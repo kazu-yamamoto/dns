@@ -129,10 +129,10 @@ data PState = PState {
 ----------------------------------------------------------------
 
 getPosition :: SGet Int
-getPosition = psPosition <$> ST.get
+getPosition = ST.gets psPosition
 
 getInput :: SGet ByteString
-getInput = psInput <$> ST.get
+getInput = ST.gets psInput
 
 addPosition :: Int -> SGet ()
 addPosition n = do
@@ -145,7 +145,7 @@ push n d = do
     ST.put $ PState (IM.insert n d dom) pos inp
 
 pop :: Int -> SGet (Maybe Domain)
-pop n = IM.lookup n . psDomain <$> ST.get
+pop n = ST.gets (IM.lookup n . psDomain)
 
 ----------------------------------------------------------------
 
