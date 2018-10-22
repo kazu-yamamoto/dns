@@ -1,4 +1,4 @@
-# 3.1.0
+# 4.0.0
 
 - TCP queries now also use EDNS, since the DO bit and other options
   may be relevant, even when the UDP buffer size is not.  Therefore,
