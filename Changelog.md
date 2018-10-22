@@ -12,12 +12,7 @@
 - New API: doFlag, ednsEnable, ednsSetVersion, ednsSetSize and
   ednsSetOptions makes it possible for 'QueryControls' to adjust
   EDNS settings.
-- Renamed:
-
-    resolvQueryFlags   -> resolvQueryControls,
-    lookupRawWithFlags -> lookupRawCtl
-    QueryFlags         -> QueryControls
-
+- New API: lookupRawCtl
 - Breaking change: the decoded EDNS record no longer contains
   an error field.  Instead the header of decoded messages is
   updated hold the extended error code when valid EDNS OPT records
@@ -62,8 +57,6 @@
   source bits match some trailing all-zero bytes.
 - Breaking change: EDNS0 is renamed to EDNS.
 - Breaking change: lookupRawAD, composeQuery, composeQueryAD are removed.
-- A new API: lookupRawWithFlags, QueryFlags, FlagOp, rdFlag, adFlag, cdFlag,
-  and resolvQueryFlags. [#116](https://github.com/kazu-yamamoto/dns/pull/116)
 - New OP codes: OP_NOTIFY and OP_UPDATE.
   [#113](https://github.com/kazu-yamamoto/dns/pull/113)
 

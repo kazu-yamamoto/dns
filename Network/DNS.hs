@@ -32,7 +32,7 @@ module Network.DNS (
   -- * Middle level
   , module Network.DNS.LookupRaw
   -- | This provides the 'lookup', 'lookupAuth', 'lookupRaw' and
-  --   'lookupRawWithFlags' functions for any resource records.
+  --   'lookupRawCtl' functions for any resource records.
 
   -- * Low level
   , module Network.DNS.Encode
