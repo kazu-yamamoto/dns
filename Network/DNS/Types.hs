@@ -10,6 +10,7 @@ module Network.DNS.Types (
   -- * Resource Records
     ResourceRecord (..)
   , Answers
+  , AuthorityRecords
   , AdditionalRecords
   -- ** Types
   , Domain
@@ -50,9 +51,26 @@ module Network.DNS.Types (
   , DNSMessage (..)
   , DNSFormat
   -- ** Query
-  , defaultQuery
-  , makeEmptyQuery
   , makeQuery
+  , makeEmptyQuery
+  , defaultQuery
+  -- ** Query Controls
+  , QueryControls
+  -- *** Header Controls
+  , HeaderControls
+  , rdFlag
+  , adFlag
+  , cdFlag
+  -- *** EDNS Controls
+  , EdnsControls
+  , ednsEnabled
+  , ednsSetVersion
+  , ednsSetUdpSize
+  , doFlag
+  , ednsSetOptions
+  -- *** Flag and OData control operations
+  , FlagOp(..)
+  , ODataOp(..)
   -- ** Response
   , defaultResponse
   , makeResponse
@@ -63,13 +81,7 @@ module Network.DNS.Types (
   , DNSFlags (..)
   , QorR (..)
   , defaultDNSFlags
-  -- *** Query flags
-  , FlagOp(..)
-  , QueryFlags
-  , rdFlag
-  , adFlag
-  , cdFlag
-  -- **** OPCODE and RCODE
+  -- *** OPCODE and RCODE
   , OPCODE (..)
   , fromOPCODE
   , toOPCODE
@@ -85,47 +97,56 @@ module Network.DNS.Types (
   , NXRRSet
   , NotAuth
   , NotZone
-  , BadOpt
+  , BadVers
+  , BadKey
+  , BadTime
+  , BadMode
+  , BadName
+  , BadAlg
+  , BadTrunc
+  , BadCookie
+  , BadRCODE
   )
   , fromRCODE
   , toRCODE
-  , fromRCODEforHeader
-  , toRCODEforHeader
+  -- ** EDNS Pseudo-Header
+  , EDNSheader(..)
+  , ifEDNS
+  , mapEDNS
+  -- *** EDNS record
+  , EDNS(..)
+  , defaultEDNS
+  , maxUdpSize
+  , minUdpSize
+  -- *** EDNS options
+  , OData (..)
+  , OptCode (
+    ClientSubnet
+  , DAU
+  , DHU
+  , N3U
+  , NSID
+  )
+  , fromOptCode
+  , toOptCode
   -- ** DNS Body
   , Question (..)
   -- * DNS Error
   , DNSError (..)
-  -- * EDNS0
-  , EDNS0
-  , defaultEDNS0
-  , maxUdpSize
-  , minUdpSize
-  -- ** Accessors
-  , udpSize
-  , extRCODE
-  , dnssecOk
-  , options
-  -- ** Converters
-  , fromEDNS0
-  , toEDNS0
-  -- * EDNS0 option data
-  , OData (..)
-  , OptCode (
-    ClientSubnet
-  )
-  , fromOptCode
-  , toOptCode
   -- * Other types
   , Mailbox
   ) where
 
 import Control.Exception (Exception, IOException)
+import Control.Applicative ((<|>))
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Builder as L
 import qualified Data.ByteString.Lazy as L
-import Data.IP (IP, IPv4, IPv6)
+import Data.Function (on)
+import Data.IP (IP(..), IPv4, IPv6)
 import qualified Data.List as List
+import           Data.Maybe (fromMaybe)
 import qualified Data.Semigroup as Sem
 
 import Network.DNS.Imports
@@ -368,7 +389,7 @@ data DNSError =
     --   or a name server may not wish to perform
     --   a particular operation (e.g., zone transfer) for particular data.
   | OperationRefused
-    -- | The server detected a malformed OPT RR.
+    -- | The server does not support the OPT RR version or content
   | BadOptRecord
     -- | Configuration is wrong.
   | BadConfiguration
@@ -381,12 +402,76 @@ data DNSError =
 
 instance Exception DNSError
 
--- | Raw data format for DNS Query and Response.
+
+-- | Data type representing the optional EDNS pseudo-header of a 'DNSMessage'
+-- When a single well-formed @OPT@ 'ResourceRecord' was present in the
+-- message's additional section, it is decoded to an 'EDNS' record and and
+-- stored in the message 'ednsHeader' field.  The corresponding @OPT RR@ is
+-- then removed from the additional section.
+--
+-- When the constructor is 'NoEDNS', no @EDNS OPT@ record was present in the
+-- message additional section.  When 'InvalidEDNS', the message holds either a
+-- malformed OPT record or more than one OPT record, which can still be found
+-- in (have not been removed from) the message additional section.
+--
+-- The EDNS OPT record augments the message error status with an 8-bit field
+-- that forms 12-bit extended RCODE when combined with the 4-bit RCODE from the
+-- unextended DNS header.  In EDNS messages it is essential to not use just the
+-- bare 4-bit 'RCODE' from the original DNS header.  Therefore, in order to
+-- avoid potential misinterpretation of the response 'RCODE', when the OPT
+-- record is decoded, the upper eight bits of the error status are
+-- automatically combined with the 'rcode' of the message header, so that there
+-- is only one place in which to find the full 12-bit result.  Therefore, the
+-- decoded 'EDNS' pseudo-header, does not hold any error status bits.
+--
+-- The reverse process occurs when encoding messages.  The low four bits of the
+-- message header 'rcode' are encoded into the wire-form DNS header, while the
+-- upper eight bits are encoded as part of the OPT record.  In DNS responses with
+-- an 'rcode' larger than 15, EDNS extensions SHOULD be enabled by providing a
+-- value for 'ednsHeader' with a constructor of 'EDNSheader'.  If EDNS is not
+-- enabled in such a message, in order to avoid truncation of 'RCODE' values
+-- that don't fit in the non-extended DNS header, the encoded wire-form 'RCODE'
+-- is set to 'FormatErr'.
+--
+-- When encoding messages for transmission, the 'ednsHeader' is used to
+-- generate the additional OPT record.  Do not add explicit @OPT@ records
+-- to the aditional section, configure EDNS via the 'EDNSheader' instead.
+--
+data EDNSheader = EDNSheader EDNS -- ^ A valid EDNS message
+                | NoEDNS          -- ^ A valid non-EDNS message
+                | InvalidEDNS     -- ^ Multiple or bad additional @OPT@ RRs
+    deriving (Eq, Show)
+
+
+-- | Return the second argument for EDNS messages, otherwise the third.
+ifEDNS :: EDNSheader -- ^ EDNS pseudo-header
+       -> a          -- ^ Value to return for EDNS messages
+       -> a          -- ^ Value to return for non-EDNS messages
+       -> a
+ifEDNS (EDNSheader _) a _ = a
+ifEDNS             _  _ b = b
+{-# INLINE ifEDNS #-}
+
+
+-- | Return the output of a function applied to the EDNS pseudo-header if EDNS
+--   is enabled, otherwise return a default value.
+mapEDNS :: EDNSheader  -- ^ EDNS pseudo-header
+        -> (EDNS -> a) -- ^ Function to apply to 'EDNS' value
+        -> a           -- ^ Default result for non-EDNS messages
+        -> a
+mapEDNS (EDNSheader eh) f _ = f eh
+mapEDNS               _ _ a = a
+{-# INLINE mapEDNS #-}
+
+
+-- | DNS message format for queries and replies.
+--
 data DNSMessage = DNSMessage {
-    header     :: DNSHeader         -- ^ Header
+    header     :: DNSHeader         -- ^ Header with extended 'RCODE'
+  , ednsHeader :: EDNSheader        -- ^ EDNS pseudo-header
   , question   :: [Question]        -- ^ The question for the name server
   , answer     :: Answers           -- ^ RRs answering the question
-  , authority  :: [ResourceRecord]  -- ^ RRs pointing toward an authority
+  , authority  :: AuthorityRecords  -- ^ RRs pointing toward an authority
   , additional :: AdditionalRecords -- ^ RRs holding additional information
   } deriving (Eq, Show)
 
@@ -422,7 +507,13 @@ data DNSFlags = DNSFlags {
                            -- response, and denotes whether recursive query support is
                            -- available in the name server.
 
-  , rcode        :: RCODE  -- ^ Response code.
+  , rcode        :: RCODE  -- ^ The full 12-bit extended RCODE when EDNS is in use.
+                           -- Should always be zero in well-formed requests.
+                           -- When decoding replies, the high eight bits from
+                           -- any EDNS response are combined with the 4-bit
+                           -- RCODE from the DNS header.  When encoding
+                           -- replies, if EDNS no EDNS OPT record is provided,
+                           -- RCODE values > 15 are mapped to FormErr.
   , authenData   :: Bool   -- ^ AD (Authenticated Data) bit - (RFC4035, Section 3.2.3).
   , chkDisable   :: Bool   -- ^ CD (Checking Disabled) bit - (RFC4035, Section 3.2.2).
   } deriving (Eq, Show)
@@ -444,8 +535,11 @@ defaultDNSFlags = DNSFlags
          , rcode        = NoErr
          }
 
--- | Flag operations. This is an instance of 'Monoid'.
--- If they are used with '(<>)', the left value wins.
+----------------------------------------------------------------
+
+-- | Boolean flag operations. These form a 'Monoid'.  When combined via
+-- `mappend`, as with function composition, the left-most value has
+-- the last say.
 --
 -- >>> mempty :: FlagOp
 -- FlagKeep
@@ -455,11 +549,19 @@ defaultDNSFlags = DNSFlags
 -- FlagClear
 -- >>> FlagReset <> FlagClear <> FlagSet <> mempty
 -- FlagReset
-data FlagOp = FlagSet   -- ^ Flag is set
-            | FlagClear -- ^ Flag is unset
-            | FlagReset -- ^ Flag is reset to the default value
-            | FlagKeep  -- ^ Flag is not changed
+data FlagOp = FlagSet   -- ^ Set the flag to 1
+            | FlagClear -- ^ Clear the flag to 0
+            | FlagReset -- ^ Reset the flag to its default value
+            | FlagKeep  -- ^ Leave the flag unchanged
             deriving (Eq, Show)
+
+-- | Apply the given 'FlagOp' to a default boolean value to produce the final
+-- setting.
+--
+applyFlag :: FlagOp -> Bool -> Bool
+applyFlag FlagSet   _ = True
+applyFlag FlagClear _ = False
+applyFlag _         v = v
 
 -- $
 -- Test associativity of the semigroup operation:
@@ -480,87 +582,305 @@ instance Monoid FlagOp where
     mappend = (Sem.<>)
 #endif
 
--- | Optional overrides of query-related DNS flags.  The 'Monoid' instance
--- makes it possible to combine the generators 'rdFlag', 'adFlag' and 'cdFlag' to
+-- | We don't show options left at their default value.
+--
+skipDefault :: String
+skipDefault = ""
+
+-- | Show non-default flag values
+--
+showFlag :: String -> FlagOp -> String
+showFlag nm FlagSet   = nm ++ ":1"
+showFlag nm FlagClear = nm ++ ":0"
+showFlag _  FlagReset = skipDefault
+showFlag _  FlagKeep  = skipDefault
+
+-- | Combine a list of options for display, skipping default values
+--
+showOpts :: [String] -> String
+showOpts os = List.intercalate "," $ List.filter (/= skipDefault) os
+
+----------------------------------------------------------------
+
+-- | Control over query-related DNS header flags.  The 'Monoid' instance makes
+-- it possible to combine the generators 'rdFlag', 'adFlag' and 'cdFlag' to
 -- yield all possible combinations of "set", "clear" and "reset" (to default)
--- for each of the bits.
+-- for each of the bits.  As with function composition, the left-most value has
+-- the last say.
 --
 -- >>> adFlag FlagSet <> mempty
 -- ad:1
--- >>> cdFlag FlagReset <> rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet <> adFlag FlagSet <> mempty
+-- >>> :{
+-- mconcat [ cdFlag FlagReset
+--         , rdFlag FlagSet
+--         , adFlag FlagClear
+--         , cdFlag FlagSet
+--         , adFlag FlagSet
+--         ]
+-- :}
 -- rd:1,ad:0
 --
-data QueryFlags = QueryFlags
+data HeaderControls = HeaderControls
     { rdBit :: !FlagOp
     , adBit :: !FlagOp
     , cdBit :: !FlagOp
     }
+    deriving (Eq)
 
-instance Sem.Semigroup QueryFlags where
-    (QueryFlags rd1 ad1 cd1) <> (QueryFlags rd2 ad2 cd2) =
-        QueryFlags (rd1 <> rd2) (ad1 <> ad2) (cd1 <> cd2)
+instance Sem.Semigroup HeaderControls where
+    (HeaderControls rd1 ad1 cd1) <> (HeaderControls rd2 ad2 cd2) =
+        HeaderControls (rd1 <> rd2) (ad1 <> ad2) (cd1 <> cd2)
 
-instance Monoid QueryFlags where
-    mempty = QueryFlags FlagKeep FlagKeep FlagKeep
+instance Monoid HeaderControls where
+    mempty = HeaderControls FlagKeep FlagKeep FlagKeep
 #if !(MIN_VERSION_base(4,11,0))
     -- this is redundant starting with base-4.11 / GHC 8.4
     -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
     mappend = (Sem.<>)
 #endif
 
-instance Show QueryFlags where
-    show (QueryFlags rd ad cd) = List.intercalate "," $ List.filter (/= magic) [
-             showFlag "rd" rd
-           , showFlag "ad" ad
-           , showFlag "cd" cd ]
-      where
-        magic = ""
-        showFlag :: String -> FlagOp -> String
-        showFlag nm FlagSet   = nm ++ ":1"
-        showFlag nm FlagClear = nm ++ ":0"
-        showFlag _  FlagReset = magic
-        showFlag _  FlagKeep  = magic
+instance Show HeaderControls where
+    show (HeaderControls rd ad cd) =
+        showOpts
+             [ showFlag "rd" rd
+             , showFlag "ad" ad
+             , showFlag "cd" cd ]
 
 -- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
 -- resulting 'DNSFlags' suitable for making queries with the requested flag
 -- settings.  This is only needed if you're creating your own 'DNSMessage',
--- the 'Network.DNS.LookupRaw.lookupRawWithFlags' function takes a 'QueryFlags'
+-- the 'Network.DNS.LookupRaw.lookupRawCtl' function takes a 'QueryControls'
 -- argument and handles this conversion internally.
 --
 -- Default overrides can be specified in the resolver configuration by setting
--- the 'Network.DNS.resolvQueryFlags' field of the
+-- the 'Network.DNS.resolvQueryControls' field of the
 -- 'Network.DNS.Resolver.ResolvConf' argument to
 -- 'Network.DNS.Resolver.makeResolvSeed'.  These then apply to lookups via
 -- resolvers based on the resulting configuration, with the exception of
--- 'Network.DNS.LookupRaw.lookupRawWithFlags' which takes an additional 'QueryFlags'
--- argument to augment the default overrides.
+-- 'Network.DNS.LookupRaw.lookupRawCtl' which takes an additional
+-- 'QueryControls' argument to augment the default overrides.
 --
-queryDNSFlags :: QueryFlags -> DNSFlags
-queryDNSFlags (QueryFlags rd ad cd) = d {
-      recDesired = toBool rd $ recDesired d
-    , authenData = toBool ad $ authenData d
-    , chkDisable = toBool cd $ chkDisable d
+queryDNSFlags :: HeaderControls -> DNSFlags
+queryDNSFlags (HeaderControls rd ad cd) = d {
+      recDesired = applyFlag rd $ recDesired d
+    , authenData = applyFlag ad $ authenData d
+    , chkDisable = applyFlag cd $ chkDisable d
     }
   where
     d = defaultDNSFlags
-    toBool FlagSet   _ = True
-    toBool FlagClear _ = False
-    toBool _         v = v
 
--- | Generator of 'QueryFlags' that manipulates the RD bit.
---
-rdFlag :: FlagOp -> QueryFlags
-rdFlag rd = mempty { rdBit = rd }
+----------------------------------------------------------------
 
--- | Generator of 'QueryFlags' that manipulates the AD bit.
+-- | The default EDNS Option list is empty.  We define two operations, one to
+-- prepend a list of options, and another to set a specific list of options.
 --
-adFlag :: FlagOp -> QueryFlags
-adFlag ad = mempty { adBit = ad }
+data ODataOp = ODataAdd [OData] -- ^ Add the specified options to the list.
+             | ODataSet [OData] -- ^ Set the option list as specified.
+             deriving (Eq)
 
--- | Generator of 'QueryFlags' that manipulates the CD bit.
+-- | Since any given option code can appear at most once in the list, we
+-- de-duplicate by the OPTION CODE when combining lists.
 --
-cdFlag :: FlagOp -> QueryFlags
-cdFlag cd = mempty { cdBit = cd }
+odataDedup :: ODataOp -> [OData]
+odataDedup op =
+    List.nubBy ((==) `on` odataToOptCode) $
+        case op of
+            ODataAdd os -> os
+            ODataSet os -> os
+
+-- $
+-- Test associativity of the OData semigroup operation:
+--
+-- >>> let ip1 = IPv4 $ read "127.0.0.0"
+-- >>> let ip2 = IPv4 $ read "192.0.2.0"
+-- >>> let cs1 = OD_ClientSubnet 8 0 ip1
+-- >>> let cs2 = OD_ClientSubnet 24 0 ip2
+-- >>> let cs3 = OD_ECSgeneric 0 24 0 "foo"
+-- >>> let dau1 = OD_DAU [3,5,7,8]
+-- >>> let dau2 = OD_DAU [13,14]
+-- >>> let dhu1 = OD_DHU [1,2]
+-- >>> let dhu2 = OD_DHU [3,4]
+-- >>> let nsid = OD_NSID "nsa.example.com"
+-- >>> let ops1 = [ODataAdd [dau1, dau2, cs1], ODataAdd [dau2, cs2, dhu1]]
+-- >>> let ops2 = [ODataSet [], ODataSet [dhu2, cs3], ODataSet [nsid]]
+-- >>> let ops = ops1 ++ ops2
+-- >>> foldl (&&) True [(a<>b)<>c == a<>(b<>c) | a <- ops, b <- ops, c <- ops]
+-- True
+
+instance Sem.Semigroup ODataOp where
+    ODataAdd as <> ODataAdd bs = ODataAdd $ as ++ bs
+    ODataAdd as <> ODataSet bs = ODataSet $ as ++ bs
+    ODataSet as <> _ = ODataSet as
+
+instance Monoid ODataOp where
+    mempty = ODataAdd []
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+----------------------------------------------------------------
+
+-- | EDNS query controls.  These support enabling or disabling EDNS, selecting
+-- the EDNS version, the supported UDP buffer size, setting the DO bit and
+-- adding EDNS options.  When EDNS is disabled via @ednsEnabled FlagClear@,
+-- all the other EDNS-related overrides have no effect.
+--
+-- >>> :{
+-- mconcat [ ednsEnabled FlagSet -- this is the default
+--         , ednsSetVersion (Just 1)
+--         , ednsSetUdpSize (Just 2048)
+--         , doFlag FlagSet
+--         , ednsSetOptions (ODataAdd [OD_NSID ""])
+--         , ednsSetOptions (ODataAdd [OD_ClientSubnet 24 0 (read "192.0.2.1")])
+--         ]
+-- :}
+-- edns.enabled:1,edns.version:1,edns.udpsize:2048,edns.dobit:1,edns.options:[NSID,ClientSubnet]
+data EdnsControls = EdnsControls
+    { extEn :: !FlagOp         -- ^ Enabled
+    , extVn :: !(Maybe Word8)  -- ^ Version
+    , extSz :: !(Maybe Word16) -- ^ UDP Size
+    , extDO :: !FlagOp         -- ^ DNSSEC OK (DO) bit
+    , extOd :: !ODataOp        -- ^ EDNS option list tweaks
+    }
+    deriving (Eq)
+
+-- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
+
+instance Sem.Semigroup EdnsControls where
+    (EdnsControls en1 vn1 sz1 do1 od1) <> (EdnsControls en2 vn2 sz2 do2 od2) =
+        EdnsControls (en1 <> en2) (vn1 <|> vn2) (sz1 <|> sz2)
+                    (do1 <> do2) (od1 <> od2)
+
+instance Monoid EdnsControls where
+    mempty = EdnsControls FlagKeep Nothing Nothing FlagKeep mempty
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+instance Show EdnsControls where
+    show (EdnsControls en vn sz d0 od) =
+        showOpts
+            [ showFlag "edns.enabled" en
+            , showWord "edns.version" vn
+            , showWord "edns.udpsize" sz
+            , showFlag "edns.dobit"   d0
+            , showOdOp "edns.options" $ map (show. odataToOptCode)
+                                      $ odataDedup od ]
+      where
+        showWord :: Show a => String -> Maybe a -> String
+        showWord nm w = maybe skipDefault (\s -> nm ++ ":" ++ show s) w
+
+        showOdOp :: String -> [String] -> String
+        showOdOp nm os = case os of
+            [] -> ""
+            _  -> nm ++ ":[" ++ List.intercalate "," os ++ "]"
+
+-- | Construct a list of 0 or 1 EDNS OPT RRs based on EdnsControls setting.
+--
+queryEdns :: EdnsControls -> EDNSheader
+queryEdns (EdnsControls en vn sz d0 od) =
+    let d  = defaultEDNS
+     in if en == FlagClear
+        then NoEDNS
+        else EDNSheader $ d { ednsVersion = fromMaybe (ednsVersion d) vn
+                            , ednsUdpSize = fromMaybe (ednsUdpSize d) sz
+                            , ednsDnssecOk = applyFlag d0 (ednsDnssecOk d)
+                            , ednsOptions  = odataDedup od
+                            }
+
+----------------------------------------------------------------
+
+-- | Query controls.  A composable combination of 'HeaderControls' and
+-- 'EdnsControls'.  Query controls form a 'Monoid', as with function
+-- composition, the left-most value has the last say.
+--
+data QueryControls = QueryControls
+    { qctlHeader :: !HeaderControls
+    , qctlEdns   :: !EdnsControls
+    }
+    deriving (Eq)
+
+instance Sem.Semigroup QueryControls where
+    (QueryControls fl1 ex1) <> (QueryControls fl2 ex2) =
+        QueryControls (fl1 <> fl2) (ex1 <> ex2)
+
+instance Monoid QueryControls where
+    mempty = QueryControls mempty mempty
+#if !(MIN_VERSION_base(4,11,0))
+    -- this is redundant starting with base-4.11 / GHC 8.4
+    -- if you want to avoid CPP, you can define `mappend = (<>)` unconditionally
+    mappend = (Sem.<>)
+#endif
+
+instance Show QueryControls where
+    show (QueryControls fl ex) = showOpts [ show fl, show ex ]
+
+----------------------------------------------------------------
+
+-- | Generator of 'QueryControls' that adjusts the RD bit.
+--
+-- >>> rdFlag FlagClear
+-- rd:0
+rdFlag :: FlagOp -> QueryControls
+rdFlag rd = mempty { qctlHeader = mempty { rdBit = rd } }
+
+-- | Generator of 'QueryControls' that adjusts the AD bit.
+--
+-- >>> adFlag FlagSet
+-- ad:1
+adFlag :: FlagOp -> QueryControls
+adFlag ad = mempty { qctlHeader = mempty { adBit = ad } }
+
+-- | Generator of 'QueryControls' that adjusts the CD bit.
+--
+-- >>> cdFlag FlagSet
+-- cd:1
+cdFlag :: FlagOp -> QueryControls
+cdFlag cd = mempty { qctlHeader = mempty { cdBit = cd } }
+
+-- | Generator of 'QueryControls' that enables or disables EDNS support
+--   When EDNS is disabled, the rest of the 'EDNS' controls are ignored.
+--
+-- >>> ednsEnabled FlagClear
+-- edns.enabled:0
+ednsEnabled :: FlagOp -> QueryControls
+ednsEnabled en = mempty { qctlEdns = mempty { extEn = en } }
+
+-- | Generator of 'QueryControls' that adjusts the 'EDNS' version.
+-- A value of 'Nothing' makes no changes, while 'Just' @v@ sets
+-- the EDNS version to @v@.
+--
+-- >>> ednsSetVersion (Just 1)
+-- edns.version:1
+ednsSetVersion :: Maybe Word8 -> QueryControls
+ednsSetVersion vn = mempty { qctlEdns = mempty { extVn = vn } }
+
+-- | Generator of 'QueryControls' that adjusts the 'EDNS' UDP buffer size.
+-- A value of 'Nothing' makes no changes, while 'Just' @n@ sets the EDNS UDP
+-- buffer size to @n@.
+--
+-- >>> ednsSetUdpSize (Just 2048)
+-- edns.udpsize:2048
+ednsSetUdpSize :: Maybe Word16 -> QueryControls
+ednsSetUdpSize sz = mempty { qctlEdns = mempty { extSz = sz } }
+
+-- | Generator of 'QueryControls' that adjusts the 'EDNS' DnssecOk (DO) bit.
+--
+-- >>> doFlag FlagSet
+-- edns.dobit:1
+doFlag :: FlagOp -> QueryControls
+doFlag d0 = mempty { qctlEdns = mempty { extDO = d0 } }
+
+-- | Generator of 'QueryControls' that adjusts the list of 'EDNS' options.
+--
+-- >>> ednsSetOptions (ODataAdd [OD_NSID ""])
+-- edns.options:[NSID]
+ednsSetOptions :: ODataOp -> QueryControls
+ednsSetOptions od = mempty { qctlEdns = mempty { extOd = od } }
 
 ----------------------------------------------------------------
 
@@ -572,9 +892,8 @@ data QorR = QR_Query    -- ^ Query.
 -- | Kind of query.
 data OPCODE
   = OP_STD -- ^ A standard query.
-  | OP_INV -- ^ An inverse query.
+  | OP_INV -- ^ An inverse query (inverse queries are deprecated).
   | OP_SSR -- ^ A server status request.
-  -- OPCODE 3 is unassigned
   | OP_NOTIFY -- ^ A zone change notification (RFC1996)
   | OP_UPDATE -- ^ An update request (RFC2136)
   deriving (Eq, Show, Enum, Bounded)
@@ -586,6 +905,7 @@ toOPCODE i = case i of
   0 -> Just OP_STD
   1 -> Just OP_INV
   2 -> Just OP_SSR
+  -- OPCODE 3 is unassigned
   4 -> Just OP_NOTIFY
   5 -> Just OP_UPDATE
   _ -> Nothing
@@ -603,9 +923,11 @@ fromOPCODE OP_UPDATE = 5
 ----------------------------------------------------------------
 
 #if __GLASGOW_HASKELL__ >= 802
--- | Response code including EDNS0's 12bit ones.
+-- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
+-- bits.  With EDNS this stores the combined error code from the DNS header and
+-- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
 newtype RCODE = RCODE {
-    -- | From rcode to number.
+    -- | Convert an 'RCODE' to its numeric value.
     fromRCODE :: Word16
   } deriving (Eq)
 
@@ -667,9 +989,37 @@ pattern NotAuth   = RCODE 9
 -- Update Section is not within the zone denoted by the Zone Section.
 pattern NotZone  :: RCODE
 pattern NotZone   = RCODE 10
--- | Bad OPT Version (RFC 6891) or TSIG Signature Failure (RFC2845).
-pattern BadOpt    :: RCODE
-pattern BadOpt     = RCODE 16
+-- | Bad OPT Version (BADVERS, RFC 6891).
+pattern BadVers   :: RCODE
+pattern BadVers    = RCODE 16
+-- | Key not recognized [RFC2845]
+pattern BadKey    :: RCODE
+pattern BadKey     = RCODE 17
+-- | Signature out of time window [RFC2845]
+pattern BadTime   :: RCODE
+pattern BadTime    = RCODE 18
+-- | Bad TKEY Mode [RFC2930]
+pattern BadMode   :: RCODE
+pattern BadMode    = RCODE 19
+-- | Duplicate key name [RFC2930]
+pattern BadName   :: RCODE
+pattern BadName    = RCODE 20
+-- | Algorithm not supported [RFC2930]
+pattern BadAlg    :: RCODE
+pattern BadAlg     = RCODE 21
+-- | Bad Truncation [RFC4635]
+pattern BadTrunc  :: RCODE
+pattern BadTrunc   = RCODE 22
+-- | Bad/missing Server Cookie [RFC7873]
+pattern BadCookie :: RCODE
+pattern BadCookie  = RCODE 23
+-- | Malformed (peer) EDNS message, no RCODE available.  This is not an RCODE
+-- that can be sent by a peer.  It lies outside the 12-bit range expressible
+-- via EDNS.  The low 12-bits are chosen to coincide with 'FormatErr'.  When
+-- an EDNS message is malformed, and we're unable to extract the extended RCODE,
+-- the header 'rcode' is set to 'BadRCODE'.
+pattern BadRCODE  :: RCODE
+pattern BadRCODE   = RCODE 0x1001
 
 -- | Use https://tools.ietf.org/html/rfc2929#section-2.3 names for DNS RCODEs
 instance Show RCODE where
@@ -683,22 +1033,26 @@ instance Show RCODE where
     show YXRRSet   = "YXRRSet"
     show NotAuth   = "NotAuth"
     show NotZone   = "NotZone"
-    show BadOpt    = "BADVERS"
+    show BadVers   = "BadVers"
+    show BadKey    = "BadKey"
+    show BadTime   = "BadTime"
+    show BadMode   = "BadMode"
+    show BadName   = "BadName"
+    show BadAlg    = "BadAlg"
+    show BadTrunc  = "BadTrunc"
+    show BadCookie = "BadCookie"
     show x         = "RCODE " ++ (show $ fromRCODE x)
 
--- | From number to rcode.
+-- | Convert a numeric value to a corresponding 'RCODE'.  The behaviour is
+-- undefined for values outside the range @[0 .. 0xFFF]@ since the EDNS
+-- extended RCODE is a 12-bit value.  Values in the range @[0xF01 .. 0xFFF]@
+-- are reserved for private use.
 toRCODE :: Word16 -> RCODE
 toRCODE = RCODE
-
--- | From rcode to number for header (4bits only).
-fromRCODEforHeader :: RCODE -> Word16
-fromRCODEforHeader (RCODE w) = w .&. 0x0f
-
--- | From number in header to rcode (4bits only).
-toRCODEforHeader :: Word16 -> RCODE
-toRCODEforHeader w = RCODE (w .&. 0x0f)
 #else
--- | Response code.
+-- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
+-- bits.  With EDNS this stores the combined error code from the DNS header and
+-- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
 data RCODE
   = NoErr     -- ^ No error condition.
   | FormatErr -- ^ Format error - The name server was
@@ -732,12 +1086,24 @@ data RCODE
   | NotZone   -- ^ Dynamic update response, a name used in the
               --   Prerequisite or Update Section is not within the zone
               --   denoted by the Zone Section.
-  | BadOpt    -- ^ Bad OPT Version (RFC 6891) or TSIG Signature
-              --   Failure (RFC2845).
+  | BadVers   -- ^ Bad OPT Version (RFC 6891)
+  | BadKey    -- ^ Key not recognized [RFC2845]
+  | BadTime   -- ^ Signature out of time window [RFC2845]
+  | BadMode   -- ^ Bad TKEY Mode [RFC2930]
+  | BadName   -- ^ Duplicate key name [RFC2930]
+  | BadAlg    -- ^ Algorithm not supported [RFC2930]
+  | BadTrunc  -- ^ Bad Truncation [RFC4635]
+  | BadCookie -- ^ Bad/missing Server Cookie [RFC7873]
+  | BadRCODE  -- ^ Malformed (peer) EDNS message, no RCODE available.  This is
+              -- not an RCODE that can be sent by a peer.  It lies outside the
+              -- 12-bit range expressible via EDNS.  The low bits are chosen to
+              -- coincide with 'FormatErr'.  When an EDNS message is malformed,
+              -- and we're unable to extract the extended RCODE, the header
+              -- 'rcode' is set to 'BadRCODE'.
   | UnknownRCODE Word16
   deriving (Eq, Ord, Show)
 
--- | From rcode to number.
+-- | Convert an 'RCODE' to its numeric value.
 fromRCODE :: RCODE -> Word16
 fromRCODE NoErr     =  0
 fromRCODE FormatErr =  1
@@ -750,10 +1116,22 @@ fromRCODE YXRRSet   =  7
 fromRCODE NXRRSet   =  8
 fromRCODE NotAuth   =  9
 fromRCODE NotZone   = 10
-fromRCODE BadOpt    = 16
+fromRCODE BadVers   = 16
+fromRCODE BadKey    = 17
+fromRCODE BadTime   = 18
+fromRCODE BadMode   = 19
+fromRCODE BadName   = 20
+fromRCODE BadAlg    = 21
+fromRCODE BadTrunc  = 22
+fromRCODE BadCookie = 23
+fromRCODE BadRCODE  = 0x1001
 fromRCODE (UnknownRCODE x) = x
 
--- | From number to rcode.
+-- | Convert a numeric value to a corresponding 'RCODE'.  The behaviour
+-- is undefined for values outside the range @[0 .. 0xFFF]@ since the
+-- EDNS extended RCODE is a 12-bit value.  Values in the range
+-- @[0xF01 .. 0xFFF]@ are reserved for private use.
+--
 toRCODE :: Word16 -> RCODE
 toRCODE  0 = NoErr
 toRCODE  1 = FormatErr
@@ -766,16 +1144,16 @@ toRCODE  7 = YXRRSet
 toRCODE  8 = NXRRSet
 toRCODE  9 = NotAuth
 toRCODE 10 = NotZone
-toRCODE 16 = BadOpt
+toRCODE 16 = BadVers
+toRCODE 17 = BadKey
+toRCODE 18 = BadTime
+toRCODE 19 = BadMode
+toRCODE 20 = BadName
+toRCODE 21 = BadAlg
+toRCODE 22 = BadTrunc
+toRCODE 23 = BadCookie
+toRCODE 0x1001 = BadRCODE
 toRCODE  x = UnknownRCODE x
-
--- | From rcode to number for header (4bits only).
-fromRCODEforHeader :: RCODE -> Word16
-fromRCODEforHeader rc = fromRCODE rc .&. 0x0f
-
--- | From number in header to rcode (4bits only).
-toRCODEforHeader :: Word16 -> RCODE
-toRCODEforHeader w = toRCODE (w .&. 0x0f)
 #endif
 
 ----------------------------------------------------------------
@@ -871,71 +1249,100 @@ hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
 b64encode :: ByteString -> String
 b64encode = BS.unpack . B64.encode
 
--- | Type for resource records in the answer section.
+-- | Type alias for resource records in the answer section.
 type Answers = [ResourceRecord]
+
+-- | Type alias for resource records in the answer section.
+type AuthorityRecords = [ResourceRecord]
 
 -- | Type for resource records in the additional section.
 type AdditionalRecords = [ResourceRecord]
 
 ----------------------------------------------------------------
 
--- | Default query.
+-- | A 'DNSMessage' template for queries with default settings for
+-- the message 'DNSHeader' and 'EDNSheader'.  This is the initial
+-- query message state, before customization via 'QueryControls'.
+--
 defaultQuery :: DNSMessage
 defaultQuery = DNSMessage {
     header = DNSHeader {
        identifier = 0
      , flags = defaultDNSFlags
      }
+  , ednsHeader = EDNSheader defaultEDNS
   , question   = []
   , answer     = []
   , authority  = []
   , additional = []
   }
 
--- | Default response.
+-- | Default response.  When responding to EDNS queries, the response must
+-- either be an EDNS response, or else FormatErr must be returned.  The default
+-- response message has EDNS disabled ('ednsHeader' set to 'NoEDNS'), it should
+-- be updated as appropriate.
+--
+-- Do not explicitly add OPT RRs to the additional section, instead let the
+-- encoder compute and add the OPT record based on the EDNS pseudo-header.
+--
+-- The 'RCODE' in the 'DNSHeader' should be set to the appropriate 12-bit
+-- extended value, which will be split between the primary header and EDNS OPT
+-- record during message encoding (low 4 bits in DNS header, high 8 bits in
+-- EDNS OPT record).  See 'EDNSheader' for more details.
+--
 defaultResponse :: DNSMessage
-defaultResponse =
-  let hd = header defaultQuery
-      flg = flags hd
-  in  defaultQuery {
-        header = hd {
-          flags = flg {
+defaultResponse = DNSMessage {
+    header = DNSHeader {
+       identifier = 0
+     , flags = defaultDNSFlags {
               qOrR = QR_Response
             , authAnswer = True
             , recAvailable = True
             , authenData = False
-            }
-        }
-      }
+       }
+     }
+  , ednsHeader = NoEDNS
+  , question   = []
+  , answer     = []
+  , authority  = []
+  , additional = []
+  }
 
--- | Making a template query filled with ENDS additional RRs and
---   query flags.
-makeEmptyQuery :: AdditionalRecords -- ^ Additional RRs for EDNS.
-               -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+-- | A query template with 'QueryControls' overrides applied,
+-- with just the 'Question' and query 'Identifier' remaining
+-- to be filled in.
+--
+makeEmptyQuery :: QueryControls -- ^ Flag and EDNS overrides
                -> DNSMessage
-makeEmptyQuery adds fs = defaultQuery {
+makeEmptyQuery ctls = defaultQuery {
       header = header'
-    , additional = adds
+    , ednsHeader = queryEdns ehctls
     }
   where
-    -- fixme :: DO bit in "adds" should be overridden when
-    --          QueryFlags supports it.
-    header' = (header defaultQuery) { flags = queryDNSFlags fs }
+    hctls = qctlHeader ctls
+    ehctls = qctlEdns ctls
+    header' = (header defaultQuery) { flags = queryDNSFlags hctls }
 
--- | Making a query.
-makeQuery :: Identifier
-          -> Question
-          -> AdditionalRecords -- ^ Additional RRs for EDNS.
-          -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+-- | Construct a complete query 'DNSMessage', by combining the 'defaultQuery'
+-- template with the specified 'Identifier', and 'Question'.  The
+-- 'QueryControls' can be 'mempty' to leave all header and EDNS settings at
+-- their default values, or some combination of overrides.  A default set of
+-- overrides can be enabled via the 'Network.DNS.Resolver.resolvQueryControls'
+-- field of 'Network.DNS.Resolver.ResolvConf'.  Per-query overrides are
+-- possible by using 'Network.DNS.LookupRaw.loookupRawCtl'.
+--
+makeQuery :: Identifier        -- ^ Crypto random request id
+          -> Question          -- ^ Question name and type
+          -> QueryControls     -- ^ Custom RD\/AD\/CD flags and EDNS settings
           -> DNSMessage
-makeQuery idt q adds fs = empqry {
+makeQuery idt q ctls = empqry {
       header = (header empqry) { identifier = idt }
     , question = [q]
     }
   where
-    empqry = makeEmptyQuery adds fs
+    empqry = makeEmptyQuery ctls
 
--- | Making a response.
+-- | Construct a query response 'DNSMessage'.
 makeResponse :: Identifier
              -> Question
              -> Answers
@@ -949,117 +1356,196 @@ makeResponse idt q as = defaultResponse {
     header' = header defaultResponse
 
 ----------------------------------------------------------------
--- EDNS0 (RFC 6891)
+-- EDNS (RFC 6891, EDNS(0))
 ----------------------------------------------------------------
 
--- | EDNS0 infromation defined in RFC 6891.
-data EDNS0 = EDNS0 {
-    -- | UDP payload size.
-    udpSize  :: Word16
-    -- | Extended RCODE.
-  , extRCODE :: RCODE
-    -- | Is DNSSEC OK?
-  , dnssecOk :: Bool
-    -- | EDNS0 option data.
-  , options  :: [OData]
+-- | EDNS information defined in RFC 6891.
+data EDNS = EDNS {
+    -- | EDNS version, presently only version 0 is defined.
+    ednsVersion :: !Word8
+    -- | Supported UDP payload size.
+  , ednsUdpSize  :: !Word16
+    -- | Request DNSSEC replies (with RRSIG and NSEC records as as appropriate)
+    -- from the server.  Generally, not needed (except for diagnostic purposes)
+    -- unless the signatures will be validated.  Just setting the 'AD' bit in
+    -- the query and checking it in the response is sufficient (but often
+    -- subject to man-in-the-middle forgery) if all that's wanted is whether
+    -- the server validated the response.
+  , ednsDnssecOk :: Bool
+    -- | EDNS options (e.g. 'OD_NSID', 'OD_ClientSubnet', ...)
+  , ednsOptions  :: [OData]
   } deriving (Eq, Show)
 
-#if __GLASGOW_HASKELL__ >= 802
--- | Default information for EDNS0.
+-- | The default EDNS pseudo-header for queries.  The UDP buffer size is set to
+--   1216 bytes, which should result in replies that fit into the 1280 byte
+--   IPv6 minimum MTU.  Since IPv6 only supports fragmentation at the source,
+--   and even then not all gateways forward IPv6 pre-fragmented IPv6 packets,
+--   it is best to keep DNS packet sizes below this limit when using IPv6
+--   nameservers.  A larger value may be practical when using IPv4 exclusively.
 --
--- >>> defaultEDNS0
--- EDNS0 {udpSize = 4096, extRCODE = NoError, dnssecOk = False, options = []}
-#else
--- | Default information for EDNS0.
+-- @
+-- defaultEDNS = EDNS
+--     { ednsVersion = 0      -- The default EDNS version is 0
+--     , ednsUdpSize = 1216   -- IPv6-safe UDP MTU
+--     , ednsDnssecOk = False -- We don't do DNSSEC validation
+--     , ednsOptions = []     -- No EDNS options by default
+--     }
+-- @
 --
--- >>> defaultEDNS0
--- EDNS0 {udpSize = 4096, extRCODE = NoErr, dnssecOk = False, options = []}
-#endif
-defaultEDNS0 :: EDNS0
-defaultEDNS0 = EDNS0 4096 NoErr False []
+defaultEDNS :: EDNS
+defaultEDNS = EDNS
+    { ednsVersion = 0      -- The default EDNS version is 0
+    , ednsUdpSize = 1216   -- IPv6-safe UDP MTU
+    , ednsDnssecOk = False -- We don't do DNSSEC validation
+    , ednsOptions = []     -- No EDNS options by default
+    }
 
--- | Maximum UDP size. If 'udpSize' of 'EDNS0' is larger than this,
---   'fromEDNS0' uses this value instead.
+-- | Maximum UDP size that can be advertised.  If the 'ednsUdpSize' of 'EDNS'
+--   is larger, then this value is sent instead.  This value is likely to work
+--   only for local nameservers on the loopback network.  Servers may enforce
+--   a smaller limit.
 --
 -- >>> maxUdpSize
 -- 16384
 maxUdpSize :: Word16
 maxUdpSize = 16384
 
--- | Minimum UDP size. If 'udpSize' of 'EDNS0' is smaller than this,
---   'fromEDNS0' uses this value instead.
+-- | Minimum UDP size to advertise. If 'ednsUdpSize' of 'EDNS' is smaller,
+--   then this value is sent instead.
 --
 -- >>> minUdpSize
 -- 512
 minUdpSize :: Word16
 minUdpSize = 512
 
--- | Generating a resource record for the additional section based on EDNS0.
--- 'DNSFlags' is not generated.
--- Just set the same 'RCODE' to 'DNSFlags'.
-fromEDNS0 :: EDNS0 -> ResourceRecord
-fromEDNS0 edns = ResourceRecord name' type' class' ttl' rdata'
-  where
-    name'  = "."
-    type'  = OPT
-    class' = maxUdpSize `min` (minUdpSize `max` udpSize edns)
-    ttl0'   = fromIntegral (fromRCODE (extRCODE edns) .&. 0x0ff0) `shiftL` 20
-    ttl'
-      | dnssecOk edns = ttl0' `setBit` 15
-      | otherwise     = ttl0'
-    rdata' = RD_OPT $ options edns
-
--- | Generating EDNS0 information from the OPT RR.
-toEDNS0 :: DNSFlags -> ResourceRecord -> Maybe EDNS0
-toEDNS0 flgs (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
-    Just $ EDNS0 udpsiz (toRCODE erc) secok opts
-  where
-    lp = fromRCODEforHeader $ rcode flgs
-    up = shiftR (ttl' .&. 0xff000000) 20
-    erc = fromIntegral up .|. lp
-    secok = ttl' `testBit` 15
-toEDNS0 _ _ = Nothing
-
 ----------------------------------------------------------------
 
 #if __GLASGOW_HASKELL__ >= 802
--- | EDNS0 Option Code (RFC 6891).
+-- | EDNS Option Code (RFC 6891).
 newtype OptCode = OptCode {
     -- | From option code to number.
     fromOptCode :: Word16
   } deriving (Eq,Ord)
+
+-- | NSID (RFC5001, section 2.3)
+pattern NSID :: OptCode
+pattern NSID = OptCode 3
+
+-- | DNSSEC algorithm support (RFC6974, section 3)
+pattern DAU :: OptCode
+pattern DAU = OptCode 5
+pattern DHU :: OptCode
+pattern DHU = OptCode 6
+pattern N3U :: OptCode
+pattern N3U = OptCode 7
 
 -- | Client subnet (RFC7871)
 pattern ClientSubnet :: OptCode
 pattern ClientSubnet = OptCode 8
 
 instance Show OptCode where
+    show NSID         = "NSID"
+    show DAU          = "DAU"
+    show DHU          = "DHU"
+    show N3U          = "N3U"
     show ClientSubnet = "ClientSubnet"
-    show x            = "OptCode " ++ (show $ fromOptCode x)
+    show x            = "OptCode" ++ (show $ fromOptCode x)
 
 -- | From number to option code.
 toOptCode :: Word16 -> OptCode
 toOptCode = OptCode
 #else
 -- | Option Code (RFC 6891).
-data OptCode = ClientSubnet          -- ^ Client subnet (RFC7871)
+data OptCode = NSID                  -- ^ Name Server Identifier (RFC5001)
+             | DAU                   -- ^ DNSSEC Algorithm understood (RFC6975)
+             | DHU                   -- ^ DNSSEC Hash Understood (RFC6975)
+             | N3U                   -- ^ NSEC3 Hash Understood (RFC6975)
+             | ClientSubnet          -- ^ Client subnet (RFC7871)
              | UnknownOptCode Word16 -- ^ Unknown option code
     deriving (Eq, Ord, Show)
 
 -- | From option code to number.
 fromOptCode :: OptCode -> Word16
+fromOptCode NSID         = 3
+fromOptCode DAU          = 5
+fromOptCode DHU          = 6
+fromOptCode N3U          = 7
 fromOptCode ClientSubnet = 8
 fromOptCode (UnknownOptCode x) = x
 
 -- | From number to option code.
 toOptCode :: Word16 -> OptCode
+toOptCode 3 = NSID
+toOptCode 5 = DAU
+toOptCode 6 = DHU
+toOptCode 7 = N3U
 toOptCode 8 = ClientSubnet
 toOptCode x = UnknownOptCode x
 #endif
 
 ----------------------------------------------------------------
 
--- | Optional resource data.
-data OData = OD_ClientSubnet Word8 Word8 IP   -- ^ Client subnet (RFC7871)
-           | UnknownOData OptCode ByteString  -- ^ Unknown optional type
-    deriving (Eq,Show,Ord)
+-- | RData formats for a few EDNS options, and an opaque catcall
+data OData =
+      -- | Name Server Identifier (RFC5001).  Bidirectional, empty from client.
+      -- (opaque octet-string).  May contain binary data
+      OD_NSID ByteString
+      -- | DNSSEC Algorithm Understood (RFC6975).  Client to server.
+      -- (array of 8-bit numbers). Lists supported DNSKEY algorithms.
+    | OD_DAU [Word8]
+      -- | DS Hash Understood (RFC6975).  Client to server.
+      -- (array of 8-bit numbers). Lists supported DS hash algorithms.
+    | OD_DHU [Word8]
+      -- | NSEC3 Hash Understood (RFC6975).  Client to server.
+      -- (array of 8-bit numbers). Lists supported NSEC3 hash algorithms.
+    | OD_N3U [Word8]
+      -- | Client subnet (RFC7871).  Bidirectional.
+      -- (source bits, scope bits, address).
+      -- The address is masked and truncated per the specification when encoding.
+      -- The address is zero-padded when decoding.
+    | OD_ClientSubnet Word8 Word8 IP
+      -- | Unsupported or malformed IP client subnet option.  Bidirectional.
+      -- (address family, source bits, scope bits, opaque address).
+    | OD_ECSgeneric Word16 Word8 Word8 ByteString
+      -- | Generic EDNS option.
+      -- (numeric 'OptCode', opaque content)
+    | UnknownOData Word16 ByteString
+    deriving (Eq,Ord)
+
+
+-- | Recover the (often implicit) 'OptCode' from a value of the 'OData' sum
+-- type.
+odataToOptCode :: OData -> OptCode
+odataToOptCode (OD_NSID {})          = NSID
+odataToOptCode (OD_DAU {})           = DAU
+odataToOptCode (OD_DHU {})           = DHU
+odataToOptCode (OD_N3U {})           = N3U
+odataToOptCode (OD_ClientSubnet {})  = ClientSubnet
+odataToOptCode (OD_ECSgeneric {})    = ClientSubnet
+odataToOptCode (UnknownOData code _) = toOptCode code
+
+instance Show OData where
+    show (OD_NSID nsid) = showNSID nsid
+    show (OD_DAU as)    = showAlgList "DAU" as
+    show (OD_DHU hs)    = showAlgList "DHU" hs
+    show (OD_N3U hs)    = showAlgList "N3U" hs
+    show (OD_ClientSubnet b1 b2 ip@(IPv4 _)) = showECS 1 b1 b2 $ show ip
+    show (OD_ClientSubnet b1 b2 ip@(IPv6 _)) = showECS 2 b1 b2 $ show ip
+    show (OD_ECSgeneric fam b1 b2 a) = showECS fam b1 b2 $ hexencode a
+    show (UnknownOData code bs) = showUnknown code bs
+
+showAlgList :: String -> [Word8] -> String
+showAlgList nm ws = nm ++ " " ++ (List.intercalate "," $ map show ws)
+
+showNSID :: ByteString -> String
+showNSID nsid = "NSID" ++ " " ++ hexencode nsid ++ ";" ++ printable nsid
+  where
+    printable = BS.unpack. BS.map (\c -> if c < ' ' || c > '~' then '?' else c)
+
+showECS :: Word16 -> Word8 -> Word8 -> String -> String
+showECS family srcBits scpBits address =
+    show family ++ " " ++ show srcBits
+                ++ " " ++ show scpBits ++ " " ++ address
+
+showUnknown :: Word16 -> ByteString -> String
+showUnknown code bs = "UnknownOData " ++ show code ++ " " ++ hexencode bs

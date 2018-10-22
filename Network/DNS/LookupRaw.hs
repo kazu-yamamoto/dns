@@ -6,7 +6,7 @@ module Network.DNS.LookupRaw (
   , lookupAuth
   -- * Lookups returning DNS Messages
   , lookupRaw
-  , lookupRawWithFlags
+  , lookupRawCtl
   -- * DNS Message procesing
   , fromDNSMessage
   , fromDNSFormat
@@ -160,7 +160,6 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 ----------------------------------------------------------------
 
 -- | Look up a name and return the entire DNS Response.
--- Flags: RD: 'True', AD: 'False', CD: 'False'.
 --
 -- For a given DNS server, the queries are done:
 --
@@ -168,15 +167,15 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --    a new identifier is created atomically from the cryptographically
 --    secure pseudo random number generator for the target DNS server.
 --    Then UDP queries are tried with the limitation of 'resolvRetry'
---    (use EDNS0 if specifiecd).
---    If it appear that the target DNS server does not support EDNS0,
+--    (use EDNS if specifiecd).
+--    If it appears that the target DNS server does not support EDNS,
 --    it falls back to traditional queries.
 --
 --  * If the response is truncated, a new TCP socket bound to a new
---    locla port is created. Then exactly one TCP query is retried.
+--    local port is created. Then exactly one TCP query is retried.
 --
 --
--- If multiple DNS server are specified 'ResolvConf' ('RCHostNames ')
+-- If multiple DNS servers are specified 'ResolvConf' ('RCHostNames ')
 -- or found ('RCFilePath'), either sequential lookup or
 -- concurrent lookup is carried out:
 --
@@ -233,18 +232,18 @@ lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
           -> Domain     -- ^ Query domain
           -> TYPE       -- ^ Query RRtype
           -> IO (Either DNSError DNSMessage)
-lookupRaw rslv dom typ = lookupRawWithFlags rslv dom typ mempty
+lookupRaw rslv dom typ = lookupRawCtl rslv dom typ mempty
 
--- | Similar to 'lookupRaw' but the query-related flag bits are specified
--- via a 'QueryFlags' combination of overrides, which are generated as a
--- 'Monoid' by the 'rdFlag', 'adFlag' and 'cdFlag' combinators.
+-- | Similar to 'lookupRaw', but the default values of the RD, AD, CD and DO
+-- flag bits, as well as various EDNS features, can be adjusted via the
+-- 'QueryControls' parameter.
 --
-lookupRawWithFlags :: Resolver   -- ^ Resolver obtained via 'withResolver'
-                   -> Domain     -- ^ Query domain
-                   -> TYPE       -- ^ Query RRtype
-                   -> QueryFlags -- ^ RD, AD and CD flags
-                   -> IO (Either DNSError DNSMessage)
-lookupRawWithFlags rslv dom typ fl = resolve dom typ rslv fl receive
+lookupRawCtl :: Resolver      -- ^ Resolver obtained via 'withResolver'
+             -> Domain        -- ^ Query domain
+             -> TYPE          -- ^ Query RRtype
+             -> QueryControls -- ^ Query flag and EDNS overrides
+             -> IO (Either DNSError DNSMessage)
+lookupRawCtl rslv dom typ ctls = resolve dom typ rslv ctls receive
 
 ----------------------------------------------------------------
 
@@ -267,7 +266,8 @@ fromDNSMessage ans conv = case errcode ans of
     NameErr   -> Left NameError
     NotImpl   -> Left NotImplemented
     Refused   -> Left OperationRefused
-    BadOpt    -> Left BadOptRecord
+    BadVers   -> Left BadOptRecord
+    BadRCODE  -> Left $ DecodeError "Malformed EDNS message"
     _         -> Left UnknownDNSError
   where
     errcode = rcode . flags . header

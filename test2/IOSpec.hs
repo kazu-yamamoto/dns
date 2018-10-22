@@ -17,8 +17,8 @@ spec = describe "send/receive" $ do
         sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
         connect sock $ addrAddress addr
         -- Google's resolvers support the AD and CD bits
-        let qry = encodeQuestion 1 (Question "www.mew.org" A) [] $
-                  rdFlag FlagSet <> adFlag FlagSet <> cdFlag FlagSet
+        let qry = encodeQuestion 1 (Question "www.mew.org" A) $
+                  adFlag FlagSet <> ednsEnabled FlagClear
         send sock qry
         ans <- receive sock
         identifier (header ans) `shouldBe` 1
@@ -28,8 +28,8 @@ spec = describe "send/receive" $ do
         addr:_ <- getAddrInfo (Just hints) (Just "8.8.8.8") (Just "domain")
         sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
         connect sock $ addrAddress addr
-        let qry = encodeQuestion 1 (Question "www.mew.org" A) [] $
-                  rdFlag FlagSet <> adFlag FlagClear <> cdFlag FlagSet
+        let qry = encodeQuestion 1 (Question "www.mew.org" A) $
+                  adFlag FlagClear <> cdFlag FlagSet <> doFlag FlagSet
         sendVC sock qry
         ans <- receiveVC sock
         identifier (header ans) `shouldBe` 1

@@ -1,9 +1,70 @@
 # 3.1.0
 
-* Breaking change: lookupRawAD, composeQuery, composeQueryAD are removed.
-* A new API: lookupRawWithFlags, QueryFlags, FlagOp, rdFlag, adFlag, cdFlag,
+- TCP queries now also use EDNS, since the DO bit and other options
+  may be relevant, even when the UDP buffer size is not.  Therefore,
+  TCP now also does a non-EDNS fallback.
+- The resolvEDNS field is subsumed in resolvQueryControls and
+  removed.  The encodeQuestion function changes to no longer take
+  an explicit "EDNSheader" argument, instead the EDNS record is
+  built based on the supplied options.  Also the encodeQuestions
+  function has been removed, since we're deprecating it, but the
+  legacy interface can no longer be maintained.
+- New API: doFlag, ednsEnable, ednsSetVersion, ednsSetSize and
+  ednsSetOptions makes it possible for 'QueryControls' to adjust
+  EDNS settings.
+- Renamed:
+
+    resolvQueryFlags   -> resolvQueryControls,
+    lookupRawWithFlags -> lookupRawCtl
+    QueryFlags         -> QueryControls
+
+- Breaking change: the decoded EDNS record no longer contains
+  an error field.  Instead the header of decoded messages is
+  updated hold the extended error code when valid EDNS OPT records
+  (EDNS pseudo-headers) are found.  The remaining EDNS record
+  fields have been renamed:
+
+        udpSize  -> ednsBufferSize
+        dnssecOk -> ednsDnssecOk
+        options  -> ednsOptions
+
+  The reverse process happens on output with the 12-bit header
+  RCODE split across the wire-form DNS header and the OPT record.
+  When EDNS is not enabled, and the RCODE > 15, it is mapped to
+  FormatErr instead.
+- Breaking change: The fromRCODEforHeader and toRCODEforHeader
+  functions have been removed.
+- The fromDNSMessage function now distinguishes between FormatErr
+  responses without an OPT record (which signal no EDNS support),
+  and FormatErr with an OPT record, which signal problems
+  (malformed or unsupported version) with the OPT record received
+  in the request.  For the latter the 'BadOptRecord' error is
+  returned.
+- Added more RCODEs, including a BadRCODE that is generated
+  locally, rather than parsed from the message.  The value
+  lies just above the EDNS 12-bit range, with the bottom
+  12-bits matching FormatErr.
+- Breaking change: The DNSMessage structure now has an
+  "ednsHeader" field, initialized to "EDNSheader defaultEDNS"
+  in "defaultQuery" and to "NoEDNS" in "defaultResponse".
+  The former enables EDNS(0) with default options, the latter
+  leaves EDNS unconfigured.
+- The BadOpt RCODE is renamed to BadVers to better resemble
+  the term used in RFCs.
+- Added EDNS OPTIONS: NSID, DAU, DHU, N3U
+- Decoding of the ClientSubnet option is now a total function,
+  provided the RDATA is structurally sound.  Unexpected values
+  just yield OD_ECSgeneric results.
+- Breaking change: New OD_ECSgeneric EDNS constructor, represents
+  ClientSubnet values whose address family is not IP or that violate
+  the specification.  The "family" field distinguishes the two cases.
+- The ClientSubnet EDNS option is now encoded correctly even when the
+  source bits match some trailing all-zero bytes.
+- Breaking change: EDNS0 is renamed to EDNS.
+- Breaking change: lookupRawAD, composeQuery, composeQueryAD are removed.
+- A new API: lookupRawWithFlags, QueryFlags, FlagOp, rdFlag, adFlag, cdFlag,
   and resolvQueryFlags. [#116](https://github.com/kazu-yamamoto/dns/pull/116)
-* New OP codes: OP_NOTIFY and OP_UPDATE.
+- New OP codes: OP_NOTIFY and OP_UPDATE.
   [#113](https://github.com/kazu-yamamoto/dns/pull/113)
 
 # 3.0.4

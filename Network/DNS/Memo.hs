@@ -72,5 +72,16 @@ copy (RD_NSEC3PARAM a b c salt) = RD_NSEC3PARAM a b c $ B.copy salt
 copy (UnknownRData is)    = UnknownRData $ B.copy is
 
 copyOData :: OData -> OData
-copyOData o@(OD_ClientSubnet _ _ _) = o
+copyOData (OD_ECSgeneric family srcBits scpBits bs) =
+    OD_ECSgeneric family srcBits scpBits $ B.copy bs
+copyOData (OD_NSID nsid) = OD_NSID $ B.copy nsid
 copyOData (UnknownOData c b)        = UnknownOData c $ B.copy b
+
+-- No copying required for the rest, but avoiding a wildcard pattern match
+-- so that if more option types are added in the future, the compiler will
+-- complain about a partial function.
+--
+copyOData o@(OD_ClientSubnet {}) = o
+copyOData o@(OD_DAU {}) = o
+copyOData o@(OD_DHU {}) = o
+copyOData o@(OD_N3U {}) = o

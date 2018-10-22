@@ -10,7 +10,6 @@ module Network.DNS.IO (
   , sendVC
     -- ** Encoding queries for transmission
   , encodeQuestion
-  , encodeQuestions
     -- ** Creating query response messages
   , responseA
   , responseAAAA
@@ -125,43 +124,17 @@ sendAll sock bs = do
 #endif
 
 -- | The encoded 'DNSMessage' has the specified request ID.  The default values
--- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
--- parameter.  A suitable combination of flags can be created via the 'rdFlag',
--- 'adFlag' and 'cdFlag' generators of the 'Network.DNS.Types.QueryFlags'
--- 'Monoid'.
+-- of the RD, AD, CD and DO flag bits, as well as various EDNS features, can be
+-- adjusted via the 'QueryControls' parameter.
 --
 -- The caller is responsible for generating the ID via a securely seeded
 -- CSPRNG.
 --
-encodeQuestion :: Identifier
-                -> Question
-                -> AdditionalRecords -- ^ Additional RRs for EDNS.
-                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
+encodeQuestion :: Identifier     -- ^ Crypto random request id
+                -> Question      -- ^ Query name and type
+                -> QueryControls -- ^ Query flag and EDNS overrides
                 -> ByteString
-encodeQuestion idt q adds fs = encode $ makeQuery idt q adds fs
-
--- | The encoded 'DNSMessage' has the specified request ID.  The default values
--- of the RD, AD and CD flag bits may be updated via the 'QueryFlags'
--- parameter.  A suitable combination of flags can be created via the 'rdFlag',
--- 'adFlag' and 'cdFlag' generators of the 'Network.DNS.Types.QueryFlags'
--- 'Monoid'.
---
--- The caller is responsible for generating the ID via a securely seeded
--- CSPRNG.
---
-encodeQuestions :: Identifier
-                -> [Question]
-                -> AdditionalRecords -- ^ Additional RRs for EDNS.
-                -> QueryFlags        -- ^ Custom RD\/AD\/CD flags.
-                -> ByteString
-encodeQuestions idt qs adds fs = encode $ empqry {
-      header = (header empqry) { identifier = idt }
-    , question = qs
-    }
-  where
-    empqry = makeEmptyQuery adds fs
-
-{-# DEPRECATED encodeQuestions "Use encodeQuestion instead" #-}
+encodeQuestion idt q ctls = encode $ makeQuery idt q ctls
 
 ----------------------------------------------------------------
 

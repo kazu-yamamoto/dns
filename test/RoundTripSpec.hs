@@ -3,7 +3,9 @@
 module RoundTripSpec where
 
 import Control.Monad (replicateM)
-import Data.IP (IP (..), IPv4, IPv6, toIPv4, toIPv6)
+import qualified Data.IP
+import Data.IP (Addr, IP(..), IPv4, IPv6, toIPv4, toIPv6, makeAddrRange)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import Network.DNS.Decode
 import Network.DNS.Encode
@@ -44,7 +46,7 @@ spec = do
         decodeMailbox bs `shouldBe` Right dom
         fmap encodeMailbox (decodeMailbox bs) `shouldBe` Right bs
 
-    prop "DNSFlags" . forAll genDNSFlags $ \ flgs -> do
+    prop "DNSFlags" . forAll (genDNSFlags 0x0f) $ \ flgs -> do
         let bs = encodeDNSFlags flgs
         decodeDNSFlags bs `shouldBe` Right flgs
         fmap encodeDNSFlags (decodeDNSFlags bs) `shouldBe` Right bs
@@ -54,25 +56,29 @@ spec = do
         decodeResourceRecord bs `shouldBe` Right rr
         fmap encodeResourceRecord (decodeResourceRecord bs) `shouldBe` Right bs
 
-    prop "DNSHeader" . forAll genDNSHeader $ \ hdr ->
+    prop "DNSHeader" . forAll (genDNSHeader 0x0f) $ \ hdr ->
         decodeDNSHeader (encodeDNSHeader hdr) `shouldBe` Right hdr
 
     prop "DNSMessage" . forAll genDNSMessage $ \ msg ->
         decode (encode msg) `shouldBe` Right msg
 
-    prop "EDNS0" . forAll genEDNS0Header $ \(edns0,hdr) -> do
-        let rr0 = fromEDNS0 edns0
-            msg0 = DNSMessage hdr [] [] [] [rr0]
-            Right msg1 = decode $ encode msg0
-            medns1 = toEDNS0 (flags $ header msg0) (head $ additional msg1)
-        medns1 `shouldBe` Just edns0
+    prop "EDNS" . forAll genEDNSHeader $ \(edns, hdr) -> do
+        let eh = EDNSheader edns
+            Right m = decode. encode $ DNSMessage hdr eh [] [] [] []
+        ednsHeader m `shouldBe` eh
 
 ----------------------------------------------------------------
 
 genDNSMessage :: Gen DNSMessage
 genDNSMessage =
-    DNSMessage <$> genDNSHeader <*> listOf genQuestion <*> listOf genResourceRecord
-                <*> listOf genResourceRecord <*> listOf genResourceRecord
+    DNSMessage <$> genDNSHeader 0x0f <*> makeEDNS <*> listOf genQuestion
+               <*> listOf genResourceRecord  <*> listOf genResourceRecord
+               <*> listOf genResourceRecord
+  where
+    makeEDNS :: Gen EDNSheader
+    makeEDNS = genBool >>= \t ->
+        if t then EDNSheader <$> genEDNS
+             else pure $ NoEDNS
 
 
 genQuestion :: Gen Question
@@ -142,13 +148,13 @@ genMailbox = do
     bs <- genMboxString
     pure $ bs <> "."
 
-genDNSHeader :: Gen DNSHeader
-genDNSHeader = DNSHeader <$> genWord16 <*> genDNSFlags
+genDNSHeader :: Word16 -> Gen DNSHeader
+genDNSHeader maxrc = DNSHeader <$> genWord16 <*> genDNSFlags maxrc
 
-genDNSFlags :: Gen DNSFlags
-genDNSFlags =
-  DNSFlags <$> genQorR <*> genOPCODE <*> genBool <*> genBool
-           <*> genBool <*> genBool <*> genRCODE <*> genBool <*> genBool
+genDNSFlags :: Word16 -> Gen DNSFlags
+genDNSFlags maxrc =
+  DNSFlags <$> genQorR <*> genOPCODE <*> genBool        <*> genBool
+           <*> genBool <*> genBool   <*> genRCODE maxrc <*> genBool <*> genBool
 
 genWord16 :: Gen Word16
 genWord16 = arbitrary
@@ -168,37 +174,80 @@ genQorR = elements [minBound .. maxBound]
 genOPCODE :: Gen OPCODE
 genOPCODE  = elements [OP_STD, OP_INV, OP_SSR, OP_NOTIFY, OP_UPDATE]
 
-genRCODE :: Gen RCODE
-genRCODE = elements $ map toRCODE [0..15]
+genRCODE :: Word16 -> Gen RCODE
+genRCODE maxrc = elements $ map toRCODE [0..maxrc]
 
-genEDNS0 :: Gen EDNS0
-genEDNS0 = do
-    erc <- genExtRCODE
+genEDNS :: Gen EDNS
+genEDNS = do
+    vers <- genWord8
     ok <- genBool
     od <- genOData
-    return $ defaultEDNS0 {
-        extRCODE = erc
-      , dnssecOk = ok
-      , options  = [od]
+    us <- elements [minUdpSize..maxUdpSize]
+    return $ defaultEDNS {
+        ednsVersion = vers
+      , ednsUdpSize = us
+      , ednsDnssecOk = ok
+      , ednsOptions  = [od]
       }
 
 genOData :: Gen OData
 genOData = oneof
     [ genOD_Unknown
-    , OD_ClientSubnet <$> genWord8 <*> genWord8 <*> oneof [ IPv4 <$> genIPv4, IPv6 <$> genIPv6 ]
+    , genOD_ECS
     ]
   where
+    -- | Choose from the range reserved for local use
+    -- https://tools.ietf.org/html/rfc6891#section-9
     genOD_Unknown = do
+      opc <- elements [65001, 65534]
       bs <- genByteString
-      let opc = toOptCode $ fromIntegral $ BS.length bs
       pure $ UnknownOData opc bs
+
+    -- | Only valid ECS prefixes round-trip, make sure the prefix is
+    -- is consistent with the mask.
+    genOD_ECS = do
+        usev4 <- genBool
+        if usev4
+        then genFuzzed genIPv4 IPv4 Data.IP.fromIPv4  1 32
+        else genFuzzed genIPv6 IPv6 Data.IP.fromIPv6b 2 128
+      where
+        genFuzzed :: Addr a
+                  => Gen a
+                  -> (a -> IP)
+                  -> (a -> [Int])
+                  -> Word16
+                  -> Word8
+                  -> Gen OData
+        genFuzzed gen toIP toBytes fam alen = do
+            ip <- gen
+            bits1 <- elements [1 .. alen]
+            bits2 <- elements [0 .. alen]
+            fuzzSrcBits <- genBool
+            fuzzScpBits <- genBool
+            srcBits <- if not fuzzSrcBits
+                       then pure bits1
+                       else flip mod alen. (+) bits1 <$> elements [1..alen-1]
+            scpBits <- if not fuzzScpBits
+                       then pure bits2
+                       else elements [alen+1 .. 0xFF]
+            let addr  = Data.IP.addr. makeAddrRange ip $ fromIntegral bits1
+                bytes = map fromIntegral $ toBytes addr
+                len   = (fromIntegral bits1 + 7) `div` 8
+                less  = take (len - 1) bytes
+                more  = less ++ [0xFF]
+            if srcBits == bits1
+            then if scpBits == bits2
+                 then pure $ OD_ClientSubnet bits1 scpBits $ toIP addr
+                 else pure $ OD_ECSgeneric fam bits1 scpBits $ B.pack bytes
+            else if (srcBits < bits1)
+                 then pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack more
+                 else pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack less
 
 genExtRCODE :: Gen RCODE
 genExtRCODE = elements $ map toRCODE [0..4095]
 
-genEDNS0Header :: Gen (EDNS0, DNSHeader)
-genEDNS0Header = do
-    edns <- genEDNS0
-    hdr <- genDNSHeader
-    let flg = flags hdr
-    return (edns, hdr { flags =  flg { rcode = extRCODE edns } })
+genEDNSHeader :: Gen (EDNS, DNSHeader)
+genEDNSHeader = do
+    edns <- genEDNS
+    hdr <- genDNSHeader 0xF00
+    return (edns, hdr)

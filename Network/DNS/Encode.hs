@@ -16,7 +16,8 @@ import Control.Monad.State (State, modify, execState, gets)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.IP (IP(..), fromIPv4, fromIPv6b)
+import qualified Data.IP
+import Data.IP (IP(..), fromIPv4, fromIPv6b, makeAddrRange)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
@@ -51,23 +52,45 @@ encodeResourceRecord rr = runSPut $ putResourceRecord rr
 ----------------------------------------------------------------
 
 putDNSMessage :: DNSMessage -> SPut
-putDNSMessage msg = putHeader hdr
+putDNSMessage msg = putHeader hd
                     <> putNums
                     <> mconcat (map putQuestion qs)
                     <> mconcat (map putResourceRecord an)
                     <> mconcat (map putResourceRecord au)
                     <> mconcat (map putResourceRecord ad)
   where
-    putNums = mconcat $ fmap putInt16 [length qs
-                                         ,length an
-                                         ,length au
-                                         ,length ad
-                                         ]
-    hdr = header msg
+    putNums = mconcat $ fmap putInt16 [ length qs
+                                      , length an
+                                      , length au
+                                      , length ad
+                                      ]
+    hm = header msg
+    fl = flags hm
+    eh = ednsHeader msg
     qs = question msg
     an = answer msg
     au = authority msg
-    ad = additional msg
+    hd = ifEDNS eh hm $ hm { flags = fl { rcode = rc } }
+    rc = ifEDNS eh <$> id <*> nonEDNSrcode $ rcode fl
+      where
+        nonEDNSrcode code | fromRCODE code < 16 = code
+                          | otherwise           = FormatErr
+    ad = prependOpt $ additional msg
+      where
+        prependOpt ads = mapEDNS eh (fromEDNS ads $ fromRCODE rc) ads
+          where
+            fromEDNS :: AdditionalRecords -> Word16 -> EDNS -> AdditionalRecords
+            fromEDNS rrs rc' edns = ResourceRecord name' type' class' ttl' rdata' : rrs
+              where
+                name'  = BS.singleton '.'
+                type'  = OPT
+                class' = maxUdpSize `min` (minUdpSize `max` ednsUdpSize edns)
+                ttl0'  = fromIntegral (rc' .&. 0xff0) `shiftL` 20
+                vers'  = fromIntegral (ednsVersion edns) `shiftL` 16
+                ttl'
+                  | ednsDnssecOk edns = ttl0' `setBit` 15 .|. vers'
+                  | otherwise         = ttl0' .|. vers'
+                rdata' = RD_OPT $ ednsOptions edns
 
 putHeader :: DNSHeader -> SPut
 putHeader hdr = putIdentifier (identifier hdr)
@@ -83,7 +106,7 @@ putDNSFlags DNSFlags{..} = put16 word
 
     st :: State Word16 ()
     st = sequence_
-              [ set (fromIntegral $ fromRCODEforHeader rcode)
+              [ set (fromRCODE rcode .&. 0x0f)
               , when chkDisable          $ set (bit 4)
               , when authenData          $ set (bit 5)
               , when recAvailable        $ set (bit 7)
@@ -174,25 +197,63 @@ putRData rd = case rd of
         ]
     UnknownRData bytes -> putByteString bytes
 
-putOData :: OData -> SPut
-putOData (OD_ClientSubnet srcNet scpNet ip) =
-    let dropZeroes = dropWhileEnd (==0)
-        (fam,raw) = case ip of
-                        IPv4 ip4 -> (1,dropZeroes $ fromIPv4 ip4)
-                        IPv6 ip6 -> (2,dropZeroes $ fromIPv6b ip6)
-        dataLen = 2 + 2 + length raw
-     in mconcat [ put16 $ fromOptCode ClientSubnet
-                , putInt16 dataLen
-                , putInt16 fam
-                , put8 srcNet
-                , put8 scpNet
-                , mconcat $ fmap putInt8 raw
-                ]
-putOData (UnknownOData code bs) =
-    mconcat [ put16 $ fromOptCode code
+-- | Encode EDNS OPTION consisting of a list of octets.
+putODWords :: Word16 -> [Word8] -> SPut
+putODWords code ws =
+     mconcat [ put16 code
+             , putInt16 $ length ws
+             , mconcat $ map put8 ws
+             ]
+
+-- | Encode an EDNS OPTION byte string.
+putODBytes :: Word16 -> ByteString -> SPut
+putODBytes code bs =
+    mconcat [ put16 code
             , putInt16 $ BS.length bs
             , putByteString bs
             ]
+
+putOData :: OData -> SPut
+putOData (OD_NSID nsid) = putODBytes (fromOptCode NSID) nsid
+putOData (OD_DAU as) = putODWords (fromOptCode DAU) as
+putOData (OD_DHU hs) = putODWords (fromOptCode DHU) hs
+putOData (OD_N3U hs) = putODWords (fromOptCode N3U) hs
+putOData (OD_ClientSubnet srcBits scpBits ip) =
+    -- https://tools.ietf.org/html/rfc7871#section-6
+    --
+    -- o  ADDRESS, variable number of octets, contains either an IPv4 or
+    --    IPv6 address, depending on FAMILY, which MUST be truncated to the
+    --    number of bits indicated by the SOURCE PREFIX-LENGTH field,
+    --    padding with 0 bits to pad to the end of the last octet needed.
+    --
+    -- o  A server receiving an ECS option that uses either too few or too
+    --    many ADDRESS octets, or that has non-zero ADDRESS bits set beyond
+    --    SOURCE PREFIX-LENGTH, SHOULD return FORMERR to reject the packet,
+    --    as a signal to the software developer making the request to fix
+    --    their implementation.
+    --
+    let octets = fromIntegral $ (srcBits + 7) `div` 8
+        prefix addr = Data.IP.addr $ makeAddrRange addr $ fromIntegral srcBits
+        (family, raw) = case ip of
+                        IPv4 ip4 -> (1, take octets $ fromIPv4  $ prefix ip4)
+                        IPv6 ip6 -> (2, take octets $ fromIPv6b $ prefix ip6)
+        dataLen = 2 + 2 + octets
+     in mconcat [ put16 $ fromOptCode ClientSubnet
+                , putInt16 dataLen
+                , put16 family
+                , put8 srcBits
+                , put8 scpBits
+                , mconcat $ fmap putInt8 raw
+                ]
+putOData (OD_ECSgeneric family srcBits scpBits addr) =
+    mconcat [ put16 $ fromOptCode ClientSubnet
+            , putInt16 $ 4 + BS.length addr
+            , put16 family
+            , put8 srcBits
+            , put8 scpBits
+            , putByteString addr
+            ]
+putOData (UnknownOData code bs) = putODBytes code bs
 
 -- In the case of the TXT record, we need to put the string length
 -- fixme : What happens with the length > 256 ?

@@ -12,7 +12,9 @@ module Network.DNS.Decode.Internal (
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
-import Data.IP (IP(..), toIPv4, toIPv6b)
+import qualified Data.IP
+import Data.IP (IP(..), toIPv4, toIPv6b, makeAddrRange)
+import Data.List (partition)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
@@ -22,15 +24,45 @@ import Network.DNS.Types
 
 getResponse :: SGet DNSMessage
 getResponse = do
-    hd <- getHeader
+    hm <- getHeader
     qdCount <- getInt16
     anCount <- getInt16
     nsCount <- getInt16
     arCount <- getInt16
-    DNSMessage hd <$> getQueries qdCount
-                  <*> getResourceRecords anCount
-                  <*> getResourceRecords nsCount
-                  <*> getResourceRecords arCount
+    queries <- getQueries qdCount
+    answers <- getResourceRecords anCount
+    authrrs <- getResourceRecords nsCount
+    addnrrs <- getResourceRecords arCount
+    let (opts, rest) = partition ((==) OPT. rrtype) addnrrs
+        flgs         = flags hm
+        rc           = fromRCODE $ rcode flgs
+        (eh, erc)    = getEDNS rc opts
+        hd           = hm { flags = flgs { rcode = erc } }
+    pure $ DNSMessage hd eh queries answers authrrs $ ifEDNS eh rest addnrrs
+
+  where
+
+    -- | Get EDNS pseudo-header and the high eight bits of the extended RCODE.
+    --
+    getEDNS :: Word16 -> AdditionalRecords -> (EDNSheader, RCODE)
+    getEDNS rc rrs = case rrs of
+        rr : [] | Just (edns, erc) <- optEDNS rr
+               -> (EDNSheader edns, toRCODE erc)
+        []     -> (NoEDNS, toRCODE rc)
+        _      -> (InvalidEDNS, BadRCODE)
+
+      where
+
+        -- | Extract EDNS information from an OPT RR.
+        --
+        optEDNS :: ResourceRecord -> Maybe (EDNS, Word16)
+        optEDNS (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
+            let hrc      = fromIntegral rc .&. 0x0f
+                erc      = shiftR (ttl' .&. 0xff000000) 20 .|. hrc
+                secok    = ttl' `testBit` 15
+                vers     = fromIntegral $ shiftR (ttl' .&. 0x00ff0000) 16
+             in Just (EDNS vers udpsiz secok opts, fromIntegral erc)
+        optEDNS _ = Nothing
 
 ----------------------------------------------------------------
 
@@ -42,14 +74,13 @@ getDNSFlags = do
     toFlags :: Word16 -> Maybe DNSFlags
     toFlags flgs = do
       oc <- getOpcode flgs
-      let rc = getRcode flgs
       return $ DNSFlags (getQorR flgs)
                         oc
                         (getAuthAnswer flgs)
                         (getTrunCation flgs)
                         (getRecDesired flgs)
                         (getRecAvailable flgs)
-                        rc
+                        (getRcode flgs)
                         (getAuthenData flgs)
                         (getChkDisable flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
@@ -58,7 +89,7 @@ getDNSFlags = do
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8
     getRecAvailable w = testBit w 7
-    getRcode w = toRCODEforHeader $ fromIntegral w
+    getRcode w = toRCODE $ w .&. 0x0f
     getAuthenData w = testBit w 5
     getChkDisable w = testBit w 4
 
@@ -207,17 +238,57 @@ getRData NSEC3PARAM len = RD_NSEC3PARAM <$> decodeHashAlg
 getRData _  len = UnknownRData <$> getNByteString len
 
 getOData :: OptCode -> Int -> SGet OData
+getOData NSID len = OD_NSID          <$> getNByteString len
+getOData DAU  len = OD_DAU. B.unpack <$> getNByteString len
+getOData DHU  len = OD_DHU. B.unpack <$> getNByteString len
+getOData N3U  len = OD_N3U. B.unpack <$> getNByteString len
 getOData ClientSubnet len = do
-        fam <- getInt16
-        srcMask <- get8
-        scpMask <- get8
-        rawip <- fmap fromIntegral . B.unpack <$> getNByteString (len - 4) -- 4 = 2 + 1 + 1
-        ip <- case fam of
-                    1 -> pure . IPv4 . toIPv4 $ take 4 (rawip ++ repeat 0)
-                    2 -> pure . IPv6 . toIPv6b $ take 16 (rawip ++ repeat 0)
-                    _ -> fail "Unsupported address family"
-        pure $ OD_ClientSubnet srcMask scpMask ip
-getOData opc len = UnknownOData opc <$> getNByteString len
+        family  <- get16
+        srcBits <- get8
+        scpBits <- get8
+        addrbs  <- getNByteString (len - 4) -- 4 = 2 + 1 + 1
+        --
+        -- https://tools.ietf.org/html/rfc7871#section-6
+        --
+        -- o  ADDRESS, variable number of octets, contains either an IPv4 or
+        --    IPv6 address, depending on FAMILY, which MUST be truncated to the
+        --    number of bits indicated by the SOURCE PREFIX-LENGTH field,
+        --    padding with 0 bits to pad to the end of the last octet needed.
+        --
+        -- o  A server receiving an ECS option that uses either too few or too
+        --    many ADDRESS octets, or that has non-zero ADDRESS bits set beyond
+        --    SOURCE PREFIX-LENGTH, SHOULD return FORMERR to reject the packet,
+        --    as a signal to the software developer making the request to fix
+        --    their implementation.
+        --
+        -- In order to avoid needless decoding errors, when the ECS encoding
+        -- requirements are violated, we construct an OD_ECSgeneric OData,
+        -- instread of an IP-specific OD_ClientSubnet OData, which will only
+        -- be used for valid inputs.  When the family is neither IPv4(1) nor
+        -- IPv6(2), or the address prefix is not correctly encoded (too long
+        -- or too short), the OD_ECSgeneric data contains the verbatim input
+        -- from the peer.
+        --
+        case BS.length addrbs == (fromIntegral srcBits + 7) `div` 8 of
+            True | Just ip <- bstoip family addrbs srcBits scpBits
+                -> pure $ OD_ClientSubnet srcBits scpBits ip
+            _   -> pure $ OD_ECSgeneric family srcBits scpBits addrbs
+  where
+    prefix addr bits = Data.IP.addr $ makeAddrRange addr $ fromIntegral bits
+    zeropad = (++ repeat 0). map fromIntegral. B.unpack
+    checkBits fromBytes toIP srcBits scpBits bytes =
+        let addr       = fromBytes bytes
+            maskedAddr = prefix addr srcBits
+            maxBits    = fromIntegral $ 8 * length bytes
+         in if addr == maskedAddr && scpBits <= maxBits
+            then Just $ toIP addr
+            else Nothing
+    bstoip :: Word16 -> B.ByteString -> Word8 -> Word8 -> Maybe IP
+    bstoip family bs srcBits scpBits = case family of
+        1 -> checkBits toIPv4  IPv4 srcBits scpBits $ take 4  $ zeropad bs
+        2 -> checkBits toIPv6b IPv6 srcBits scpBits $ take 16 $ zeropad bs
+        _ -> Nothing
+getOData opc len = UnknownOData (fromOptCode opc) <$> getNByteString len
 
 ----------------------------------------------------------------
 
