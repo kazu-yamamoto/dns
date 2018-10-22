@@ -78,14 +78,11 @@ genDNSMessage =
     makeEDNS :: Gen EDNSheader
     makeEDNS = genBool >>= \t ->
         if t then EDNSheader <$> genEDNS
-             else pure $ NoEDNS
+             else pure NoEDNS
 
 
 genQuestion :: Gen Question
-genQuestion = do
-    typ <- genTYPE
-    dom <- genDomain
-    pure $ Question dom typ
+genQuestion = Question <$> genDomain <*> genTYPE
 
 genTYPE :: Gen TYPE
 genTYPE = frequency
@@ -184,8 +181,8 @@ genEDNS = do
     od <- genOData
     us <- elements [minUdpSize..maxUdpSize]
     return $ defaultEDNS {
-        ednsVersion = vers
-      , ednsUdpSize = us
+        ednsVersion  = vers
+      , ednsUdpSize  = us
       , ednsDnssecOk = ok
       , ednsOptions  = [od]
       }
@@ -198,10 +195,7 @@ genOData = oneof
   where
     -- | Choose from the range reserved for local use
     -- https://tools.ietf.org/html/rfc6891#section-9
-    genOD_Unknown = do
-      opc <- elements [65001, 65534]
-      bs <- genByteString
-      pure $ UnknownOData opc bs
+    genOD_Unknown = UnknownOData <$> elements [65001, 65534] <*> genByteString
 
     -- | Only valid ECS prefixes round-trip, make sure the prefix is
     -- is consistent with the mask.
@@ -239,7 +233,7 @@ genOData = oneof
             then if scpBits == bits2
                  then pure $ OD_ClientSubnet bits1 scpBits $ toIP addr
                  else pure $ OD_ECSgeneric fam bits1 scpBits $ B.pack bytes
-            else if (srcBits < bits1)
+            else if srcBits < bits1
                  then pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack more
                  else pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack less
 
