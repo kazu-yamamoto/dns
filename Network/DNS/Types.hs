@@ -55,17 +55,13 @@ module Network.DNS.Types (
   , defaultQuery
   -- ** Query Controls
   , QueryControls
-  -- *** Header Controls
-  , HeaderControls
   , rdFlag
   , adFlag
   , cdFlag
-  -- *** EDNS Controls
-  , EdnsControls
+  , doFlag
   , ednsEnabled
   , ednsSetVersion
   , ednsSetUdpSize
-  , doFlag
   , ednsSetOptions
   -- *** Flag and OData control operations
   , FlagOp(..)
@@ -789,8 +785,7 @@ queryEdns (EdnsControls en vn sz d0 od) =
 
 ----------------------------------------------------------------
 
--- | Query controls.  A composable combination of 'HeaderControls' and
--- 'EdnsControls'.  Query controls form a 'Monoid', as with function
+-- | Query controls. Query controls form a 'Monoid', as with function
 -- composition, the left-most value has the last say.
 --
 data QueryControls = QueryControls
