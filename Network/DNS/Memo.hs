@@ -81,7 +81,7 @@ copyOData (UnknownOData c b)        = UnknownOData c $ B.copy b
 -- so that if more option types are added in the future, the compiler will
 -- complain about a partial function.
 --
-copyOData o@(OD_ClientSubnet {}) = o
-copyOData o@(OD_DAU {}) = o
-copyOData o@(OD_DHU {}) = o
-copyOData o@(OD_N3U {}) = o
+copyOData o@OD_ClientSubnet {} = o
+copyOData o@OD_DAU {} = o
+copyOData o@OD_DHU {} = o
+copyOData o@OD_N3U {} = o

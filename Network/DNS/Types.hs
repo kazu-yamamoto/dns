@@ -1516,12 +1516,12 @@ data OData =
 -- | Recover the (often implicit) 'OptCode' from a value of the 'OData' sum
 -- type.
 odataToOptCode :: OData -> OptCode
-odataToOptCode (OD_NSID {})          = NSID
-odataToOptCode (OD_DAU {})           = DAU
-odataToOptCode (OD_DHU {})           = DHU
-odataToOptCode (OD_N3U {})           = N3U
-odataToOptCode (OD_ClientSubnet {})  = ClientSubnet
-odataToOptCode (OD_ECSgeneric {})    = ClientSubnet
+odataToOptCode OD_NSID {}            = NSID
+odataToOptCode OD_DAU {}             = DAU
+odataToOptCode OD_DHU {}             = DHU
+odataToOptCode OD_N3U {}             = N3U
+odataToOptCode OD_ClientSubnet {}    = ClientSubnet
+odataToOptCode OD_ECSgeneric {}      = ClientSubnet
 odataToOptCode (UnknownOData code _) = toOptCode code
 
 instance Show OData where
@@ -1535,7 +1535,7 @@ instance Show OData where
     show (UnknownOData code bs) = showUnknown code bs
 
 showAlgList :: String -> [Word8] -> String
-showAlgList nm ws = nm ++ " " ++ (List.intercalate "," $ map show ws)
+showAlgList nm ws = nm ++ " " ++ List.intercalate "," (map show ws)
 
 showNSID :: ByteString -> String
 showNSID nsid = "NSID" ++ " " ++ hexencode nsid ++ ";" ++ printable nsid

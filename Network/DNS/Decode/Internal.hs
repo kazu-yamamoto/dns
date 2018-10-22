@@ -46,7 +46,7 @@ getResponse = do
     --
     getEDNS :: Word16 -> AdditionalRecords -> (EDNSheader, RCODE)
     getEDNS rc rrs = case rrs of
-        rr : [] | Just (edns, erc) <- optEDNS rr
+        [rr] | Just (edns, erc) <- optEDNS rr
                -> (EDNSheader edns, toRCODE erc)
         []     -> (NoEDNS, toRCODE rc)
         _      -> (InvalidEDNS, BadRCODE)
@@ -144,14 +144,14 @@ getRData MX _ = RD_MX <$> decodePreference <*> getDomain
     decodePreference = get16
 getRData CNAME _ = RD_CNAME <$> getDomain
 getRData DNAME _ = RD_DNAME <$> getDomain
-getRData TXT len = (RD_TXT . ignoreLength) <$> getNByteString len
+getRData TXT len = RD_TXT . ignoreLength <$> getNByteString len
   where
     ignoreLength = BS.drop 1
 getRData A len
-  | len == 4  = (RD_A . toIPv4) <$> getNBytes len
+  | len == 4  = RD_A . toIPv4 <$> getNBytes len
   | otherwise = fail "IPv4 addresses must be 4 bytes long"
 getRData AAAA len
-  | len == 16 = (RD_AAAA . toIPv6b) <$> getNBytes len
+  | len == 16 = RD_AAAA . toIPv6b <$> getNBytes len
   | otherwise = fail "IPv6 addresses must be 16 bytes long"
 getRData SOA _ = RD_SOA    <$> getDomain
                            <*> getMailbox
@@ -168,9 +168,9 @@ getRData SOA _ = RD_SOA    <$> getDomain
     decodeMinimum = get32
 getRData PTR _ = RD_PTR <$> getDomain
 getRData SRV _ = RD_SRV <$> decodePriority
-                           <*> decodeWeight
-                           <*> decodePort
-                           <*> getDomain
+                        <*> decodeWeight
+                        <*> decodePort
+                        <*> getDomain
   where
     decodePriority = get16
     decodeWeight   = get16
@@ -188,9 +188,9 @@ getRData OPT ol = RD_OPT <$> decode' ol
             (dat:) <$> decode' (l - optLen - 4)
 --
 getRData TLSA len = RD_TLSA <$> decodeUsage
-                               <*> decodeSelector
-                               <*> decodeMType
-                               <*> decodeADF
+                            <*> decodeSelector
+                            <*> decodeMType
+                            <*> decodeADF
   where
     decodeUsage    = get8
     decodeSelector = get8
@@ -198,9 +198,9 @@ getRData TLSA len = RD_TLSA <$> decodeUsage
     decodeADF      = getNByteString (len - 3)
 --
 getRData DS len = RD_DS <$> decodeTag
-                           <*> decodeAlg
-                           <*> decodeDtyp
-                           <*> decodeDval
+                        <*> decodeAlg
+                        <*> decodeDtyp
+                        <*> decodeDval
   where
     decodeTag  = get16
     decodeAlg  = get8
@@ -231,7 +231,7 @@ getRData NSEC3PARAM len = RD_NSEC3PARAM <$> decodeHashAlg
         let n = len - 5
         slen <- get8
         guard $ fromIntegral slen == n
-        if (n == 0)
+        if n == 0
         then return B.empty
         else getNByteString n
 --
