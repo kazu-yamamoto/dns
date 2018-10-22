@@ -1,5 +1,10 @@
 # 4.0.0
 
+- Re-export 'sendAll' and export 'encodeVC' for use with TCP.
+- No longer using sendAll with UDP, UDP datagrams must not be sent
+  piece-by-piece
+- Removed socket I/O work-around for no longer supported GHC versions
+  on Windows.
 - TCP queries now also use EDNS, since the DO bit and other options
   may be relevant, even when the UDP buffer size is not.  Therefore,
   TCP now also does a non-EDNS fallback.

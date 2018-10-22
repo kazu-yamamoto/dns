@@ -8,39 +8,26 @@ module Network.DNS.IO (
     -- * Sending pre-encoded messages
   , send
   , sendVC
+  , sendAll
     -- ** Encoding queries for transmission
   , encodeQuestion
+  , encodeVC
     -- ** Creating query response messages
   , responseA
   , responseAAAA
   ) where
 
-#if !defined(mingw32_HOST_OS)
-#define POSIX
-#else
-#define WIN
-#endif
-
-#if __GLASGOW_HASKELL__ < 709
-#define GHC708
-#endif
-
 import qualified Control.Exception as E
+import Control.Monad (void)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
 import Data.IP (IPv4, IPv6)
 import Network.Socket (Socket)
+import Network.Socket.ByteString (recv)
+import qualified Network.Socket.ByteString as Socket
 import System.IO.Error
-
-
-#if defined(WIN) && defined(GHC708)
-import Network.Socket (send, recv)
-import qualified Data.ByteString.Char8 as BS
-#else
-import Network.Socket.ByteString (sendAll, recv)
-#endif
 
 import Network.DNS.Decode (decode)
 import Network.DNS.Encode (encode)
@@ -49,8 +36,11 @@ import Network.DNS.Types
 
 ----------------------------------------------------------------
 
--- | Receiving DNS data from 'Socket' and parse it.
-
+-- | Receive and decode a single 'DNSMessage' from a UDP 'Socket'.  Messages
+-- longer than 'maxUdpSize' are silently truncated, but this should not occur
+-- in practice, since we cap the advertised EDNS UDP buffer size limit at the
+-- same value.  A 'DNSError' is raised if I/O or message decoding fails.
+--
 receive :: Socket -> IO DNSMessage
 receive sock = do
     let bufsiz = fromIntegral maxUdpSize
@@ -59,9 +49,10 @@ receive sock = do
         Left  e   -> E.throwIO e
         Right msg -> return msg
 
--- | Receive and parse a single virtual-circuit (TCP) query or response.
---   It is up to the caller to implement any desired timeout.
-
+-- | Receive and decode a single 'DNSMesage' from a virtual-circuit (TCP).  It
+-- is up to the caller to implement any desired timeout. An 'DNSError' is
+-- raised if I/O or message decoding fails.
+--
 receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = do
     len <- toLen <$> recvDNS sock 2
@@ -101,27 +92,34 @@ recvDNS sock len = recv1 `E.catch` \e -> E.throwIO $ NetworkFailure e
 
 ----------------------------------------------------------------
 
--- | Sending composed query or response to 'Socket'.
+-- | Send an encoded 'DNSMessage' datagram over UDP.  The message length is
+-- implicit in the size of the UDP datagram.  With TCP you must use 'sendVC',
+-- because TCP does not have message boundaries, and each message needs to be
+-- prepended with an explicit length.  The socket must be explicitly connected
+-- to the destination nameserver.
+--
 send :: Socket -> ByteString -> IO ()
-send sock legacyQuery = sendAll sock legacyQuery
+send = (void .). Socket.send
+{-# INLINE send #-}
 
--- | Sending composed query or response to a single virtual-circuit (TCP).
+-- | Send a single encoded 'DNSMessage' over TCP.  An explicit length is
+-- prepended to the encoded buffer before transmission.  If you want to
+-- send a batch of multiple encoded messages back-to-back over a single
+-- TCP connection, and then loop to collect the results, use 'encodeVC'
+-- to prefix each message with a length, and then use 'sendAll' to send
+-- a concatenated batch of the resulting encapsulated messages.
+--
 sendVC :: Socket -> ByteString -> IO ()
-sendVC vc legacyQuery = sendAll vc $ encodeVC legacyQuery
+sendVC = (. encodeVC). sendAll
+{-# INLINE sendVC #-}
 
--- | Encoding for virtual circuit.
-encodeVC :: ByteString -> ByteString
-encodeVC legacyQuery =
-    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length legacyQuery
-    in len <> legacyQuery
-
-#if defined(WIN) && defined(GHC708)
--- Windows does not support sendAll in Network.ByteString for older GHCs.
+-- | Send one or more encoded 'DNSMessage' buffers over TCP, each allready
+-- encapsulated with an explicit length prefix (perhaps via 'encodeVC') and
+-- then concatenated into a single buffer.  DO NOT use 'sendAll' with UDP.
+--
 sendAll :: Socket -> BS.ByteString -> IO ()
-sendAll sock bs = do
-  sent <- send sock (BS.unpack bs)
-  when (sent < fromIntegral (BS.length bs)) $ sendAll sock (BS.drop (fromIntegral sent) bs)
-#endif
+sendAll = Socket.sendAll
+{-# INLINE sendAll #-}
 
 -- | The encoded 'DNSMessage' has the specified request ID.  The default values
 -- of the RD, AD, CD and DO flag bits, as well as various EDNS features, can be
@@ -136,16 +134,38 @@ encodeQuestion :: Identifier     -- ^ Crypto random request id
                 -> ByteString
 encodeQuestion idt q ctls = encode $ makeQuery idt q ctls
 
+-- | Encapsulate an encoded 'DNSMessage' buffer for transmission over a TCP
+-- virtual circuit.  With TCP the buffer needs to start with an explicit
+-- length (the length is implicit with UDP).
+--
+encodeVC :: ByteString -> ByteString
+encodeVC legacyQuery =
+    let len = LBS.toStrict . BB.toLazyByteString $ BB.int16BE $ fromIntegral $ BS.length legacyQuery
+    in len <> legacyQuery
+{-# INLINE encodeVC #-}
+
 ----------------------------------------------------------------
 
--- | Composing a response from IPv4 addresses
+-- | Compose a response with a single IPv4 RRset.  If the query
+-- had an EDNS pseudo-header, a suitable EDNS pseudo-header must
+-- be added to the response message, or else a 'FormatErr' response
+-- must be sent.  The response TTL, defaults to 300 seconds, and
+-- should be updated (to the same value across all the RRs) if some
+-- other TTL value is more appropriate.
+--
 responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
 responseA idt q ips = makeResponse idt q as
   where
     dom = qname q
     as  = ResourceRecord dom A classIN 300 . RD_A <$> ips
 
--- | Composing a response from IPv6 addresses
+-- | Compose a response with a single IPv6 RRset.  If the query
+-- had an EDNS pseudo-header, a suitable EDNS pseudo-header must
+-- be added to the response message, or else a 'FormatErr' response
+-- must be sent.  The response TTL, defaults to 300 seconds, and
+-- should be updated (to the same value across all the RRs) if some
+-- other TTL value is more appropriate.
+--
 responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
 responseAAAA idt q ips = makeResponse idt q as
   where
