@@ -29,6 +29,8 @@
   FormatErr instead.
 - Breaking change: The fromRCODEforHeader and toRCODEforHeader
   functions have been removed.
+- Breaking change: DNSFormat and fromDNSFormat
+  have been removed.
 - The fromDNSMessage function now distinguishes between FormatErr
   responses without an OPT record (which signal no EDNS support),
   and FormatErr with an OPT record, which signal problems

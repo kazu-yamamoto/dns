@@ -49,7 +49,6 @@ module Network.DNS.Types (
   , RData (..)
   -- * DNS Message
   , DNSMessage (..)
-  , DNSFormat
   -- ** Query
   , makeQuery
   , makeEmptyQuery
@@ -474,10 +473,6 @@ data DNSMessage = DNSMessage {
   , authority  :: AuthorityRecords  -- ^ RRs pointing toward an authority
   , additional :: AdditionalRecords -- ^ RRs holding additional information
   } deriving (Eq, Show)
-
-{-# DEPRECATED DNSFormat "Use DNSMessage instead" #-}
--- | For backward compatibility.
-type DNSFormat = DNSMessage
 
 -- | An identifier assigned by the program that
 --   generates any kind of query.

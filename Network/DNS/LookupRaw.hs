@@ -9,7 +9,6 @@ module Network.DNS.LookupRaw (
   , lookupRawCtl
   -- * DNS Message procesing
   , fromDNSMessage
-  , fromDNSFormat
   ) where
 
 import Data.Time (getCurrentTime, addUTCTime)
@@ -271,8 +270,3 @@ fromDNSMessage ans conv = case errcode ans of
     _         -> Left UnknownDNSError
   where
     errcode = rcode . flags . header
-
-{-# DEPRECATED fromDNSFormat "Use fromDNSMessage instead" #-}
--- | For backward compatibility.
-fromDNSFormat :: DNSMessage -> (DNSMessage -> a) -> Either DNSError a
-fromDNSFormat = fromDNSMessage
