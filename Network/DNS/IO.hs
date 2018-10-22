@@ -149,7 +149,7 @@ encodeVC legacyQuery =
 -- | Compose a response with a single IPv4 RRset.  If the query
 -- had an EDNS pseudo-header, a suitable EDNS pseudo-header must
 -- be added to the response message, or else a 'FormatErr' response
--- must be sent.  The response TTL, defaults to 300 seconds, and
+-- must be sent.  The response TTL defaults to 300 seconds, and
 -- should be updated (to the same value across all the RRs) if some
 -- other TTL value is more appropriate.
 --
@@ -162,7 +162,7 @@ responseA idt q ips = makeResponse idt q as
 -- | Compose a response with a single IPv6 RRset.  If the query
 -- had an EDNS pseudo-header, a suitable EDNS pseudo-header must
 -- be added to the response message, or else a 'FormatErr' response
--- must be sent.  The response TTL, defaults to 300 seconds, and
+-- must be sent.  The response TTL defaults to 300 seconds, and
 -- should be updated (to the same value across all the RRs) if some
 -- other TTL value is more appropriate.
 --
