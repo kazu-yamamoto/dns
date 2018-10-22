@@ -9,10 +9,13 @@
   built based on the supplied options.  Also the encodeQuestions
   function has been removed, since we're deprecating it, but the
   legacy interface can no longer be maintained.
-- New API: doFlag, ednsEnable, ednsSetVersion, ednsSetSize and
-  ednsSetOptions makes it possible for 'QueryControls' to adjust
-  EDNS settings.
 - New API: lookupRawCtl
+- New API: ODataOp, doFlag, ednsEnable, ednsSetVersion, ednsSetSize
+  and ednsSetOptions make it possible for 'QueryControls' to adjust
+  EDNS settings.
+- New API: FlagOp, rdFlag, adFlag and cdFlag make it possible to
+  override the default settings of the query-related DNS header
+  flags.
 - Breaking change: the decoded EDNS record no longer contains
   an error field.  Instead the header of decoded messages is
   updated hold the extended error code when valid EDNS OPT records
