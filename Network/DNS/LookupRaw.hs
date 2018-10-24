@@ -11,7 +11,8 @@ module Network.DNS.LookupRaw (
   , fromDNSMessage
   ) where
 
-import Data.Time (getCurrentTime, addUTCTime)
+import Data.Hourglass (timeAdd, Seconds)
+import Time.System (timeCurrent)
 import Prelude hiding (lookup)
 
 import Network.DNS.IO
@@ -134,9 +135,11 @@ cachePositive cconf c key rss
 
 insertPositive :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertPositive CacheConf{..} c k v ttl = when (ttl /= 0) $ do
-    tim <- addUTCTime life <$> getCurrentTime
+    ctime <- timeCurrent
+    let tim = ctime `timeAdd` life
     insertCache k tim v c
   where
+    life :: Seconds
     life = fromIntegral (maximumTTL `min` ttl)
 
 cacheNegative :: CacheConf -> Cache -> Key -> Entry -> DNSMessage -> IO ()
@@ -148,9 +151,11 @@ cacheNegative cconf c key v ans = case soas of
 
 insertNegative :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
 insertNegative CacheConf{..} c k v ttl = when (ttl /= 0) $ do
-    tim <- addUTCTime life <$> getCurrentTime
+    ctime <- timeCurrent
+    let tim = ctime `timeAdd` life
     insertCache k tim v c
   where
+    life :: Seconds
     life = fromIntegral ttl
 
 isTypeOf :: TYPE -> ResourceRecord -> Bool
