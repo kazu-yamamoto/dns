@@ -2,9 +2,10 @@ module Network.DNS.Memo where
 
 import qualified Control.Reaper as R
 import qualified Data.ByteString as B
+import Data.Hourglass (Elapsed)
 import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
-import Data.Time (UTCTime, getCurrentTime)
+import Time.System (timeCurrent)
 
 import Network.DNS.Imports
 import Network.DNS.Types
@@ -13,7 +14,7 @@ data Section = Answer | Authority deriving (Eq, Ord, Show)
 
 type Key = (ByteString
            ,TYPE)
-type Prio = UTCTime
+type Prio = Elapsed
 
 type Entry = Either DNSError [RData]
 
@@ -46,7 +47,7 @@ insertCache (dom,typ) tim ent0 reaper = R.reaperAdd reaper (key,tim,ent)
 -- functions. So, we need to do this redundant way.
 prune :: DB -> IO (DB -> DB)
 prune oldpsq = do
-    tim <- getCurrentTime
+    tim <- timeCurrent
     let (_, pruned) = PSQ.atMostView tim oldpsq
     return $ \newpsq -> foldl' ins pruned $ PSQ.toList newpsq
   where
