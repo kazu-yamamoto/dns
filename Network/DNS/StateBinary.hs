@@ -15,7 +15,9 @@ module Network.DNS.StateBinary (
   , putByteString
   , SGet
   , runSGet
+  , runSGetAt
   , runSGetWithLeftovers
+  , runSGetWithLeftoversAt
   , get8
   , get16
   , get32
@@ -25,6 +27,7 @@ module Network.DNS.StateBinary (
   , getNByteString
   , getPosition
   , getInput
+  , getAtTime
   , wsPop
   , wsPush
   , wsPosition
@@ -124,6 +127,7 @@ data PState = PState {
     psDomain :: IntMap Domain
   , psPosition :: Int
   , psInput :: ByteString
+  , psAtTime  :: Int64
   }
 
 ----------------------------------------------------------------
@@ -134,15 +138,18 @@ getPosition = ST.gets psPosition
 getInput :: SGet ByteString
 getInput = ST.gets psInput
 
+getAtTime :: SGet Int64
+getAtTime = ST.gets psAtTime
+
 addPosition :: Int -> SGet ()
 addPosition n = do
-    PState dom pos inp <- ST.get
-    ST.put $ PState dom (pos + n) inp
+    PState dom pos inp t <- ST.get
+    ST.put $ PState dom (pos + n) inp t
 
 push :: Int -> Domain -> SGet ()
 push n d = do
-    PState dom pos inp <- ST.get
-    ST.put $ PState (IM.insert n d dom) pos inp
+    PState dom pos inp t <- ST.get
+    ST.put $ PState (IM.insert n d dom) pos inp t
 
 pop :: Int -> SGet (Maybe Domain)
 pop n = ST.gets (IM.lookup n . psDomain)
@@ -193,24 +200,45 @@ getNByteString n = ST.lift (A.take n) <* addPosition n
 
 ----------------------------------------------------------------
 
-initialState :: ByteString -> PState
-initialState inp = PState IM.empty 0 inp
+-- | To get a broad range of correct RRSIG inception and expiration times
+-- without over or underflow, we choose a time half way between midnight PDT
+-- 2010-07-15 (the day the root zone was signed) and 2^32 seconds later on
+-- 2146-08-21.  Since 'decode' and 'runSGet' are pure, we can't peek at the
+-- current time while parsing.  Outside this date range the output is off by
+-- some non-zero multiple 2\^32 seconds.
+--
+dnsTimeMid :: Int64
+dnsTimeMid = 3426660848
 
-runSGet :: SGet a -> ByteString -> Either DNSError (a, PState)
-runSGet parser inp = toResult $ A.parse (ST.runStateT parser $ initialState inp) inp
+initialState :: Int64 -> ByteString -> PState
+initialState t inp = PState IM.empty 0 inp t
+
+runSGetAt :: Int64 -> SGet a -> ByteString -> Either DNSError (a, PState)
+runSGetAt t parser inp =
+    toResult $ A.parse (ST.runStateT parser $ initialState t inp) inp
   where
     toResult :: A.Result r -> Either DNSError r
     toResult (A.Done _ r)        = Right r
     toResult (A.Fail _ _ msg)    = Left $ DecodeError msg
     toResult (A.Partial _)       = Left $ DecodeError "incomplete input"
 
-runSGetWithLeftovers :: SGet a -> ByteString -> Either DNSError ((a, PState), ByteString)
-runSGetWithLeftovers parser inp = toResult $ A.parse (ST.runStateT parser $ initialState inp) inp
+runSGet :: SGet a -> ByteString -> Either DNSError (a, PState)
+runSGet = runSGetAt dnsTimeMid
+
+runSGetWithLeftoversAt :: Int64      -- ^ Reference time for DNS clock arithmetic
+                       -> SGet a     -- ^ Parser
+                       -> ByteString -- ^ Encoded message
+                       -> Either DNSError ((a, PState), ByteString)
+runSGetWithLeftoversAt t parser inp =
+    toResult $ A.parse (ST.runStateT parser $ initialState t inp) inp
   where
     toResult :: A.Result r -> Either DNSError (r, ByteString)
     toResult (A.Done     i r) = Right (r, i)
     toResult (A.Partial  f)   = toResult $ f BS.empty
     toResult (A.Fail _ _ err) = Left $ DecodeError err
+
+runSGetWithLeftovers :: SGet a -> ByteString -> Either DNSError ((a, PState), ByteString)
+runSGetWithLeftovers = runSGetWithLeftoversAt dnsTimeMid
 
 runSPut :: SPut -> ByteString
 runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState

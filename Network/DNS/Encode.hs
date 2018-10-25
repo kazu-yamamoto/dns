@@ -182,6 +182,17 @@ putRData rd = case rd of
         , put8 dt
         , putByteString dv
         ]
+    RD_RRSIG RDREP_RRSIG{..} -> mconcat
+        [ put16 $ fromTYPE rrsigType
+        , put8 rrsigKeyAlg
+        , put8 rrsigNumLabels
+        , put32 rrsigTTL
+        , put32 $ fromIntegral rrsigExpiration
+        , put32 $ fromIntegral rrsigInception
+        , put16 rrsigKeyTag
+        , putDomain rrsigZone
+        , putByteString rrsigValue
+        ]
     RD_NULL -> pure mempty
     (RD_DNSKEY f p a k) -> mconcat
         [ put16 f
