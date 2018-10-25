@@ -54,6 +54,8 @@ Library
                       , network >= 2.3
                       , psqueues
                       , safe == 0.3.*
+                      , text
+                      , text-format
   if os(windows)
     Build-Depends:    split
     C-Sources:        cbits/dns.c

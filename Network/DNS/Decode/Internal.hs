@@ -207,6 +207,32 @@ getRData DS len = RD_DS <$> decodeTag
     decodeDtyp = get8
     decodeDval = getNByteString (len - 4)
 --
+getRData RRSIG len = RD_RRSIG <$> decodeRRSIG
+  where
+    decodeRRSIG = do
+        -- The signature follows a variable length zone name
+        -- and occupies the rest of the RData.  Simplest to
+        -- checkpoint the position at the start of the RData,
+        -- and after reading the zone name, and subtract that
+        -- from the RData length.
+        --
+        pos0 <- getPosition
+        typ <- getTYPE
+        alg <- get8
+        cnt <- get8
+        ttl <- get32
+        tex <- getDnsTime
+        tin <- getDnsTime
+        tag <- get16
+        dom <- getDomain -- XXX: Enforce no compression?
+        pos1 <- getPosition
+        val <- getNByteString (len - (pos1 - pos0))
+        return $ RDREP_RRSIG typ alg cnt ttl tex tin tag dom val
+    getDnsTime   = do
+        tnow <- getAtTime
+        tdns <- get32
+        return $! dnsTime tdns tnow
+--
 getRData NULL len = const RD_NULL <$> getNByteString len
 --
 getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags

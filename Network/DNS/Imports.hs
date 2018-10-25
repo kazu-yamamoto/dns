@@ -1,5 +1,6 @@
 module Network.DNS.Imports (
     ByteString
+  , Int64
   , NonEmpty(..)
   , module Control.Applicative
   , module Control.Monad
@@ -17,6 +18,7 @@ import Control.Applicative
 import Control.Monad
 import Data.Bits
 import Data.ByteString (ByteString)
+import Data.Int (Int64)
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe

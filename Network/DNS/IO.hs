@@ -24,12 +24,15 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.Char (ord)
 import Data.IP (IPv4, IPv6)
+import Time.System (timeCurrent)
+import Time.Types (Elapsed(..), Seconds(..))
 import Network.Socket (Socket)
 import Network.Socket.ByteString (recv)
 import qualified Network.Socket.ByteString as Socket
 import System.IO.Error
 
-import Network.DNS.Decode (decode)
+
+import Network.DNS.Decode (decodeAt)
 import Network.DNS.Encode (encode)
 import Network.DNS.Imports
 import Network.DNS.Types
@@ -45,7 +48,8 @@ receive :: Socket -> IO DNSMessage
 receive sock = do
     let bufsiz = fromIntegral maxUdpSize
     bs <- recv sock bufsiz `E.catch` \e -> E.throwIO $ NetworkFailure e
-    case decode bs of
+    Elapsed (Seconds now) <- timeCurrent
+    case decodeAt (fromIntegral now) bs of
         Left  e   -> E.throwIO e
         Right msg -> return msg
 
@@ -57,7 +61,8 @@ receiveVC :: Socket -> IO DNSMessage
 receiveVC sock = do
     len <- toLen <$> recvDNS sock 2
     bs <- recvDNS sock len
-    case decode bs of
+    Elapsed (Seconds now) <- timeCurrent
+    case decodeAt (fromIntegral now) bs of
         Left e    -> E.throwIO e
         Right msg -> return msg
   where

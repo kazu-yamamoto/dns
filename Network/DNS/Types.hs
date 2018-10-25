@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
 
 -- | Data types for DNS Query and Response.
@@ -47,6 +48,8 @@ module Network.DNS.Types (
   , toTYPE
   -- ** Resource Data
   , RData (..)
+  , RD_RRSIG(..)
+  , dnsTime
   -- * DNS Message
   , DNSMessage (..)
   -- ** Query
@@ -143,6 +146,9 @@ import Data.IP (IP(..), IPv4, IPv6)
 import qualified Data.List as List
 import           Data.Maybe (fromMaybe)
 import qualified Data.Semigroup as Sem
+import qualified Data.Text.Format as T
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.Builder as T
 
 import Network.DNS.Imports
 
@@ -1200,6 +1206,118 @@ data ResourceRecord = ResourceRecord {
   , rdata   :: RData  -- ^ Resource data
   } deriving (Eq,Show)
 
+----------------------------------------------------------------
+
+-- | Given a 32-bit circle-arithmetic DNS time, and the current absolute epoch
+-- time, return the epoch time corresponding to the DNS timestamp.
+--
+dnsTime :: Word32 -- ^ DNS circle-arithmetic timestamp
+        -> Int64  -- ^ current epoch time
+        -> Int64  -- ^ absolute DNS timestamp
+dnsTime tdns tnow =
+    let delta = tdns - fromIntegral tnow
+     in if delta > 0x7FFFFFFF -- tdns is in the past?
+           then tnow - (0x100000000 - fromIntegral delta)
+           else tnow + fromIntegral delta
+
+-- | Convert epoch time to a YYYYMMDDHHMMSS string:
+-- <http://howardhinnant.github.io/date_algorithms.html>
+--
+-- This avoids all the pain of converting epoch time to NominalDiffTime ->
+-- UTCTime -> LocalTime then using formatTime with defaultTimeLocale!
+-- >>> :{
+-- let testVector =
+--         [ ( "19230704085602", -1467299038)
+--         , ( "19331017210945", -1142563815)
+--         , ( "19480919012827", -671668293 )
+--         , ( "19631210171455", -191227505 )
+--         , ( "20060819001740", 1155946660 )
+--         , ( "20180723061122", 1532326282 )
+--         , ( "20281019005024", 1855529424 )
+--         , ( "20751108024632", 3340406792 )
+--         , ( "21240926071415", 4883008455 )
+--         , ( "21270331070215", 4962150135 )
+--         , ( "21371220015305", 5300560385 )
+--         , ( "21680118121052", 6249787852 )
+--         , ( "21811012210032", 6683202032 )
+--         , ( "22060719093224", 7464648744 )
+--         , ( "22100427121648", 7583717808 )
+--         , ( "22530821173957", 8950757997 )
+--         , ( "23010804210243", 10463979763)
+--         , ( "23441111161706", 11829514626)
+--         , ( "23750511175551", 12791843751)
+--         , ( "23860427060801", 13137746881) ]
+--  in (==) <$> map (showTime.snd) <*> map fst $ testVector
+-- :}
+-- True
+--
+showTime :: Int64 -> String
+showTime t =
+    let (z0, s) = t `divMod` 86400
+        z = z0 + 719468
+        (era, doe) = z `divMod` 146097
+        yoe = (doe - doe `quot` 1460 + doe `quot` 36524
+                   - doe `quot` 146096) `quot` 365
+        y = yoe + era * 400
+        doy = doe - (365*yoe + yoe `quot` 4 - yoe `quot` 100)
+        mp = (5*doy + 2) `quot` 153
+        day = doy - (153*mp + 2) `quot` 5 + 1
+        mon = 1 + (mp + 2) `rem` 12
+        year = y + (12 - mon) `quot` 10
+        (hh, (mm, ss)) = flip divMod 60 <$> s `divMod` 3600
+     in T.unpack $ T.toLazyText
+                 $ T.left 4 '0' year <> T.left 2 '0' mon <> T.left 2 '0' day
+                <> T.left 2 '0'   hh <> T.left 2 '0'  mm <> T.left 2 '0' ss
+
+-- | RRSIG representation.
+--
+-- As noted in
+-- <https://tools.ietf.org/html/rfc4034#section-3.1.5 Section 3.1.5 of RFC 4034>
+-- the RRsig inception and expiration times use serial number arithmetic.  As a
+-- result these timestamps /are not/ pure values, their meaning is
+-- time-dependent!  They depend on the present time and are both at most
+-- approximately +\/-68 years from the present.  This ambiguity is not a
+-- problem because cached RRSIG records should only persist a few days,
+-- signature lifetimes should be *much* shorter than 68 years, and key rotation
+-- should result any misconstrued 136-year-old signatures fail to validate.
+-- This also means that the interpretation of a time that is exactly half-way
+-- around the clock at @now +\/-0x80000000@ is not important, the signature
+-- should never be valid.
+--
+-- The upshot for us is that we need to convert these *impure* relative values
+-- to pure absolute values at the moment they are received from from the network
+-- (or read from files, ... in some impure I/O context), and convert them back to
+-- 32-bit values when encoding.  Therefore, the constructor takes absolute
+-- 64-bit representations of the inception and expiration times.
+--
+-- The 'dnsTime' function performs the requisite conversion.
+--
+data RD_RRSIG = RDREP_RRSIG
+    { rrsigType       :: !TYPE       -- ^ RRtype of RRset signed
+    , rrsigKeyAlg     :: !Word8      -- ^ DNSKEY algorithm
+    , rrsigNumLabels  :: !Word8      -- ^ Number of labels signed
+    , rrsigTTL        :: !Word32     -- ^ Maximum origin TTL
+    , rrsigExpiration :: !Int64      -- ^ Time last valid
+    , rrsigInception  :: !Int64      -- ^ Time first valid
+    , rrsigKeyTag     :: !Word16     -- ^ Signing key tag
+    , rrsigZone       :: !Domain     -- ^ Signing domain
+    , rrsigValue      :: !ByteString -- ^ Opaque signature
+    }
+    deriving (Eq, Ord)
+
+instance Show RD_RRSIG where
+    show RDREP_RRSIG{..} = unwords
+        [ show rrsigType
+        , show rrsigKeyAlg
+        , show rrsigNumLabels
+        , show rrsigTTL
+        , showTime rrsigExpiration
+        , showTime rrsigInception
+        , show rrsigKeyTag
+        , BS.unpack rrsigZone
+        , b64encode rrsigValue
+        ]
+
 -- | Raw data format for each type.
 data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_NS Domain        -- ^ An authoritative name serve
@@ -1218,7 +1336,7 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_DNAME Domain     -- ^ DNAME (RFC6672)
            | RD_OPT [OData]      -- ^ OPT (RFC6891)
            | RD_DS Word16 Word8 Word8 ByteString -- ^ Delegation Signer (RFC4034)
-           --RD_RRSIG
+           | RD_RRSIG RD_RRSIG   -- ^ DNSSEC signature
            --RD_NSEC
            | RD_DNSKEY Word16 Word8 Word8 ByteString
                                  -- ^ DNSKEY (RFC4034)
@@ -1249,6 +1367,7 @@ instance Show RData where
   show (UnknownRData is) = show is
   show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ hexencode dgst
   show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ hexencode dv
+  show (RD_RRSIG sig) = show sig
   show RD_NULL = "NULL"
   show (RD_DNSKEY f p a k) = show f ++ " " ++ show p ++ " " ++ show a ++ " " ++ b64encode k
   show (RD_NSEC3PARAM h f i s) = show h ++ " " ++ show f ++ " " ++ show i ++ " " ++ showSalt s
