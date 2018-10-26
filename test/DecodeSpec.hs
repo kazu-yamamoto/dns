@@ -3,9 +3,11 @@
 module DecodeSpec where
 
 import Data.ByteString.Internal (ByteString(..), unsafeCreate)
+import qualified Data.ByteString.Char8 as BC
 #if !MIN_VERSION_bytestring(0,10,0)
 import qualified Data.ByteString as BS
 #endif
+import Data.Monoid ((<>))
 import Data.Word8
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (plusPtr)
@@ -20,10 +22,10 @@ test_doublePointer = "f7eb8500000100010007000404736563330561706e696303636f6d0000
 -- DNSMessage {header = DNSHeader {identifier = 63467, flags = DNSFlags {qOrR = QR_Response, opcode = OP_STD, authAnswer = True, trunCation = False, recDesired = True, recAvailable = False, rcode = NoErr, authenData = False}}, question = [Question {qname = "sec3.apnic.com.", qtype = A}], answer = [ResourceRecord {rrname = "sec3.apnic.com.", rrtype = A, rrttl = 7200, rdata = 202.12.28.140}], authority = [ResourceRecord {rrname = "apnic.com.", rrtype = NS, rrttl = 7200, rdata = ns1.apnic.net.},ResourceRecord {rrname = "apnic.com.", rrtype = NS, rrttl = 7200, rdata = ns3.apnic.net.},ResourceRecord {rrname = "apnic.com.", rrtype = NS, rrttl = 7200, rdata = ns4.apnic.net.},ResourceRecord {rrname = "apnic.com.", rrtype = NS, rrttl = 7200, rdata = sec1.apnic.com.},ResourceRecord {rrname = "apnic.com.", rrtype = NS, rrttl = 7200, rdata = sec1.authdns.ripe.net.},ResourceRecord {rrname = "apnic.com.", rrtype = NS, rrttl = 7200, rdata = sec2.apnic.com.},ResourceRecord {rrname = "apnic.com.", rrtype = NS, rrttl = 7200, rdata = sec3.apnic.com.}], additional = [ResourceRecord {rrname = "sec1.apnic.com.", rrtype = A, rrttl = 7200, rdata = 202.12.29.59},ResourceRecord {rrname = "sec1.apnic.com.", rrtype = AAAA, rrttl = 7200, rdata = 2001:dc0:2001:a:4608::59},ResourceRecord {rrname = "sec2.apnic.com.", rrtype = A, rrttl = 7200, rdata = 202.12.29.60},ResourceRecord {rrname = "sec3.apnic.com.", rrtype = AAAA, rrttl = 7200, rdata = 2001:dc0:1:0:4777::140}]})
 
 test_txt :: ByteString
-test_txt = "463181800001000100000000076e69636f6c6173046b766462076e647072696d6102696f0000100001c00c0010000100000e10000c6e69636f6c61732e6b766462"
+test_txt = "463181800001000100000000076e69636f6c6173046b766462076e647072696d6102696f0000100001c00c0010000100000e10000d0c6e69636f6c61732e6b766462"
 -- DNSMessage {header = DNSHeader {identifier = 17969, flags = DNSFlags {qOrR = QR_Response, opcode = OP_STD, authAnswer = False, trunCation = False, recDesired = True, recAvailable = True, rcode = NoErr, authenData = False}}
 --              , question = [Question {qname = "nicolas.kvdb.ndprima.io.", qtype = TXT}]
---              , answer = [ResourceRecord {rrname = "nicolas.kvdb.ndprima.io.", rrtype = TXT, rrttl = 3600, rdata = icolas.kvdb}]
+--              , answer = [ResourceRecord {rrname = "nicolas.kvdb.ndprima.io.", rrtype = TXT, rrttl = 3600, rdata = nicolas.kvdb}]
 --              , authority = []
 --              , additional = []})
 
@@ -52,7 +54,14 @@ spec = do
             tripleDecodeTest test_txt
         it "decodes mx" $
             tripleDecodeTest test_mx
-
+        it "detect excess" $
+            case decode (encode defaultQuery <> "\0") of
+                Left (DecodeError {}) -> True
+                _ -> error "Excess input not detected"
+        it "detect truncation" $
+            case decode (BC.init $ encode defaultQuery) of
+                Left (DecodeError {}) -> True
+                _ -> error "Excess input not detected"
 
 tripleDecodeTest :: ByteString -> IO ()
 tripleDecodeTest hexbs =
