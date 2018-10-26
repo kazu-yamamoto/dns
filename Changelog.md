@@ -1,5 +1,51 @@
 # 4.0.0
 
+- Safety: Both 'decode' and 'decodeAt' must now consume exactly
+  the complete input buffer or a DecodeError is returned.
+
+  * The same applies to each complete message with 'decodeMany'
+    and 'decodeManyAt'.  Any final encoded message segment at the
+    end of the input buffer is still returned as the second
+    element of the result pair.
+
+- Bugfix: fixed incorrect decoding of TXT records, and corrected
+  the associated test.
+
+- Cleanup: More precise control over decoder error messages via
+  'failSGet', which avoids the unhelpful Attoparsec "Failure
+  reading: " error prefix.
+
+- Cleanup: Simplified loop detection in name decompression, making
+  use of a monotone strictly decreasing limit on valid "pointer"
+  targets.
+
+- Breaking change: In the "Decode" module, expose only the
+  decode{,Many}{,At} functions.  The rest of the "Decode" module's
+  functions are now internal, exposed only for testing.  These
+  include:
+
+  * decodeDNSHeader
+  * decodeDNSFlags
+  * decodeResourceRecord
+  * decodeDomain
+  * decodeMailbox
+
+- Cleanup: Reworked Decode module structure:
+
+    * Moved Decode.Internal to Decode.Parsers
+
+    * Created a new Decode.Internal which is now exposed, and
+      moved some functions there from Decode which are only
+      exposed for testing, since they could not reliably be used
+      except as part of decoding a full message.
+
+- Feature: RRSIG support, we can now encode, decode and show RRSIG
+  records.  This uses the new 'decodeAt' and 'decodeManyAt' API.
+
+- New API: 'decodeAt' and 'decodeManyAt' make it possible for
+  the decoder to get the current time, in order to decode some
+  RR types (like RRSIG) whose full meaning is time-dependent.
+
 - Re-export 'sendAll' and export 'encodeVC' for use with TCP.
 - No longer using sendAll with UDP, UDP datagrams must not be sent
   piece-by-piece
