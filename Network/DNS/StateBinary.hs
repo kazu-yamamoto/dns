@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE CPP #-}
@@ -14,6 +15,8 @@ module Network.DNS.StateBinary (
   , putInt32
   , putByteString
   , SGet
+  , failSGet
+  , fitSGet
   , runSGet
   , runSGetAt
   , runSGetWithLeftovers
@@ -35,6 +38,8 @@ module Network.DNS.StateBinary (
   , push
   , pop
   , getNBytes
+  , getNoctets
+  , skipNBytes
   ) where
 
 import Control.Monad.State (State, StateT)
@@ -142,9 +147,13 @@ getAtTime :: SGet Int64
 getAtTime = ST.gets psAtTime
 
 addPosition :: Int -> SGet ()
-addPosition n = do
+addPosition n | n < 0 = failSGet "internal error: negative position increment"
+              | otherwise = do
     PState dom pos inp t <- ST.get
-    ST.put $ PState dom (pos + n) inp t
+    let !pos' = pos + n
+    when (pos' > BS.length inp) $
+        failSGet "malformed or truncated input"
+    ST.put $ PState dom pos' inp t
 
 push :: Int -> Domain -> SGet ()
 push n d = do
@@ -190,13 +199,38 @@ getInt32 = fromIntegral <$> get32
 
 ----------------------------------------------------------------
 
+overrun :: SGet a
+overrun = failSGet "malformed or truncated input"
+
 getNBytes :: Int -> SGet [Int]
-getNBytes len = toInts <$> getNByteString len
+getNBytes n | n < 0     = overrun
+            | otherwise = toInts <$> getNByteString n
   where
     toInts = map fromIntegral . BS.unpack
 
+getNoctets :: Int -> SGet [Word8]
+getNoctets n | n < 0     = overrun
+             | otherwise = BS.unpack <$> getNByteString n
+
+skipNBytes :: Int -> SGet ()
+skipNBytes n | n < 0     = overrun
+             | otherwise = ST.lift (A.take n) >> addPosition n
+
 getNByteString :: Int -> SGet ByteString
-getNByteString n = ST.lift (A.take n) <* addPosition n
+getNByteString n | n < 0     = overrun
+                 | otherwise = ST.lift (A.take n) <* addPosition n
+
+fitSGet :: Int -> SGet a -> SGet a
+fitSGet len parser | len < 0   = overrun
+                   | otherwise = do
+    pos0 <- getPosition
+    ret <- parser
+    pos' <- getPosition
+    if (pos' == pos0 + len)
+    then return $! ret
+    else if (pos' > pos0 + len)
+    then failSGet "element size exceeds declared size"
+    else failSGet "element shorter than declared size"
 
 ----------------------------------------------------------------
 
@@ -213,13 +247,19 @@ dnsTimeMid = 3426660848
 initialState :: Int64 -> ByteString -> PState
 initialState t inp = PState IM.empty 0 inp t
 
+-- Construct our own error message, without the unhelpful AttoParsec
+-- \"Failed reading: \" prefix.
+--
+failSGet :: String -> SGet a
+failSGet msg = ST.lift (fail "" A.<?> msg)
+
 runSGetAt :: Int64 -> SGet a -> ByteString -> Either DNSError (a, PState)
 runSGetAt t parser inp =
     toResult $ A.parse (ST.runStateT parser $ initialState t inp) inp
   where
     toResult :: A.Result r -> Either DNSError r
     toResult (A.Done _ r)        = Right r
-    toResult (A.Fail _ _ msg)    = Left $ DecodeError msg
+    toResult (A.Fail _ ctx msg)  = Left $ DecodeError $ head $ ctx ++ [msg]
     toResult (A.Partial _)       = Left $ DecodeError "incomplete input"
 
 runSGet :: SGet a -> ByteString -> Either DNSError (a, PState)
@@ -235,7 +275,7 @@ runSGetWithLeftoversAt t parser inp =
     toResult :: A.Result r -> Either DNSError (r, ByteString)
     toResult (A.Done     i r) = Right (r, i)
     toResult (A.Partial  f)   = toResult $ f BS.empty
-    toResult (A.Fail _ _ err) = Left $ DecodeError err
+    toResult (A.Fail _ ctx e) = Left $ DecodeError $ head $ ctx ++ [e]
 
 runSGetWithLeftovers :: SGet a -> ByteString -> Either DNSError ((a, PState), ByteString)
 runSGetWithLeftovers = runSGetWithLeftoversAt dnsTimeMid

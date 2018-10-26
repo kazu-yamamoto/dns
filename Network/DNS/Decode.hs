@@ -23,6 +23,8 @@ module Network.DNS.Decode (
   , decodeMany
   ) where
 
+import qualified Data.ByteString as B
+
 import Network.DNS.Decode.Parsers
 import Network.DNS.Imports
 import Network.DNS.StateBinary
@@ -38,22 +40,25 @@ import Network.DNS.Types
 decodeAt :: Int64                      -- ^ current epoch time
          -> ByteString                 -- ^ encoded input buffer
          -> Either DNSError DNSMessage -- ^ decoded message or error
-decodeAt t bs = fst <$> runSGetAt t getResponse bs
+decodeAt t bs = fst <$> runSGetAt t (fitSGet (B.length bs) getResponse) bs
 
--- | Decode an input buffer containing a single encoded DNS message.  DNS
--- /circle-arithmetic/ timestamps (e.g. in RRSIG records) are interpreted at a
--- nominal time in the year 2078 chosen to give correct dates for timestamps
--- over a 136 year time range from the date the root zone was signed on the
--- 15th of July 2010 until the 21st of August in 2146.  Outside this range the
--- output is off by some non-zero multiple 2\^32 seconds.
+-- | Decode an input buffer containing a single encoded DNS message.  If the
+-- input buffer has excess content beyond the end of the message an error is
+-- returned.  DNS /circle-arithmetic/ timestamps (e.g. in RRSIG records) are
+-- interpreted based on a nominal time in the year 2073 chosen to maximize
+-- the time range for which this gives correct translations of 32-bit epoch
+-- times to absolute 64-bit epoch times.  This will yield incorrect results
+-- starting circa 2141.
 --
 decode :: ByteString                 -- ^ encoded input buffer
        -> Either DNSError DNSMessage -- ^ decoded message or error
-decode bs = fst <$> runSGet getResponse bs
+decode bs = fst <$> runSGet (fitSGet (B.length bs) getResponse) bs
 
 -- | Decode a buffer containing multiple encoded DNS messages each preceded by
--- a 16-bit length in network byte order.  DNS /circle-arithmetic/ timestamps
--- (e.g. in RRSIG records) are interpreted at the supplied epoch time.
+-- a 16-bit length in network byte order.  Any left-over bytes of a partial
+-- message after the last complete message are returned as the second element
+-- of the result tuple.  DNS /circle-arithmetic/ timestamps (e.g. in RRSIG
+-- records) are interpreted at the supplied epoch time.
 --
 decodeManyAt :: Int64      -- ^ current epoch time
              -> ByteString -- ^ encoded input buffer
@@ -63,12 +68,14 @@ decodeManyAt :: Int64      -- ^ current epoch time
 decodeManyAt t bs = decodeMParse (decodeAt t) bs
 
 -- | Decode a buffer containing multiple encoded DNS messages each preceded by
--- a 16-bit length in network byte order.  DNS /circle-arithmetic/ timestamps
--- (e.g. in RRSIG records) are interpreted based on a nominal time in the year
--- 2078 chosen to give correct dates for DNS timestamps over a 136 year time
--- range from the date the root zone was signed on the 15th of July 2010 until
--- the 21st of August in 2146.  Outside this date range the output is off by
--- some non-zero multiple 2\^32 seconds.
+-- a 16-bit length in network byte order.  Any left-over bytes of a partial
+-- message after the last complete message are returned as the second element
+-- of the result tuple.  DNS /circle-arithmetic/ timestamps (e.g. in RRSIG
+-- records) are interpreted based on a nominal time in the year 2078 chosen to
+-- give correct dates for DNS timestamps over a 136 year time range from the
+-- date the root zone was signed on the 15th of July 2010 until the 21st of
+-- August in 2146.  Outside this date range the output is off by some non-zero
+-- multiple 2\^32 seconds.
 --
 decodeMany :: ByteString -- ^ encoded input buffer
            -> Either DNSError ([DNSMessage], ByteString)

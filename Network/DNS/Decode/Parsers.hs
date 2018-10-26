@@ -127,33 +127,21 @@ getResourceRecord :: SGet ResourceRecord
 getResourceRecord = do
     dom <- getDomain
     typ <- getTYPE
-    cls <- decodeCLASS
-    ttl <- decodeTTL
-    len <- decodeRLen
-    dat <- getRData typ len
+    cls <- get16
+    ttl <- get32
+    len <- getInt16
+    dat <- fitSGet len $ getRData typ len
     return $ ResourceRecord dom typ cls ttl dat
-  where
-    decodeCLASS = get16
-    decodeTTL   = get32
-    decodeRLen  = getInt16
 
 getRData :: TYPE -> Int -> SGet RData
-getRData NS _ = RD_NS <$> getDomain
-getRData MX _ = RD_MX <$> decodePreference <*> getDomain
-  where
-    decodePreference = get16
+getRData NS _    = RD_NS    <$> getDomain
+getRData MX _    = RD_MX    <$> get16 <*> getDomain
 getRData CNAME _ = RD_CNAME <$> getDomain
 getRData DNAME _ = RD_DNAME <$> getDomain
-getRData TXT len = RD_TXT . ignoreLength <$> getNByteString len
-  where
-    ignoreLength = BS.drop 1
-getRData A len
-  | len == 4  = RD_A . toIPv4 <$> getNBytes len
-  | otherwise = fail "IPv4 addresses must be 4 bytes long"
-getRData AAAA len
-  | len == 16 = RD_AAAA . toIPv6b <$> getNBytes len
-  | otherwise = fail "IPv6 addresses must be 16 bytes long"
-getRData SOA _ = RD_SOA    <$> getDomain
+getRData TXT len = RD_TXT   <$> getTXT len ""
+getRData A _     = RD_A . toIPv4 <$> getNBytes 4
+getRData AAAA _  = RD_AAAA . toIPv6b <$> getNBytes 16
+getRData SOA _   = RD_SOA  <$> getDomain
                            <*> getMailbox
                            <*> decodeSerial
                            <*> decodeRefesh
@@ -245,29 +233,41 @@ getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
     decodeKeyAlg    = get8
     decodeKeyBytes  = getNByteString (len - 4)
 --
-getRData NSEC3PARAM len = RD_NSEC3PARAM <$> decodeHashAlg
-                                <*> decodeFlags
-                                <*> decodeIterations
-                                <*> decodeSalt
+getRData NSEC3PARAM _ = RD_NSEC3PARAM <$> decodeHashAlg
+                                      <*> decodeFlags
+                                      <*> decodeIterations
+                                      <*> decodeSalt
   where
     decodeHashAlg    = get8
     decodeFlags      = get8
     decodeIterations = get16
-    decodeSalt       = do
-        let n = len - 5
-        slen <- get8
-        guard $ fromIntegral slen == n
-        if n == 0
-        then return B.empty
-        else getNByteString n
+    decodeSalt       = getInt8 >>= getNByteString
 --
 getRData _  len = UnknownRData <$> getNByteString len
 
+----------------------------------------------------------------
+
+-- $
+--
+-- >>> :set -XOverloadedStrings
+-- >>> :module + Network.DNS.StateBinary
+-- >>> let Right ((t,_),l) = runSGetWithLeftovers (getTXT 8 "") "\3foo\3barbaz"
+-- >>> (t, l) == ("foobar", "baz")
+-- True
+
+-- | Concatenate a sequence of length-prefixed chunks of text
+getTXT :: Int -> ByteString -> SGet ByteString
+getTXT n s
+    | n <= 0    = return s
+    | otherwise = getInt8 >>= \m -> getNByteString m >>= getTXT (n-m-1). (<>) s
+
+----------------------------------------------------------------
+
 getOData :: OptCode -> Int -> SGet OData
-getOData NSID len = OD_NSID          <$> getNByteString len
-getOData DAU  len = OD_DAU. B.unpack <$> getNByteString len
-getOData DHU  len = OD_DHU. B.unpack <$> getNByteString len
-getOData N3U  len = OD_N3U. B.unpack <$> getNByteString len
+getOData NSID len = OD_NSID <$> getNByteString len
+getOData DAU  len = OD_DAU  <$> getNoctets len
+getOData DHU  len = OD_DHU  <$> getNoctets len
+getOData N3U  len = OD_N3U  <$> getNoctets len
 getOData ClientSubnet len = do
         family  <- get16
         srcBits <- get8
@@ -318,50 +318,90 @@ getOData opc len = UnknownOData (fromOptCode opc) <$> getNByteString len
 
 ----------------------------------------------------------------
 
+-- | Pointers MUST point back into the packet per RFC1035 Section 4.1.4.  This
+-- is further interpreted by the DNS community (from a discussion on the IETF
+-- DNSOP mailing list) to mean that they don't point back into the same domain.
+-- Therefore, when starting to parse a domain, the current offset is also a
+-- strict upper bound on the targets of any pointers that arise while processing
+-- the domain.  When following a pointer, the target again becomes a stict upper
+-- bound for any subsequent pointers.  This results in a simple loop-prevention
+-- algorithm, each sequence of valid pointer values is necessarily strictly
+-- decreasing!  The third argument to 'getDomain'' is a strict pointer upper
+-- bound, and is set here to the position at the start of parsing the domain
+-- or mailbox.
+--
 getDomain :: SGet Domain
-getDomain = do
-    lim <- B.length <$> getInput
-    getDomain' '.' lim 0
+getDomain = getPosition >>= getDomain' '.'
 
 getMailbox :: SGet Mailbox
-getMailbox = do
-    lim <- B.length <$> getInput
-    getDomain' '@' lim 0
+getMailbox = getPosition >>= getDomain' '@'
+
+-- $
+-- Pathological case: pointer embedded inside a label!  The pointer points
+-- behind the start of the domain and is then absorbed into the initial label!
+-- Though we don't IMHO have to support this, it is not manifestly illegal, and
+-- does exercise the code in an interesting way.  Ugly as this is, it also
+-- "works" the same in Perl's Net::DNS and reportedly in ISC's BIND.
+--
+-- >>> :{
+-- let input = "\6\3foo\192\0\3bar\0"
+--     parser = skipNBytes 1 >> getDomain' '.' 1
+--     Right (output, _) = runSGet parser input
+--  in output == "foo.\003foo\192\000.bar."
+-- :}
+-- True
+--
+-- The case below fails to point far enough back, and triggers the loop
+-- prevention code-path.
+--
+-- >>> :{
+-- let input = "\6\3foo\192\1\3bar\0"
+--     parser = skipNBytes 1 >> getDomain' '.' 1
+--     Left (DecodeError err) = runSGet parser input
+--  in err
+-- :}
+-- "invalid name compression pointer"
 
 -- | Get a domain name, using sep1 as the separate between the 1st and 2nd
 -- label.  Subsequent labels (and always the trailing label) are terminated
 -- with a ".".
-getDomain' :: Char -> Int -> Int -> SGet ByteString
-getDomain' sep1 lim loopcnt
-  -- 127 is the logical limitation of pointers.
-  | loopcnt >= 127 = fail "pointer recursion limit exceeded"
-  | otherwise      = do
-      pos <- getPosition
-      c <- getInt8
-      let n = getValue c
-      getdomain pos c n
+--
+-- Domain name compression pointers must always refer to a position that
+-- precedes the start of the current domain name.  The starting offsets form a
+-- strictly decreasing sequence, which prevents pointer loops.
+--
+getDomain' :: Char -> Int -> SGet ByteString
+getDomain' sep1 ptrLimit = do
+    pos <- getPosition
+    c <- getInt8
+    let n = getValue c
+    getdomain pos c n
   where
     getdomain pos c n
       | c == 0 = return "." -- Perhaps the root domain?
       | isPointer c = do
           d <- getInt8
           let offset = n * 256 + d
-          when (offset >= lim) $ fail "pointer is too large"
+          when (offset >= ptrLimit) $
+              failSGet "invalid name compression pointer"
           mo <- pop offset
           case mo of
               Nothing -> do
-                  target <- B.drop offset <$> getInput
-                  case runSGet (getDomain' sep1 lim (loopcnt + 1)) target of
-                        Left (DecodeError err) -> fail err
-                        Left err               -> fail $ show err
-                        Right o  -> push pos (fst o) >> return (fst o)
+                  msg <- getInput
+                  -- Reprocess the same ByteString starting at the pointer
+                  -- target (offset).
+                  let parser = skipNBytes offset >> getDomain' sep1 offset
+                  case runSGet parser msg of
+                      Left (DecodeError err) -> failSGet err
+                      Left err               -> fail $ show err
+                      Right o  -> push pos (fst o) >> return (fst o)
               Just o -> push pos o >> return o
       -- As for now, extended labels have no use.
       -- This may change some time in the future.
       | isExtLabel c = return ""
       | otherwise = do
           hs <- getNByteString n
-          ds <- getDomain' '.' lim (loopcnt + 1)
+          ds <- getDomain' '.' ptrLimit
           let dom = case ds of -- avoid trailing ".."
                   "." -> hs `BS.append` "."
                   _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
