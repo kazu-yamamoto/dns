@@ -1,17 +1,10 @@
 -- | Decoders for DNS.
 module Network.DNS.Decode (
-    -- * Decoder
+    -- * DNS message decoders
     decodeAt
   , decodeManyAt
   , decode
   , decodeMany
-    -- ** Decoder for Each Part
-  , decodeResourceRecordAt
-  , decodeResourceRecord
-  , decodeDNSHeader
-  , decodeDNSFlags
-  , decodeDomain
-  , decodeMailbox
   ) where
 
 import Network.DNS.Decode.Parsers
@@ -79,38 +72,3 @@ decodeMParse decoder bs = do
     -- Read a list of length-encoded bytestrings
     lengthEncoded :: SGet [ByteString]
     lengthEncoded = many $ getInt16 >>= getNByteString
-
--- | Decoding DNS flags.
-decodeDNSFlags :: ByteString -> Either DNSError DNSFlags
-decodeDNSFlags bs = fst <$> runSGet getDNSFlags bs
-
--- | Decoding DNS header.
-decodeDNSHeader :: ByteString -> Either DNSError DNSHeader
-decodeDNSHeader bs = fst <$> runSGet getHeader bs
-
--- | Decoding domain.
-decodeDomain :: ByteString -> Either DNSError Domain
-decodeDomain bs = fst <$> runSGet getDomain bs
-
--- | Decoding mailbox.
-decodeMailbox :: ByteString -> Either DNSError Mailbox
-decodeMailbox bs = fst <$> runSGet getMailbox bs
-
--- | Decoding resource record.
-
--- | Decode a resource record (RR) with any DNS timestamps interpreted at the
--- nominal epoch time (see 'decodeAt').  Since RRs may use name compression,
--- it is not generally possible to decode resource record separately from the
--- enclosing DNS message.  This is an internal function.
-decodeResourceRecord :: ByteString -> Either DNSError ResourceRecord
-decodeResourceRecord bs = fst <$> runSGet getResourceRecord bs
-
--- | Decode a resource record (RR) with DNS timestamps interpreted at the
--- supplied epoch time.  Since RRs may use DNS name compression, it is not
--- generally possible to decode resource record separately from the enclosing
--- DNS message.  This is an internal function.
---
-decodeResourceRecordAt :: Int64      -- ^ current epoch time
-                       -> ByteString -- ^ encoded resource record
-                       -> Either DNSError ResourceRecord
-decodeResourceRecordAt t bs = fst <$> runSGetAt t getResourceRecord bs
