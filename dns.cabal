@@ -31,7 +31,7 @@ Library
                         Network.DNS.Encode
                         Network.DNS.Decode
                         Network.DNS.IO
-  Other-Modules:        Network.DNS.Decode.Internal
+  Other-Modules:        Network.DNS.Decode.Parsers
                         Network.DNS.Imports
                         Network.DNS.Memo
                         Network.DNS.StateBinary
