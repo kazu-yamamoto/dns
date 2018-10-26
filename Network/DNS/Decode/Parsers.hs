@@ -68,23 +68,25 @@ getResponse = do
 
 getDNSFlags :: SGet DNSFlags
 getDNSFlags = do
-    word <- get16
-    maybe (fail $ "Unsupported flags: 0x" ++ showHex word "") pure (toFlags word)
+    flgs <- get16
+    oc <- getOpcode flgs
+    return $ DNSFlags (getQorR flgs)
+                      oc
+                      (getAuthAnswer flgs)
+                      (getTrunCation flgs)
+                      (getRecDesired flgs)
+                      (getRecAvailable flgs)
+                      (getRcode flgs)
+                      (getAuthenData flgs)
+                      (getChkDisable flgs)
   where
-    toFlags :: Word16 -> Maybe DNSFlags
-    toFlags flgs = do
-      oc <- getOpcode flgs
-      return $ DNSFlags (getQorR flgs)
-                        oc
-                        (getAuthAnswer flgs)
-                        (getTrunCation flgs)
-                        (getRecDesired flgs)
-                        (getRecAvailable flgs)
-                        (getRcode flgs)
-                        (getAuthenData flgs)
-                        (getChkDisable flgs)
     getQorR w = if testBit w 15 then QR_Response else QR_Query
-    getOpcode w = toOPCODE (shiftR w 11 .&. 0x0f)
+    getOpcode w =
+        case shiftR w 11 .&. 0x0f of
+            n | Just opc <- toOPCODE n
+              -> pure opc
+              | otherwise
+              -> failSGet $ "Unsupported header opcode: " ++ show n
     getAuthAnswer w = testBit w 10
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8
@@ -108,9 +110,6 @@ getQueries n = replicateM n getQuery
 
 getTYPE :: SGet TYPE
 getTYPE = toTYPE <$> get16
-
-getOptCode :: SGet OptCode
-getOptCode = toOptCode <$> get16
 
 -- XXX: Include the class when implemented, or otherwise perhaps check the
 -- implicit assumption that the class is classIN.
@@ -138,7 +137,7 @@ getRData NS _    = RD_NS    <$> getDomain
 getRData MX _    = RD_MX    <$> get16 <*> getDomain
 getRData CNAME _ = RD_CNAME <$> getDomain
 getRData DNAME _ = RD_DNAME <$> getDomain
-getRData TXT len = RD_TXT   <$> getTXT len ""
+getRData TXT len = RD_TXT   <$> getTXT len
 getRData A _     = RD_A . toIPv4 <$> getNBytes 4
 getRData AAAA _  = RD_AAAA . toIPv6b <$> getNBytes 16
 getRData SOA _   = RD_SOA  <$> getDomain
@@ -163,17 +162,7 @@ getRData SRV _ = RD_SRV <$> decodePriority
     decodePriority = get16
     decodeWeight   = get16
     decodePort     = get16
-getRData OPT ol = RD_OPT <$> decode' ol
-  where
-    decode' :: Int -> SGet [OData]
-    decode' l
-        | l  < 0 = fail $ "decodeOPTData: length inconsistency (" ++ show l ++ ")"
-        | l == 0 = pure []
-        | otherwise = do
-            optCode <- getOptCode
-            optLen <- getInt16
-            dat <- getOData optCode optLen
-            (dat:) <$> decode' (l - optLen - 4)
+getRData OPT len   = RD_OPT <$> getOpts len
 --
 getRData TLSA len = RD_TLSA <$> decodeUsage
                             <*> decodeSelector
@@ -251,15 +240,28 @@ getRData _  len = UnknownRData <$> getNByteString len
 --
 -- >>> :set -XOverloadedStrings
 -- >>> :module + Network.DNS.StateBinary
--- >>> let Right ((t,_),l) = runSGetWithLeftovers (getTXT 8 "") "\3foo\3barbaz"
+-- >>> let Right ((t,_),l) = runSGetWithLeftovers (getTXT 8) "\3foo\3barbaz"
 -- >>> (t, l) == ("foobar", "baz")
 -- True
 
--- | Concatenate a sequence of length-prefixed chunks of text
-getTXT :: Int -> ByteString -> SGet ByteString
-getTXT n s
-    | n <= 0    = return s
-    | otherwise = getInt8 >>= \m -> getNByteString m >>= getTXT (n-m-1). (<>) s
+-- | Concatenate a sequence of length-prefixed strings of text
+-- https://tools.ietf.org/html/rfc1035#section-3.3
+--
+getTXT :: Int -> SGet ByteString
+getTXT len = B.concat <$> sGetMany "TXT RR string" len getstring
+  where
+    getstring = getInt8 >>= getNByteString
+
+-- <https://tools.ietf.org/html/rfc6891#section-6.1.2>
+-- Parse a list of EDNS options
+--
+getOpts :: Int -> SGet [OData]
+getOpts len = sGetMany "EDNS option" len getoption
+  where
+    getoption = do
+        code <- toOptCode <$> get16
+        olen <- getInt16
+        getOData code olen
 
 ----------------------------------------------------------------
 

@@ -28,6 +28,7 @@ module Network.DNS.StateBinary (
   , getInt16
   , getInt32
   , getNByteString
+  , sGetMany
   , getPosition
   , getInput
   , getAtTime
@@ -231,6 +232,28 @@ fitSGet len parser | len < 0   = overrun
     else if (pos' > pos0 + len)
     then failSGet "element size exceeds declared size"
     else failSGet "element shorter than declared size"
+
+-- | Parse a list of elements that takes up exactly a given number of bytes.
+-- In order to avoid infinite loops, if an element parser succeeds without
+-- moving the buffer offset forward, an error will be returned.
+--
+sGetMany :: String -- ^ element type for error messages
+         -> Int    -- ^ input buffer length
+         -> SGet a -- ^ element parser
+         -> SGet [a]
+sGetMany elemname len parser | len < 0   = overrun
+                             | otherwise = go len []
+  where
+    go n xs
+        | n < 0     = failSGet $ elemname ++ " longer than declared size"
+        | n == 0    = pure $ reverse xs
+        | otherwise = do
+            pos0 <- getPosition
+            x    <- parser
+            pos1 <- getPosition
+            if (pos1 <= pos0)
+            then failSGet $ "internal error: in-place success for " ++ elemname
+            else go (n + pos0 - pos1) (x : xs)
 
 ----------------------------------------------------------------
 
