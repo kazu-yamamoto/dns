@@ -30,6 +30,7 @@ Library
                         Network.DNS.Types
                         Network.DNS.Encode
                         Network.DNS.Decode
+                        Network.DNS.Decode.Internal
                         Network.DNS.IO
   Other-Modules:        Network.DNS.Decode.Parsers
                         Network.DNS.Imports

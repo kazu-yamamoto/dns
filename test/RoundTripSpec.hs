@@ -8,6 +8,7 @@ import Data.IP (Addr, IP(..), IPv4, IPv6, toIPv4, toIPv6, makeAddrRange)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import Network.DNS.Decode
+import Network.DNS.Decode.Internal
 import Network.DNS.Encode
 import Network.DNS.Types
 import Test.Hspec

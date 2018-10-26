@@ -1,17 +1,26 @@
--- | Decoders for DNS.
+-- | DNS message decoders.
+--
+-- When in doubt, use the 'decodeAt' or 'decodeManyAt' functions, which
+-- correctly handle /circle-arithmetic/ DNS timestamps, e.g., in @RRSIG@
+-- resource records.  The 'decode', and 'decodeMany' functions are only
+-- appropriate in pure contexts when the current time is not available, and
+-- @RRSIG@ records are not expected or desired.
+--
+-- The 'decodeMany' and 'decodeManyAt' functions decode a buffer holding one or
+-- more messages, each preceded by 16-bit length in network byte order.  This
+-- encoding is generally only appropriate for DNS TCP, and because TCP does not
+-- preserve message boundaries, the decode is prepared to return a trailing
+-- message fragment to be completed and retried when more input arrives from
+-- network.
+--
 module Network.DNS.Decode (
-    -- * Decoder
+    -- * Decoding a single DNS message
     decodeAt
-  , decodeManyAt
   , decode
+    -- * Decoding multple length-encoded DNS messages,
+    -- e.g., from TCP traffic.
+  , decodeManyAt
   , decodeMany
-    -- ** Decoder for Each Part
-  , decodeResourceRecordAt
-  , decodeResourceRecord
-  , decodeDNSHeader
-  , decodeDNSFlags
-  , decodeDomain
-  , decodeMailbox
   ) where
 
 import Network.DNS.Decode.Parsers
@@ -21,15 +30,14 @@ import Network.DNS.Types
 
 ----------------------------------------------------------------
 
--- | Decoding DNS query or response.
-
--- | Decode an input buffer containing a single encoded DNS message.  DNS
--- /circle-arithmetic/ timestamps (e.g. in RRSIG records) are interpreted
--- at the supplied epoch time.
+-- | Decode an input buffer containing a single encoded DNS message.  If the
+-- input buffer has excess content beyond the end of the message an error is
+-- returned.  DNS /circle-arithmetic/ timestamps (e.g. in RRSIG records) are
+-- interpreted at the supplied epoch time.
 --
-decodeAt :: Int64      -- ^ current epoch time
-         -> ByteString -- ^ input encoded buffer
-         -> Either DNSError DNSMessage
+decodeAt :: Int64                      -- ^ current epoch time
+         -> ByteString                 -- ^ encoded input buffer
+         -> Either DNSError DNSMessage -- ^ decoded message or error
 decodeAt t bs = fst <$> runSGetAt t getResponse bs
 
 -- | Decode an input buffer containing a single encoded DNS message.  DNS
@@ -39,18 +47,19 @@ decodeAt t bs = fst <$> runSGetAt t getResponse bs
 -- 15th of July 2010 until the 21st of August in 2146.  Outside this range the
 -- output is off by some non-zero multiple 2\^32 seconds.
 --
-decode :: ByteString -> Either DNSError DNSMessage
+decode :: ByteString                 -- ^ encoded input buffer
+       -> Either DNSError DNSMessage -- ^ decoded message or error
 decode bs = fst <$> runSGet getResponse bs
-
--- | Parse many length-encoded DNS records, for example, from TCP traffic.
 
 -- | Decode a buffer containing multiple encoded DNS messages each preceded by
 -- a 16-bit length in network byte order.  DNS /circle-arithmetic/ timestamps
 -- (e.g. in RRSIG records) are interpreted at the supplied epoch time.
 --
 decodeManyAt :: Int64      -- ^ current epoch time
-             -> ByteString -- ^ input buffer
+             -> ByteString -- ^ encoded input buffer
              -> Either DNSError ([DNSMessage], ByteString)
+                           -- ^ decoded messages and left-over partial message
+                           -- or error if any complete message fails to parse.
 decodeManyAt t bs = decodeMParse (decodeAt t) bs
 
 -- | Decode a buffer containing multiple encoded DNS messages each preceded by
@@ -61,16 +70,22 @@ decodeManyAt t bs = decodeMParse (decodeAt t) bs
 -- the 21st of August in 2146.  Outside this date range the output is off by
 -- some non-zero multiple 2\^32 seconds.
 --
-decodeMany :: ByteString -- ^ input buffer
+decodeMany :: ByteString -- ^ encoded input buffer
            -> Either DNSError ([DNSMessage], ByteString)
+                         -- ^ decoded messages and left-over partial message
+                         -- or error if any complete message fails to parse.
 decodeMany bs = decodeMParse decode bs
 
 
 -- | Decode multiple messages using the given parser.
 --
 decodeMParse :: (ByteString -> Either DNSError DNSMessage)
+                -- ^ message decoder
              -> ByteString
+                -- ^ enoded input buffer
              -> Either DNSError ([DNSMessage], ByteString)
+                -- ^ decoded messages and left-over partial message
+                -- or error if any complete message fails to parse.
 decodeMParse decoder bs = do
     ((bss, _), leftovers) <- runSGetWithLeftovers lengthEncoded bs
     msgs <- mapM decoder bss
@@ -79,38 +94,3 @@ decodeMParse decoder bs = do
     -- Read a list of length-encoded bytestrings
     lengthEncoded :: SGet [ByteString]
     lengthEncoded = many $ getInt16 >>= getNByteString
-
--- | Decoding DNS flags.
-decodeDNSFlags :: ByteString -> Either DNSError DNSFlags
-decodeDNSFlags bs = fst <$> runSGet getDNSFlags bs
-
--- | Decoding DNS header.
-decodeDNSHeader :: ByteString -> Either DNSError DNSHeader
-decodeDNSHeader bs = fst <$> runSGet getHeader bs
-
--- | Decoding domain.
-decodeDomain :: ByteString -> Either DNSError Domain
-decodeDomain bs = fst <$> runSGet getDomain bs
-
--- | Decoding mailbox.
-decodeMailbox :: ByteString -> Either DNSError Mailbox
-decodeMailbox bs = fst <$> runSGet getMailbox bs
-
--- | Decoding resource record.
-
--- | Decode a resource record (RR) with any DNS timestamps interpreted at the
--- nominal epoch time (see 'decodeAt').  Since RRs may use name compression,
--- it is not generally possible to decode resource record separately from the
--- enclosing DNS message.  This is an internal function.
-decodeResourceRecord :: ByteString -> Either DNSError ResourceRecord
-decodeResourceRecord bs = fst <$> runSGet getResourceRecord bs
-
--- | Decode a resource record (RR) with DNS timestamps interpreted at the
--- supplied epoch time.  Since RRs may use DNS name compression, it is not
--- generally possible to decode resource record separately from the enclosing
--- DNS message.  This is an internal function.
---
-decodeResourceRecordAt :: Int64      -- ^ current epoch time
-                       -> ByteString -- ^ encoded resource record
-                       -> Either DNSError ResourceRecord
-decodeResourceRecordAt t bs = fst <$> runSGetAt t getResourceRecord bs
