@@ -14,7 +14,7 @@ module Network.DNS.Decode (
   , decodeMailbox
   ) where
 
-import Network.DNS.Decode.Internal
+import Network.DNS.Decode.Parsers
 import Network.DNS.Imports
 import Network.DNS.StateBinary
 import Network.DNS.Types

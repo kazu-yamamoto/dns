@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Network.DNS.Decode.Internal (
+module Network.DNS.Decode.Parsers (
     getResponse
   , getDNSFlags
   , getHeader
