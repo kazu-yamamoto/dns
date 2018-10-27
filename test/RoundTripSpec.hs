@@ -101,7 +101,7 @@ genResourceRecord = frequency
   where
     genRR = do
       dom <- genDomain
-      t <- elements [A , AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS]
+      t <- elements [A, AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS, TLSA]
       ResourceRecord dom t classIN <$> genWord32 <*> mkRData dom t
 
 mkRData :: Domain -> TYPE -> Gen RData
@@ -110,7 +110,7 @@ mkRData dom typ =
         A -> RD_A <$> genIPv4
         AAAA -> RD_AAAA <$> genIPv6
         NS -> pure $ RD_NS dom
-        TXT -> RD_TXT <$> genByteString
+        TXT -> RD_TXT <$> genTextString
         MX -> RD_MX <$> genWord16 <*> genDomain
         CNAME -> pure $ RD_CNAME dom
         SOA -> RD_SOA dom <$> genMailbox <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32
@@ -121,6 +121,10 @@ mkRData dom typ =
         TLSA -> RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString
 
         _ -> pure . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
+  where
+    genTextString = do
+        len <- elements [0, 1, 63, 255, 256, 511, 512, 1023, 1024]
+        B.pack <$> replicateM len genWord8
 
 genIPv4 :: Gen IPv4
 genIPv4 = toIPv4 <$> replicateM 4 (fromIntegral <$> genWord8)
