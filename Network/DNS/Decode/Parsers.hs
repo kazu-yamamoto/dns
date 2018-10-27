@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE BangPatterns, OverloadedStrings #-}
 
 module Network.DNS.Decode.Parsers (
     getResponse
@@ -132,6 +132,15 @@ getResourceRecord = do
     dat <- fitSGet len $ getRData typ len
     return $ ResourceRecord dom typ cls ttl dat
 
+----------------------------------------------------------------
+
+-- | Helper to find position of RData end, that is, the offset of the first
+-- byte /after/ the current RData.
+--
+rdataEnd :: Int      -- ^ number of bytes left from current position
+         -> SGet Int -- ^ end position
+rdataEnd !len = (+) len <$> getPosition
+
 getRData :: TYPE -> Int -> SGet RData
 getRData NS _    = RD_NS    <$> getDomain
 getRData MX _    = RD_MX    <$> get16 <*> getDomain
@@ -193,7 +202,7 @@ getRData RRSIG len = RD_RRSIG <$> decodeRRSIG
         -- and after reading the zone name, and subtract that
         -- from the RData length.
         --
-        pos0 <- getPosition
+        end <- rdataEnd len
         typ <- getTYPE
         alg <- get8
         cnt <- get8
@@ -202,8 +211,8 @@ getRData RRSIG len = RD_RRSIG <$> decodeRRSIG
         tin <- getDnsTime
         tag <- get16
         dom <- getDomain -- XXX: Enforce no compression?
-        pos1 <- getPosition
-        val <- getNByteString (len - (pos1 - pos0))
+        pos <- getPosition
+        val <- getNByteString $ end - pos
         return $ RDREP_RRSIG typ alg cnt ttl tex tin tag dom val
     getDnsTime   = do
         tnow <- getAtTime
@@ -239,7 +248,7 @@ getRData _  len = UnknownRData <$> getNByteString len
 -- $
 --
 -- >>> :set -XOverloadedStrings
--- >>> :module + Network.DNS.StateBinary
+-- >>> import Network.DNS.StateBinary
 -- >>> let Right ((t,_),l) = runSGetWithLeftovers (getTXT 8) "\3foo\3barbaz"
 -- >>> (t, l) == ("foobar", "baz")
 -- True
@@ -248,7 +257,7 @@ getRData _  len = UnknownRData <$> getNByteString len
 -- https://tools.ietf.org/html/rfc1035#section-3.3
 --
 getTXT :: Int -> SGet ByteString
-getTXT len = B.concat <$> sGetMany "TXT RR string" len getstring
+getTXT !len = B.concat <$> sGetMany "TXT RR string" len getstring
   where
     getstring = getInt8 >>= getNByteString
 
@@ -256,7 +265,7 @@ getTXT len = B.concat <$> sGetMany "TXT RR string" len getstring
 -- Parse a list of EDNS options
 --
 getOpts :: Int -> SGet [OData]
-getOpts len = sGetMany "EDNS option" len getoption
+getOpts !len = sGetMany "EDNS option" len getoption
   where
     getoption = do
         code <- toOptCode <$> get16
