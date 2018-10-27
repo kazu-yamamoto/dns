@@ -1,4 +1,7 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE
+    BangPatterns
+  , RecordWildCards
+  #-}
 
 -- | Encoders for DNS.
 module Network.DNS.Encode (
@@ -146,43 +149,53 @@ putResourceRecord ResourceRecord{..} = mconcat [
 
 putRData :: RData -> SPut
 putRData rd = case rd of
-    RD_A ip         -> mconcat $ map putInt8 (fromIPv4 ip)
-    RD_AAAA ip      -> mconcat $ map putInt8 (fromIPv6b ip)
-    RD_NS dom       -> putDomain dom
-    RD_CNAME dom    -> putDomain dom
-    RD_DNAME dom    -> putDomain dom
-    RD_PTR dom      -> putDomain dom
-    RD_MX prf dom   -> mconcat [put16 prf, putDomain dom]
-    RD_TXT txt      -> putByteStringWithLength txt
-    RD_OPT opts     -> mconcat $ fmap putOData opts
-    RD_SOA mn mr serial refresh retry expire min' -> mconcat
+    RD_A                 address -> mconcat $ map putInt8 (fromIPv4 address)
+    RD_NS                nsdname -> putDomain nsdname
+    RD_CNAME               cname -> putDomain cname
+    RD_SOA         a b c d e f g -> putSOA a b c d e f g
+    RD_NULL                bytes -> putByteString bytes
+    RD_PTR              ptrdname -> putDomain ptrdname
+    RD_MX              pref exch -> mconcat [put16 pref, putDomain exch]
+    RD_TXT            textstring -> putTXT textstring
+    RD_AAAA              address -> mconcat $ map putInt8 (fromIPv6b address)
+    RD_SRV       pri wei prt tgt -> putSRV pri wei prt tgt
+    RD_DNAME               dname -> putDomain dname
+    RD_OPT               options -> mconcat $ fmap putOData options
+    RD_DS             kt ka dt d -> putDS kt ka dt d
+    RD_RRSIG               rrsig -> putRRSIG rrsig
+    RD_DNSKEY        f p alg key -> putDNSKEY f p alg key
+    RD_NSEC3PARAM  a f iter salt -> putNSEC3PARAM a f iter salt
+    RD_TLSA           u s m dgst -> putTLSA u s m dgst
+    UnknownRData           bytes -> putByteString bytes
+  where
+    putSOA mn mr serial refresh retry expire minttl = mconcat
         [ putDomain mn
         , putMailbox mr
         , put32 serial
         , put32 refresh
         , put32 retry
         , put32 expire
-        , put32 min'
+        , put32 minttl
         ]
-    RD_SRV prio weight port dom -> mconcat
-        [ put16 prio
+    -- TXT record string fragments are at most 255 bytes
+    putTXT textstring =
+        let (!h, !t) = BS.splitAt 255 textstring
+         in putByteStringWithLength h <> if BS.null t
+                then mempty
+                else putTXT t
+    putSRV priority weight port target = mconcat
+        [ put16 priority
         , put16 weight
         , put16 port
-        , putDomain dom
+        , putDomain target
         ]
-    RD_TLSA u s m d -> mconcat
-        [ put8 u
-        , put8 s
-        , put8 m
-        , putByteString d
+    putDS keytag keyalg digestType digest = mconcat
+        [ put16 keytag
+        , put8 keyalg
+        , put8 digestType
+        , putByteString digest
         ]
-    RD_DS t a dt dv -> mconcat
-        [ put16 t
-        , put8 a
-        , put8 dt
-        , putByteString dv
-        ]
-    RD_RRSIG RDREP_RRSIG{..} -> mconcat
+    putRRSIG RDREP_RRSIG{..} = mconcat
         [ put16 $ fromTYPE rrsigType
         , put8 rrsigKeyAlg
         , put8 rrsigNumLabels
@@ -193,20 +206,24 @@ putRData rd = case rd of
         , putDomain rrsigZone
         , putByteString rrsigValue
         ]
-    RD_NULL -> pure mempty
-    (RD_DNSKEY f p a k) -> mconcat
-        [ put16 f
-        , put8 p
-        , put8 a
-        , putByteString k
+    putDNSKEY flags protocol alg key = mconcat
+        [ put16 flags
+        , put8 protocol
+        , put8 alg
+        , putByteString key
         ]
-    (RD_NSEC3PARAM h f i s) -> mconcat
-        [ put8 h
-        , put8 f
-        , put16 i
-        , putByteStringWithLength s
+    putNSEC3PARAM alg flags iterations salt = mconcat
+        [ put8 alg
+        , put8 flags
+        , put16 iterations
+        , putByteStringWithLength salt
         ]
-    UnknownRData bytes -> putByteString bytes
+    putTLSA usage selector mtype assocData = mconcat
+        [ put8 usage
+        , put8 selector
+        , put8 mtype
+        , putByteString assocData
+        ]
 
 -- | Encode EDNS OPTION consisting of a list of octets.
 putODWords :: Word16 -> [Word8] -> SPut

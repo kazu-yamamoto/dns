@@ -247,32 +247,6 @@ pattern CSYNC      = TYPE  62 -- RFC 7477
 pattern ANY :: TYPE
 pattern ANY        = TYPE 255
 
-instance Show TYPE where
-    show A          = "A"
-    show NS         = "NS"
-    show CNAME      = "CNAME"
-    show SOA        = "SOA"
-    show NULL       = "NULL"
-    show PTR        = "PTR"
-    show MX         = "MX"
-    show TXT        = "TXT"
-    show AAAA       = "AAAA"
-    show SRV        = "SRV"
-    show DNAME      = "DNAME"
-    show OPT        = "OPT"
-    show DS         = "DS"
-    show RRSIG      = "RRSIG"
-    show NSEC       = "NSEC"
-    show DNSKEY     = "DNSKEY"
-    show NSEC3      = "NSEC3"
-    show NSEC3PARAM = "NSEC3PARAM"
-    show TLSA       = "TLSA"
-    show CDS        = "CDS"
-    show CDNSKEY    = "CDNSKEY"
-    show CSYNC      = "CSYNC"
-    show ANY        = "ANY"
-    show x          = "TYPE " ++ (show $ fromTYPE x)
-
 -- | From number to type.
 toTYPE :: Word16 -> TYPE
 toTYPE = TYPE
@@ -303,7 +277,7 @@ data TYPE = A          -- ^ IPv4 address
           | ANY        -- ^ A request for all records the server/cache
                        --   has available
           | UnknownTYPE Word16  -- ^ Unknown type
-          deriving (Eq, Ord, Show, Read)
+          deriving (Eq, Ord, Read)
 
 -- | From type to number.
 fromTYPE :: TYPE -> Word16
@@ -359,6 +333,32 @@ toTYPE 62 = CSYNC
 toTYPE 255 = ANY
 toTYPE x   = UnknownTYPE x
 #endif
+
+instance Show TYPE where
+    show A          = "A"
+    show NS         = "NS"
+    show CNAME      = "CNAME"
+    show SOA        = "SOA"
+    show NULL       = "NULL"
+    show PTR        = "PTR"
+    show MX         = "MX"
+    show TXT        = "TXT"
+    show AAAA       = "AAAA"
+    show SRV        = "SRV"
+    show DNAME      = "DNAME"
+    show OPT        = "OPT"
+    show DS         = "DS"
+    show RRSIG      = "RRSIG"
+    show NSEC       = "NSEC"
+    show DNSKEY     = "DNSKEY"
+    show NSEC3      = "NSEC3"
+    show NSEC3PARAM = "NSEC3PARAM"
+    show TLSA       = "TLSA"
+    show CDS        = "CDS"
+    show CDNSKEY    = "CDNSKEY"
+    show CSYNC      = "CSYNC"
+    show ANY        = "ANY"
+    show x          = "TYPE" ++ (show $ fromTYPE x)
 
 ----------------------------------------------------------------
 
@@ -1324,9 +1324,7 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_CNAME Domain     -- ^ The canonical name for an alias
            | RD_SOA Domain Mailbox Word32 Word32 Word32 Word32 Word32
                                  -- ^ Marks the start of a zone of authority
-           | RD_NULL             -- ^ A null RR (EXPERIMENTAL).
-                                 -- Anything can be in a NULL record,
-                                 -- for now we just drop this data.
+           | RD_NULL ByteString  -- ^ NULL RR (EXPERIMENTAL, RFC1035).
            | RD_PTR Domain       -- ^ A domain name pointer
            | RD_MX Word16 Domain -- ^ Mail exchange
            | RD_TXT ByteString   -- ^ Text strings
@@ -1351,29 +1349,52 @@ data RData = RD_A IPv4           -- ^ IPv4 address
     deriving (Eq, Ord)
 
 instance Show RData where
-  show (RD_NS dom) = BS.unpack dom
-  show (RD_MX prf dom) = show prf ++ " " ++ BS.unpack dom
-  show (RD_CNAME dom) = BS.unpack dom
-  show (RD_DNAME dom) = BS.unpack dom
-  show (RD_A a) = show a
-  show (RD_AAAA aaaa) = show aaaa
-  show (RD_TXT txt) = BS.unpack txt
-  show (RD_SOA mn mr serial refresh retry expire mi) = BS.unpack mn ++ " " ++ BS.unpack mr ++ " " ++
-                                                       show serial ++ " " ++ show refresh ++ " " ++
-                                                       show retry ++ " " ++ show expire ++ " " ++ show mi
-  show (RD_PTR dom) = BS.unpack dom
-  show (RD_SRV pri wei prt dom) = show pri ++ " " ++ show wei ++ " " ++ show prt ++ BS.unpack dom
-  show (RD_OPT od) = show od
-  show (UnknownRData is) = show is
-  show (RD_TLSA use sel mtype dgst) = show use ++ " " ++ show sel ++ " " ++ show mtype ++ " " ++ hexencode dgst
-  show (RD_DS t a dt dv) = show t ++ " " ++ show a ++ " " ++ show dt ++ " " ++ hexencode dv
-  show (RD_RRSIG sig) = show sig
-  show RD_NULL = "NULL"
-  show (RD_DNSKEY f p a k) = show f ++ " " ++ show p ++ " " ++ show a ++ " " ++ b64encode k
-  show (RD_NSEC3PARAM h f i s) = show h ++ " " ++ show f ++ " " ++ show i ++ " " ++ showSalt s
+  show rd = case rd of
+      RD_A                  address -> show address
+      RD_NS                 nsdname -> showDomain nsdname
+      RD_CNAME                cname -> showDomain cname
+      RD_SOA          a b c d e f g -> showSOA a b c d e f g
+      RD_NULL                 bytes -> showOpaque bytes
+      RD_PTR               ptrdname -> showDomain ptrdname
+      RD_MX               pref exch -> showMX pref exch
+      RD_TXT             textstring -> BS.unpack textstring
+      RD_AAAA               address -> show address
+      RD_SRV        pri wei prt tgt -> showSRV pri wei prt tgt
+      RD_DNAME               target -> showDomain target
+      RD_OPT                options -> show options
+      RD_DS          tag alg dalg d -> showDS tag alg dalg d
+      RD_RRSIG                rrsig -> show rrsig
+      RD_DNSKEY             f p a k -> showDNSKEY f p a k
+      RD_NSEC3PARAM         a f i s -> showNSEC3PARAM a f i s
+      RD_TLSA               u s m d -> showTLSA u s m d
+      UnknownRData            bytes -> showOpaque bytes
     where
       showSalt ""    = "-"
       showSalt salt  = hexencode salt
+      showDomain = BS.unpack
+      showSOA mname mrname serial refresh retry expire minttl =
+          showDomain mname ++ " " ++ showDomain mrname ++ " " ++
+          show serial ++ " " ++ show refresh ++ " " ++
+          show retry ++ " " ++ show expire ++ " " ++ show minttl
+      showMX preference exchange =
+          show preference ++ " " ++ showDomain exchange
+      showSRV priority weight port target =
+          show priority ++ " " ++ show weight ++ " " ++
+          show port ++ BS.unpack target
+      showDS keytag alg digestType digest =
+          show keytag ++ " " ++ show alg ++ " " ++
+          show digestType ++ " " ++ hexencode digest
+      showDNSKEY flags protocol alg key =
+          show flags ++ " " ++ show protocol ++ " " ++
+          show alg ++ " " ++ b64encode key
+      showNSEC3PARAM hashAlg flags iterations salt =
+          show hashAlg ++ " " ++ show flags ++ " " ++
+          show iterations ++ " " ++ showSalt salt
+      showTLSA usage selector mtype digest =
+          show usage ++ " " ++ show selector ++ " " ++
+          show mtype ++ " " ++ hexencode digest
+      -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
+      showOpaque bs = unwords $ ["\\#", show (BS.length bs), hexencode bs]
 
 hexencode :: ByteString -> String
 hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex

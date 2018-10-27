@@ -219,7 +219,7 @@ getRData RRSIG len = RD_RRSIG <$> decodeRRSIG
         tdns <- get32
         return $! dnsTime tdns tnow
 --
-getRData NULL len = const RD_NULL <$> getNByteString len
+getRData NULL len = RD_NULL <$> getNByteString len
 --
 getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
                                 <*> decodeKeyProto
