@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, CPP #-}
+{-# LANGUAGE OverloadedStrings, CPP, TransformListComp #-}
 
 module RoundTripSpec where
 
@@ -16,6 +16,7 @@ import Test.Hspec.QuickCheck
 import Test.QuickCheck (Gen, arbitrary, elements, forAll, frequency, listOf, oneof)
 import Data.Word (Word8, Word16, Word32)
 import Data.Monoid ((<>))
+import GHC.Exts (the, groupWith)
 
 #if __GLASGOW_HASKELL__ < 709
 import Control.Applicative
@@ -101,7 +102,7 @@ genResourceRecord = frequency
   where
     genRR = do
       dom <- genDomain
-      t <- elements [A, AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS, TLSA]
+      t <- elements [A, AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS, TLSA, NSEC]
       ResourceRecord dom t classIN <$> genWord32 <*> mkRData dom t
 
 mkRData :: Domain -> TYPE -> Gen RData
@@ -118,6 +119,7 @@ mkRData dom typ =
         SRV -> RD_SRV <$> genWord16 <*> genWord16 <*> genWord16 <*> genDomain
         DNAME -> RD_DNAME <$> genDomain
         DS -> RD_DS <$> genWord16 <*> genWord8 <*> genWord8 <*> genByteString
+        NSEC -> RD_NSEC <$> genDomain <*> genNsecTypes
         TLSA -> RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString
 
         _ -> pure . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
@@ -125,6 +127,13 @@ mkRData dom typ =
     genTextString = do
         len <- elements [0, 1, 63, 255, 256, 511, 512, 1023, 1024]
         B.pack <$> replicateM len genWord8
+    genNsecTypes = do
+        ntypes <- elements [0..15]
+        types <- sequence $ replicate ntypes $ toTYPE <$> elements [1..1024]
+        return $ [ the t |
+                   t <- types,
+                   then group by (fromTYPE t)
+                        using groupWith ]
 
 genIPv4 :: Gen IPv4
 genIPv4 = toIPv4 <$> replicateM 4 (fromIntegral <$> genWord8)

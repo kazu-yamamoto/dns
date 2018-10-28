@@ -69,6 +69,7 @@ copy (RD_SRV a b c dom)   = RD_SRV a b c $ B.copy dom
 copy (RD_DNAME dom)       = RD_DNAME $ B.copy dom
 copy (RD_OPT od)          = RD_OPT $ map copyOData od
 copy (RD_DS t a dt dv)    = RD_DS t a dt $ B.copy dv
+copy (RD_NSEC dom ts)     = RD_NSEC (B.copy dom) ts
 copy (RD_DNSKEY f p a k)  = RD_DNSKEY f p a $ B.copy k
 copy (RD_TLSA a b c dgst) = RD_TLSA a b c $ B.copy dgst
 copy (RD_NSEC3PARAM a b c salt) = RD_NSEC3PARAM a b c $ B.copy salt

@@ -1,6 +1,7 @@
 {-# LANGUAGE
     BangPatterns
   , RecordWildCards
+  , TransformListComp
   #-}
 
 -- | Encoders for DNS.
@@ -20,7 +21,9 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.IP
+import Data.List (foldl')
 import Data.IP (IP(..), fromIPv4, fromIPv6b, makeAddrRange)
+import GHC.Exts (the, groupWith)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
@@ -163,6 +166,7 @@ putRData rd = case rd of
     RD_OPT               options -> mconcat $ fmap putOData options
     RD_DS             kt ka dt d -> putDS kt ka dt d
     RD_RRSIG               rrsig -> putRRSIG rrsig
+    RD_NSEC           next types -> putDomain next <> putNsecTypes types
     RD_DNSKEY        f p alg key -> putDNSKEY f p alg key
     RD_NSEC3PARAM  a f iter salt -> putNSEC3PARAM a f iter salt
     RD_TLSA           u s m dgst -> putTLSA u s m dgst
@@ -224,6 +228,40 @@ putRData rd = case rd of
         , put8 mtype
         , putByteString assocData
         ]
+
+-- | Encode DNSSEC NSEC type bits
+putNsecTypes :: [TYPE] -> SPut
+putNsecTypes types = putTypeList $ map fromTYPE types
+  where
+    putTypeList :: [Word16] -> SPut
+    putTypeList ts =
+        mconcat [ putWindow (the top8) bot8 |
+                  t <- ts,
+                  let top8 = fromIntegral t `shiftR` 8,
+                  let bot8 = fromIntegral t .&. 0xff,
+                  then group by top8
+                       using groupWith ]
+
+    putWindow :: Int -> [Int] -> SPut
+    putWindow top8 bot8s =
+        let blks = maximum bot8s `shiftR` 3
+         in putInt8 top8
+            <> put8 (1 + fromIntegral blks)
+            <> putBits 0 [ (the block, foldl' mergeBits 0 bot8) |
+                           bot8 <- bot8s,
+                           let block = bot8 `shiftR` 3,
+                           then group by block
+                                using groupWith ]
+      where
+        -- | Combine type bits in network bit order, i.e. bit 0 first.
+        mergeBits acc b = setBit acc (7 - b.&.0x07)
+
+    putBits :: Int -> [(Int, Word8)] -> SPut
+    putBits _ [] = pure mempty
+    putBits n ((block, octet) : rest) =
+        putReplicate (block-n) 0
+        <> put8 octet
+        <> putBits (block + 1) rest
 
 -- | Encode EDNS OPTION consisting of a list of octets.
 putODWords :: Word16 -> [Word8] -> SPut
