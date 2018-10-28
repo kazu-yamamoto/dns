@@ -14,6 +14,7 @@ module Network.DNS.StateBinary (
   , putInt16
   , putInt32
   , putByteString
+  , putReplicate
   , SGet
   , failSGet
   , fitSGet
@@ -50,6 +51,7 @@ import qualified Data.Attoparsec.Types as T
 import qualified Data.ByteString as BS
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
@@ -101,6 +103,10 @@ putInt32 = fixedSized 4 (BB.int32BE . fromIntegral)
 
 putByteString :: ByteString -> SPut
 putByteString = writeSized BS.length BB.byteString
+
+putReplicate :: Int -> Word8 -> SPut
+putReplicate n w =
+    fixedSized n BB.lazyByteString $ LB.replicate (fromIntegral n) w
 
 addPositionW :: Int -> State WState ()
 addPositionW n = do

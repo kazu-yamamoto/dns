@@ -220,6 +220,11 @@ getRData RRSIG len = RD_RRSIG <$> decodeRRSIG
         return $! dnsTime tdns tnow
 --
 getRData NULL len = RD_NULL <$> getNByteString len
+getRData NSEC len = do
+    end <- rdataEnd len
+    dom <- getDomain
+    pos <- getPosition
+    RD_NSEC dom <$> getNsecTypes (end - pos)
 --
 getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
                                 <*> decodeKeyProto
@@ -271,6 +276,23 @@ getOpts !len = sGetMany "EDNS option" len getoption
         code <- toOptCode <$> get16
         olen <- getInt16
         getOData code olen
+
+-- <https://tools.ietf.org/html/rfc4034#section-4.1>
+-- Parse a list of NSEC type bitmaps
+--
+getNsecTypes :: Int -> SGet [TYPE]
+getNsecTypes !len = concat <$> sGetMany "NSEC type bitmap" len getbits
+  where
+    getbits = do
+        window <- flip shiftL 8 <$> getInt8
+        blocks <- getInt8
+        when (blocks > 32) $
+            failSGet $ "NSEC bitmap block too long: " ++ show blocks
+        concatMap blkTypes. zip [window, window + 8..] <$> getNBytes blocks
+      where
+        blkTypes (bitOffset, byte) =
+            [ toTYPE $ fromIntegral $ bitOffset + i |
+              i <- [0..7], byte.&.(bit (7-i)) /= 0 ]
 
 ----------------------------------------------------------------
 

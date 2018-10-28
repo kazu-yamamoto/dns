@@ -1335,7 +1335,7 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_OPT [OData]      -- ^ OPT (RFC6891)
            | RD_DS Word16 Word8 Word8 ByteString -- ^ Delegation Signer (RFC4034)
            | RD_RRSIG RD_RRSIG   -- ^ DNSSEC signature
-           --RD_NSEC
+           | RD_NSEC Domain [TYPE] -- ^ DNSSEC denial of existence NSEC record
            | RD_DNSKEY Word16 Word8 Word8 ByteString
                                  -- ^ DNSKEY (RFC4034)
            --RD_NSEC3
@@ -1364,6 +1364,7 @@ instance Show RData where
       RD_OPT                options -> show options
       RD_DS          tag alg dalg d -> showDS tag alg dalg d
       RD_RRSIG                rrsig -> show rrsig
+      RD_NSEC            next types -> showNSEC next types
       RD_DNSKEY             f p a k -> showDNSKEY f p a k
       RD_NSEC3PARAM         a f i s -> showNSEC3PARAM a f i s
       RD_TLSA               u s m d -> showTLSA u s m d
@@ -1384,6 +1385,8 @@ instance Show RData where
       showDS keytag alg digestType digest =
           show keytag ++ " " ++ show alg ++ " " ++
           show digestType ++ " " ++ hexencode digest
+      showNSEC next types =
+          unwords $ showDomain next : map show types
       showDNSKEY flags protocol alg key =
           show flags ++ " " ++ show protocol ++ " " ++
           show alg ++ " " ++ b64encode key
