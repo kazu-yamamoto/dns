@@ -44,8 +44,8 @@ module Network.DNS.StateBinary (
   , skipNBytes
   ) where
 
-import Control.Monad.State (State, StateT)
-import qualified Control.Monad.State as ST
+import Control.Monad.State.Strict (State, StateT)
+import qualified Control.Monad.State.Strict as ST
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.Types as T
 import qualified Data.ByteString as BS

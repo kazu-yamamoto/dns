@@ -43,6 +43,7 @@ module Network.DNS.Types (
   , CDNSKEY
   , CSYNC
   , ANY
+  , CAA
   )
   , fromTYPE
   , toTYPE
@@ -138,10 +139,7 @@ module Network.DNS.Types (
 
 import Control.Exception (Exception, IOException)
 import Control.Applicative ((<|>))
-import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Builder as L
-import qualified Data.ByteString.Lazy as L
 import Data.Function (on)
 import Data.IP (IP(..), IPv4, IPv6)
 import Data.Int (Int64)
@@ -149,6 +147,10 @@ import qualified Data.List as List
 import           Data.Maybe (fromMaybe)
 import qualified Data.Semigroup as Sem
 import Text.Printf (printf)
+
+import qualified Data.ByteString.Base16 as B16
+import qualified Network.DNS.Base32Hex as B32
+import qualified Data.ByteString.Base64 as B64
 
 import Network.DNS.Imports
 
@@ -246,6 +248,9 @@ pattern CSYNC      = TYPE  62 -- RFC 7477
 -- | A request for all records the server/cache has available
 pattern ANY :: TYPE
 pattern ANY        = TYPE 255
+-- | A request for all records the server/cache has available
+pattern CAA :: TYPE
+pattern CAA        = TYPE 257
 
 -- | From number to type.
 toTYPE :: Word16 -> TYPE
@@ -276,6 +281,7 @@ data TYPE = A          -- ^ IPv4 address
           | CSYNC      -- ^ Child-To-Parent Synchronization (RFC7477)
           | ANY        -- ^ A request for all records the server/cache
                        --   has available
+          | CAA        -- ^ Certification Authority Authorization
           | UnknownTYPE Word16  -- ^ Unknown type
           deriving (Eq, Ord, Read)
 
@@ -304,6 +310,7 @@ fromTYPE CDS        = 59
 fromTYPE CDNSKEY    = 60
 fromTYPE CSYNC      = 62
 fromTYPE ANY        = 255
+fromTYPE CAA        = 257
 fromTYPE (UnknownTYPE x) = x
 
 -- | From number to type.
@@ -331,6 +338,7 @@ toTYPE 59 = CDS
 toTYPE 60 = CDNSKEY
 toTYPE 62 = CSYNC
 toTYPE 255 = ANY
+toTYPE 257 = CAA
 toTYPE x   = UnknownTYPE x
 #endif
 
@@ -358,6 +366,7 @@ instance Show TYPE where
     show CDNSKEY    = "CDNSKEY"
     show CSYNC      = "CSYNC"
     show ANY        = "ANY"
+    show CAA        = "CAA"
     show x          = "TYPE" ++ (show $ fromTYPE x)
 
 ----------------------------------------------------------------
@@ -1333,8 +1342,10 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_NSEC Domain [TYPE] -- ^ DNSSEC denial of existence NSEC record
            | RD_DNSKEY Word16 Word8 Word8 ByteString
                                  -- ^ DNSKEY (RFC4034)
-           --RD_NSEC3
+           | RD_NSEC3 Word8 Word8 Word16 ByteString ByteString [TYPE]
+                                 -- ^ DNSSEC hashed denial of existence (RFC5155)
            | RD_NSEC3PARAM Word8 Word8 Word16 ByteString
+                                 -- ^ NSEC3 zone parameters (RFC5155)
            | RD_TLSA Word8 Word8 Word8 ByteString
                                  -- ^ TLSA (RFC6698)
            --RD_CDS
@@ -1361,12 +1372,13 @@ instance Show RData where
       RD_RRSIG                rrsig -> show rrsig
       RD_NSEC            next types -> showNSEC next types
       RD_DNSKEY             f p a k -> showDNSKEY f p a k
+      RD_NSEC3      a f i s h types -> showNSEC3 a f i s h types
       RD_NSEC3PARAM         a f i s -> showNSEC3PARAM a f i s
       RD_TLSA               u s m d -> showTLSA u s m d
       UnknownRData            bytes -> showOpaque bytes
     where
       showSalt ""    = "-"
-      showSalt salt  = hexencode salt
+      showSalt salt  = b16encode salt
       showDomain = BS.unpack
       showSOA mname mrname serial refresh retry expire minttl =
           showDomain mname ++ " " ++ showDomain mrname ++ " " ++
@@ -1379,26 +1391,29 @@ instance Show RData where
           show port ++ BS.unpack target
       showDS keytag alg digestType digest =
           show keytag ++ " " ++ show alg ++ " " ++
-          show digestType ++ " " ++ hexencode digest
+          show digestType ++ " " ++ b16encode digest
       showNSEC next types =
           unwords $ showDomain next : map show types
       showDNSKEY flags protocol alg key =
           show flags ++ " " ++ show protocol ++ " " ++
           show alg ++ " " ++ b64encode key
+      -- | <https://tools.ietf.org/html/rfc5155#section-3.2>
+      showNSEC3 hashalg flags iterations salt nexthash types =
+          unwords $ show hashalg : show flags : show iterations :
+                    showSalt salt : b32encode nexthash : map show types
       showNSEC3PARAM hashAlg flags iterations salt =
           show hashAlg ++ " " ++ show flags ++ " " ++
           show iterations ++ " " ++ showSalt salt
       showTLSA usage selector mtype digest =
           show usage ++ " " ++ show selector ++ " " ++
-          show mtype ++ " " ++ hexencode digest
+          show mtype ++ " " ++ b16encode digest
       -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
-      showOpaque bs = unwords $ ["\\#", show (BS.length bs), hexencode bs]
+      showOpaque bs = unwords $ ["\\#", show (BS.length bs), b16encode bs]
 
-hexencode :: ByteString -> String
-hexencode = BS.unpack . L.toStrict . L.toLazyByteString . L.byteStringHex
-
-b64encode :: ByteString -> String
-b64encode = BS.unpack . B64.encode
+b16encode, b32encode, b64encode :: ByteString -> String
+b16encode = BS.unpack. B16.encode
+b32encode = BS.unpack. B32.encode
+b64encode = BS.unpack. B64.encode
 
 -- | Type alias for resource records in the answer section.
 type Answers = [ResourceRecord]
@@ -1685,14 +1700,14 @@ instance Show OData where
     show (OD_N3U hs)    = showAlgList "N3U" hs
     show (OD_ClientSubnet b1 b2 ip@(IPv4 _)) = showECS 1 b1 b2 $ show ip
     show (OD_ClientSubnet b1 b2 ip@(IPv6 _)) = showECS 2 b1 b2 $ show ip
-    show (OD_ECSgeneric fam b1 b2 a) = showECS fam b1 b2 $ hexencode a
+    show (OD_ECSgeneric fam b1 b2 a) = showECS fam b1 b2 $ b16encode a
     show (UnknownOData code bs) = showUnknown code bs
 
 showAlgList :: String -> [Word8] -> String
 showAlgList nm ws = nm ++ " " ++ List.intercalate "," (map show ws)
 
 showNSID :: ByteString -> String
-showNSID nsid = "NSID" ++ " " ++ hexencode nsid ++ ";" ++ printable nsid
+showNSID nsid = "NSID" ++ " " ++ b16encode nsid ++ ";" ++ printable nsid
   where
     printable = BS.unpack. BS.map (\c -> if c < ' ' || c > '~' then '?' else c)
 
@@ -1702,4 +1717,4 @@ showECS family srcBits scpBits address =
                 ++ " " ++ show scpBits ++ " " ++ address
 
 showUnknown :: Word16 -> ByteString -> String
-showUnknown code bs = "UnknownOData " ++ show code ++ " " ++ hexencode bs
+showUnknown code bs = "UnknownOData " ++ show code ++ " " ++ b16encode bs

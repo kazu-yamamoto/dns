@@ -236,6 +236,16 @@ getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
     decodeKeyAlg    = get8
     decodeKeyBytes  = getNByteString (len - 4)
 --
+getRData NSEC3 len = do
+    dend <- rdataEnd len
+    halg <- get8
+    flgs <- get8
+    iter <- get16
+    salt <- getInt8 >>= getNByteString
+    hash <- getInt8 >>= getNByteString
+    tpos <- getPosition
+    RD_NSEC3 halg flgs iter salt hash <$> getNsecTypes (dend - tpos)
+--
 getRData NSEC3PARAM _ = RD_NSEC3PARAM <$> decodeHashAlg
                                       <*> decodeFlags
                                       <*> decodeIterations

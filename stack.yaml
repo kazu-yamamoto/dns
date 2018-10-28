@@ -3,6 +3,6 @@ resolver: lts-9.3
 packages:
 - '.'
 extra-deps:
-- QuickCheck-2.10
-- psqueues-0.2.4.0
-
+flags:
+  sandi:
+    with-conduit: false
