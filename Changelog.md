@@ -1,5 +1,8 @@
 # 4.0.0
 
+- Added the TYPE definition, but not yet RData, for CAA.
+- Added decode, encode and show for NSEC3 RRs.
+- Added base16-bytestring as a new dependency.
 - Added decode, encode and show for NSEC RRs.
 - New RData constructor RD_NSEC.
 - Correct presentation form of unknown RR types.

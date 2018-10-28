@@ -168,6 +168,7 @@ putRData rd = case rd of
     RD_RRSIG               rrsig -> putRRSIG rrsig
     RD_NSEC           next types -> putDomain next <> putNsecTypes types
     RD_DNSKEY        f p alg key -> putDNSKEY f p alg key
+    RD_NSEC3     a f i s h types -> putNSEC3 a f i s h types
     RD_NSEC3PARAM  a f iter salt -> putNSEC3PARAM a f iter salt
     RD_TLSA           u s m dgst -> putTLSA u s m dgst
     UnknownRData           bytes -> putByteString bytes
@@ -215,6 +216,14 @@ putRData rd = case rd of
         , put8 protocol
         , put8 alg
         , putByteString key
+        ]
+    putNSEC3 alg flags iterations salt hash types = mconcat
+        [ put8 alg
+        , put8 flags
+        , put16 iterations
+        , putByteStringWithLength salt
+        , putByteStringWithLength hash
+        , putNsecTypes types
         ]
     putNSEC3PARAM alg flags iterations salt = mconcat
         [ put8 alg

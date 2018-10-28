@@ -32,7 +32,8 @@ Library
                         Network.DNS.Decode
                         Network.DNS.Decode.Internal
                         Network.DNS.IO
-  Other-Modules:        Network.DNS.Decode.Parsers
+  Other-Modules:        Network.DNS.Base32Hex
+                        Network.DNS.Decode.Parsers
                         Network.DNS.Imports
                         Network.DNS.Memo
                         Network.DNS.StateBinary
@@ -41,9 +42,11 @@ Library
   if impl(ghc < 8)
     Build-Depends:      semigroups
   Build-Depends:        base >= 4 && < 5
+                      , array
                       , async
                       , attoparsec
                       , auto-update
+                      , base16-bytestring
                       , base64-bytestring
                       , binary
                       , bytestring

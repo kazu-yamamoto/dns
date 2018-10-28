@@ -102,7 +102,8 @@ genResourceRecord = frequency
   where
     genRR = do
       dom <- genDomain
-      t <- elements [A, AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS, TLSA, NSEC]
+      t <- elements [A, AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS,
+                     TLSA, NSEC, NSEC3]
       ResourceRecord dom t classIN <$> genWord32 <*> mkRData dom t
 
 mkRData :: Domain -> TYPE -> Gen RData
@@ -120,10 +121,18 @@ mkRData dom typ =
         DNAME -> RD_DNAME <$> genDomain
         DS -> RD_DS <$> genWord16 <*> genWord8 <*> genWord8 <*> genByteString
         NSEC -> RD_NSEC <$> genDomain <*> genNsecTypes
+        NSEC3 -> genNSEC3
         TLSA -> RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString
 
         _ -> pure . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
   where
+    genNSEC3 = do
+        (alg, hlen)  <- elements [(1,32),(2,64)]
+        flgs <- elements [0,1]
+        iter <- elements [0..100]
+        salt <- elements ["", "AB"]
+        hash <- B.pack <$> replicateM hlen genWord8
+        RD_NSEC3 alg flgs iter salt hash <$> genNsecTypes
     genTextString = do
         len <- elements [0, 1, 63, 255, 256, 511, 512, 1023, 1024]
         B.pack <$> replicateM len genWord8
