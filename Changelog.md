@@ -1,5 +1,11 @@
 # 4.0.0
 
+- Added decode, encode and show for NSEC RRs.
+- New RData constructor RD_NSEC.
+- Correct presentation form of unknown RR types.
+- Corrected encoding of long TXT records
+- RD_NULL now has an opaque data payload.
+
 - Safety: Both 'decode' and 'decodeAt' must now consume exactly
   the complete input buffer or a DecodeError is returned.
 
