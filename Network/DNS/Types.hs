@@ -140,13 +140,11 @@ import Control.Exception (Exception, IOException)
 import Control.Applicative ((<|>))
 import qualified Data.ByteString.Char8 as BS
 import Data.Function (on)
+import qualified Data.Hourglass as H
 import Data.IP (IP(..), IPv4, IPv6)
 import qualified Data.List as List
 import           Data.Maybe (fromMaybe)
 import qualified Data.Semigroup as Sem
-import qualified Data.Text.Format as T
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Builder as T
 
 import qualified Data.ByteString.Base16 as B16
 import qualified Network.DNS.Base32Hex as B32
@@ -1230,10 +1228,7 @@ dnsTime tdns tnow =
            else tnow + fromIntegral delta
 
 -- | Convert epoch time to a YYYYMMDDHHMMSS string:
--- <http://howardhinnant.github.io/date_algorithms.html>
 --
--- This avoids all the pain of converting epoch time to NominalDiffTime ->
--- UTCTime -> LocalTime then using formatTime with defaultTimeLocale!
 -- >>> :{
 -- let testVector =
 --         [ ( "19230704085602", -1467299038)
@@ -1260,23 +1255,12 @@ dnsTime tdns tnow =
 -- :}
 -- True
 --
+
 showTime :: Int64 -> String
-showTime t =
-    let (z0, s) = t `divMod` 86400
-        z = z0 + 719468
-        (era, doe) = z `divMod` 146097
-        yoe = (doe - doe `quot` 1460 + doe `quot` 36524
-                   - doe `quot` 146096) `quot` 365
-        y = yoe + era * 400
-        doy = doe - (365*yoe + yoe `quot` 4 - yoe `quot` 100)
-        mp = (5*doy + 2) `quot` 153
-        day = doy - (153*mp + 2) `quot` 5 + 1
-        mon = 1 + (mp + 2) `rem` 12
-        year = y + (12 - mon) `quot` 10
-        (hh, (mm, ss)) = flip divMod 60 <$> s `divMod` 3600
-     in T.unpack $ T.toLazyText
-                 $ T.left 4 '0' year <> T.left 2 '0' mon <> T.left 2 '0' day
-                <> T.left 2 '0'   hh <> T.left 2 '0'  mm <> T.left 2 '0' ss
+showTime t = H.timePrint fmt $ H.Elapsed $ H.Seconds t
+  where
+    fmt = [ H.Format_Year4, H.Format_Month2, H.Format_Day2
+          , H.Format_Hour,  H.Format_Minute, H.Format_Second ]
 
 -- | RRSIG representation.
 --
