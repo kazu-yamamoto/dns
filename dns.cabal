@@ -28,12 +28,14 @@ Library
                         Network.DNS.Resolver
                         Network.DNS.Utils
                         Network.DNS.Types
-                        Network.DNS.Encode
                         Network.DNS.Decode
                         Network.DNS.Decode.Internal
+                        Network.DNS.Encode
+                        Network.DNS.Encode.Internal
                         Network.DNS.IO
   Other-Modules:        Network.DNS.Base32Hex
                         Network.DNS.Decode.Parsers
+                        Network.DNS.Encode.Builders
                         Network.DNS.Imports
                         Network.DNS.Memo
                         Network.DNS.StateBinary

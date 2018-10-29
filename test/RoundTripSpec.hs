@@ -10,6 +10,7 @@ import qualified Data.ByteString.Char8 as BS
 import Network.DNS.Decode
 import Network.DNS.Decode.Internal
 import Network.DNS.Encode
+import Network.DNS.Encode.Internal
 import Network.DNS.Types
 import Test.Hspec
 import Test.Hspec.QuickCheck

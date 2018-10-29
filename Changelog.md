@@ -1,60 +1,51 @@
 # 4.0.0
 
+- Breaking change: the DNSMessage __component__ encoding
+  functions are now internal.  They're still exported from
+  the new 'Nework.DNS.Encode.Internal' module, but this
+  is only to make them available for the test-suite.
 - Added the TYPE definition, but not yet RData, for CAA.
 - Added decode, encode and show for NSEC3 RRs.
 - Added base16-bytestring as a new dependency.
 - Added decode, encode and show for NSEC RRs.
-- New RData constructor RD_NSEC.
+- New RData constructor RD\_NSEC.
 - Correct presentation form of unknown RR types.
 - Corrected encoding of long TXT records
-- RD_NULL now has an opaque data payload.
-
+- RD\_NULL now has an opaque data payload.
 - Safety: Both 'decode' and 'decodeAt' must now consume exactly
   the complete input buffer or a DecodeError is returned.
-
   * The same applies to each complete message with 'decodeMany'
     and 'decodeManyAt'.  Any final encoded message segment at the
     end of the input buffer is still returned as the second
     element of the result pair.
-
 - Bugfix: fixed incorrect decoding of TXT records, and corrected
   the associated test.
-
 - Cleanup: More precise control over decoder error messages via
   'failSGet', which avoids the unhelpful Attoparsec "Failure
   reading: " error prefix.
-
 - Cleanup: Simplified loop detection in name decompression, making
   use of a monotone strictly decreasing limit on valid "pointer"
   targets.
-
 - Breaking change: In the "Decode" module, expose only the
   decode{,Many}{,At} functions.  The rest of the "Decode" module's
   functions are now internal, exposed only for testing.  These
   include:
-
   * decodeDNSHeader
   * decodeDNSFlags
   * decodeResourceRecord
   * decodeDomain
   * decodeMailbox
-
 - Cleanup: Reworked Decode module structure:
-
     * Moved Decode.Internal to Decode.Parsers
-
     * Created a new Decode.Internal which is now exposed, and
       moved some functions there from Decode which are only
       exposed for testing, since they could not reliably be used
       except as part of decoding a full message.
-
 - Feature: RRSIG support, we can now encode, decode and show RRSIG
   records.  This uses the new 'decodeAt' and 'decodeManyAt' API.
-
 - New API: 'decodeAt' and 'decodeManyAt' make it possible for
   the decoder to get the current time, in order to decode some
   RR types (like RRSIG) whose full meaning is time-dependent.
-
 - Re-export 'sendAll' and export 'encodeVC' for use with TCP.
 - No longer using sendAll with UDP, UDP datagrams must not be sent
   piece-by-piece
@@ -81,11 +72,9 @@
   updated hold the extended error code when valid EDNS OPT records
   (EDNS pseudo-headers) are found.  The remaining EDNS record
   fields have been renamed:
-
-        udpSize  -> ednsBufferSize
-        dnssecOk -> ednsDnssecOk
-        options  -> ednsOptions
-
+      * udpSize  -> ednsBufferSize
+      * dnssecOk -> ednsDnssecOk
+      * options  -> ednsOptions
   The reverse process happens on output with the 12-bit header
   RCODE split across the wire-form DNS header and the OPT record.
   When EDNS is not enabled, and the RCODE > 15, it is mapped to
@@ -114,15 +103,15 @@
 - Added EDNS OPTIONS: NSID, DAU, DHU, N3U
 - Decoding of the ClientSubnet option is now a total function,
   provided the RDATA is structurally sound.  Unexpected values
-  just yield OD_ECSgeneric results.
-- Breaking change: New OD_ECSgeneric EDNS constructor, represents
+  just yield OD\_ECSgeneric results.
+- Breaking change: New OD\_ECSgeneric EDNS constructor, represents
   ClientSubnet values whose address family is not IP or that violate
   the specification.  The "family" field distinguishes the two cases.
 - The ClientSubnet EDNS option is now encoded correctly even when the
   source bits match some trailing all-zero bytes.
 - Breaking change: EDNS0 is renamed to EDNS.
 - Breaking change: lookupRawAD, composeQuery, composeQueryAD are removed.
-- New OP codes: OP_NOTIFY and OP_UPDATE.
+- New OP codes: OP\_NOTIFY and OP\_UPDATE.
   [#113](https://github.com/kazu-yamamoto/dns/pull/113)
 
 # 3.0.4
