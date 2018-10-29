@@ -302,7 +302,7 @@ getNsecTypes !len = concat <$> sGetMany "NSEC type bitmap" len getbits
       where
         blkTypes (bitOffset, byte) =
             [ toTYPE $ fromIntegral $ bitOffset + i |
-              i <- [0..7], byte.&.(bit (7-i)) /= 0 ]
+              i <- [0..7], byte .&. bit (7-i) /= 0 ]
 
 ----------------------------------------------------------------
 

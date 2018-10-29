@@ -365,7 +365,7 @@ instance Show TYPE where
     show CSYNC      = "CSYNC"
     show ANY        = "ANY"
     show CAA        = "CAA"
-    show x          = "TYPE" ++ (show $ fromTYPE x)
+    show x          = "TYPE" ++ show (fromTYPE x)
 
 ----------------------------------------------------------------
 
@@ -1397,7 +1397,7 @@ instance Show RData where
           show usage ++ " " ++ show selector ++ " " ++
           show mtype ++ " " ++ b16encode digest
       -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
-      showOpaque bs = unwords $ ["\\#", show (BS.length bs), b16encode bs]
+      showOpaque bs = unwords ["\\#", show (BS.length bs), b16encode bs]
 
 b16encode, b32encode, b64encode :: ByteString -> String
 b16encode = BS.unpack. B16.encode
