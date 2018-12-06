@@ -168,7 +168,7 @@ type Mailbox = ByteString
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 800
 -- | Types for resource records.
 newtype TYPE = TYPE {
     -- | From type to number.
@@ -948,7 +948,7 @@ fromOPCODE OP_UPDATE = 5
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 800
 -- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
 -- bits.  With EDNS this stores the combined error code from the DNS header and
 -- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
@@ -1575,7 +1575,7 @@ minUdpSize = 512
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 802
+#if __GLASGOW_HASKELL__ >= 800
 -- | EDNS Option Code (RFC 6891).
 newtype OptCode = OptCode {
     -- | From option code to number.
