@@ -1,28 +1,36 @@
-cache:
-- c:\sr -> stack.yaml
-- C:\Users\appveyor\AppData\Local\Programs\stack\x86_64-windows -> stack.yaml
+version: "{build}"
+clone_folder: "c:\\dns"
 
-clone_folder: "c:\\stack"
 environment:
   global:
-    STACK_ROOT: "c:\\sr"
+    CABOPTS:  "--store-dir=C:\\SR --http-transport=plain-http"
   matrix:
-    - stack_lts: "lts-12.24"
-    - stack_lts: "nightly"
+    - GHCVER: "8.6.3"
 
-matrix:
-  allow_failures:
-    - stack_lts: "nightly"
+platform:
+#  - x86 # We may want to test x86 as well, but it would double the 23min build time.
+  - x64
+
+cache:
+ - "C:\\SR"
 
 install:
-- curl -sS -ostack.zip -L --insecure http://www.stackage.org/stack/windows-x86_64
-- 7z x stack.zip stack.exe
-- stack --no-terminal setup --resolver %stack_lts% > nul
+ - "choco install -y cabal"
+ - "choco install -y ghc --version %GHCVER%"
+ - "refreshenv"
+ - "set PATH=C:\\msys64\\mingw64\\bin;C:\\msys64\\usr\\bin;C:\\ghc\\ghc-%GHCVER%\\bin;%PATH%"
+ - "cabal --version"
+ - "ghc --version"
+ - "cabal %CABOPTS% update -vverbose+nowrap"
+ - "cabal %CABOPTS% install hspec-discover"
+ - "cabal %CABOPTS% install cabal-doctest"
 
-build_script:
-- stack --no-terminal build --resolver %stack_lts% --reconfigure
+build: off
+deploy: off
 
 test_script:
-- stack --no-terminal test --resolver %stack_lts% --reconfigure
-
-deploy: off
+ - cabal %CABOPTS% new-build -j1 -vnormal+nowrap --dry all
+ - ps: Push-AppveyorArtifact dist-newstyle\cache\plan.json
+ - cabal %CABOPTS% new-build -j1 -vnormal+nowrap all
+ - cabal %CABOPTS% new-test  -j1 -vnormal+nowrap all
+ - ps: ls dns*.log -recurse | %{ Push-AppveyorArtifact $_}
