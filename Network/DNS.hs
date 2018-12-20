@@ -9,7 +9,8 @@
 --   Examples:
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupA resolver "www.mew.org"
+--   >>> let hostname = Data.ByteString.Char8.pack "www.mew.org"
+--   >>> withResolver rs $ \resolver -> lookupA resolver hostname
 --   Right [210.130.207.72]
 module Network.DNS (
   -- * High level
@@ -53,3 +54,6 @@ import Network.DNS.LookupRaw
 import Network.DNS.Resolver
 import Network.DNS.Types
 import Network.DNS.Utils
+
+-- $setup
+-- >>> import qualified Data.ByteString.Char8
