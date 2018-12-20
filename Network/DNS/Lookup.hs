@@ -80,6 +80,8 @@ import Network.DNS.LookupRaw as DNS
 import Network.DNS.Resolver as DNS
 import Network.DNS.Types
 
+-- $setup
+-- >>> :set -XOverloadedStrings
 
 ----------------------------------------------------------------
 

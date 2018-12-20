@@ -20,6 +20,9 @@ import Network.DNS.Imports
 import Network.DNS.StateBinary
 import Network.DNS.Types
 
+-- $setup
+-- >>> :set -XOverloadedStrings
+
 ----------------------------------------------------------------
 
 getResponse :: SGet DNSMessage
@@ -262,7 +265,6 @@ getRData _  len = UnknownRData <$> getNByteString len
 
 -- $
 --
--- >>> :set -XOverloadedStrings
 -- >>> import Network.DNS.StateBinary
 -- >>> let Right ((t,_),l) = runSGetWithLeftovers (getTXT 8) "\3foo\3barbaz"
 -- >>> (t, l) == ("foobar", "baz")

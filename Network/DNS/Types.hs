@@ -153,6 +153,7 @@ import qualified Data.ByteString.Base64 as B64
 import Network.DNS.Imports
 
 -- $setup
+-- >>> :set -XOverloadedStrings
 -- >>> import Network.DNS
 
 ----------------------------------------------------------------
