@@ -153,7 +153,6 @@ import qualified Data.ByteString.Base64 as B64
 import Network.DNS.Imports
 
 -- $setup
--- >>> :set -XOverloadedStrings
 -- >>> import Network.DNS
 
 ----------------------------------------------------------------
@@ -169,7 +168,7 @@ type Mailbox = ByteString
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 -- | Types for resource records.
 newtype TYPE = TYPE {
     -- | From type to number.
@@ -366,7 +365,7 @@ instance Show TYPE where
     show CSYNC      = "CSYNC"
     show ANY        = "ANY"
     show CAA        = "CAA"
-    show x          = "TYPE" ++ show (fromTYPE x)
+    show x          = "TYPE" ++ (show $ fromTYPE x)
 
 ----------------------------------------------------------------
 
@@ -949,7 +948,7 @@ fromOPCODE OP_UPDATE = 5
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 -- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
 -- bits.  With EDNS this stores the combined error code from the DNS header and
 -- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
@@ -1398,7 +1397,7 @@ instance Show RData where
           show usage ++ " " ++ show selector ++ " " ++
           show mtype ++ " " ++ b16encode digest
       -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
-      showOpaque bs = unwords ["\\#", show (BS.length bs), b16encode bs]
+      showOpaque bs = unwords $ ["\\#", show (BS.length bs), b16encode bs]
 
 b16encode, b32encode, b64encode :: ByteString -> String
 b16encode = BS.unpack. B16.encode
@@ -1576,7 +1575,7 @@ minUdpSize = 512
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
+#if __GLASGOW_HASKELL__ >= 802
 -- | EDNS Option Code (RFC 6891).
 newtype OptCode = OptCode {
     -- | From option code to number.

@@ -36,6 +36,10 @@ module Network.DNS.Resolver (
 #define WIN
 #endif
 
+#if __GLASGOW_HASKELL__ < 709
+#define GHC708
+#endif
+
 import Control.Exception as E
 import qualified Crypto.Random as C
 import qualified Data.ByteString as BS

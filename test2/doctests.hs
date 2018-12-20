@@ -1,14 +1,18 @@
 module Main where
 
-import Build_doctests (flags, pkgs, module_sources)
-import Test.DocTest (doctest)
+import Test.DocTest
 
 main :: IO ()
-main = do
-    putStrLn $ unwords $ "\ndoctest args: " : args
-    doctest args
-  where
-    args = [ "-XCPP" ] ++
-           flags ++
-           pkgs ++
-           module_sources
+main = doctest [
+    "-XOverloadedStrings"
+  , "-XCPP"
+  {-
+    Both 'iproute' and 'network-data' provide
+    ‘Data.IP’ package:
+      Ambiguous interface for ‘Data.IP’:
+        it was found in multiple packages: network-data-0.5.3 iproute-1.7.0
+    We ignore network-data to make tests pass.
+  -}
+  , "-ignore-package=network-data"
+  , "Network/DNS.hs"
+  ]

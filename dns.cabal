@@ -10,7 +10,7 @@ Description:
   in pure Haskell.
 Category:               Network
 Cabal-Version:          >= 1.10
-Build-Type:             Custom
+Build-Type:             Simple
 Extra-Source-Files:     Changelog.md
                         cbits/dns.c
 Tested-With:            GHC == 7.10.3
@@ -18,9 +18,6 @@ Tested-With:            GHC == 7.10.3
                       , GHC == 8.2.2
                       , GHC == 8.4.4
                       , GHC == 8.6.1
-
-Custom-Setup
-  Setup-Depends:        base, Cabal, cabal-doctest >=1.0.6 && <1.1
 
 Library
   Default-Language:     Haskell2010
@@ -99,7 +96,7 @@ Test-Suite spec
                       , iproute >= 1.2.4
                       , word8
 
-Test-Suite doctests
+Test-Suite doctest
   Type:                 exitcode-stdio-1.0
   Default-Language:     Haskell2010
   Hs-Source-Dirs:       test2
@@ -107,7 +104,6 @@ Test-Suite doctests
   Main-Is:              doctests.hs
   Build-Depends:        base
                       , doctest
-                      , dns
 
 Source-Repository head
   Type:                 git

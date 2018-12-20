@@ -233,9 +233,9 @@ fitSGet len parser | len < 0   = overrun
     pos0 <- getPosition
     ret <- parser
     pos' <- getPosition
-    if pos' == pos0 + len
+    if (pos' == pos0 + len)
     then return $! ret
-    else if pos' > pos0 + len
+    else if (pos' > pos0 + len)
     then failSGet "element size exceeds declared size"
     else failSGet "element shorter than declared size"
 
@@ -257,7 +257,7 @@ sGetMany elemname len parser | len < 0   = overrun
             pos0 <- getPosition
             x    <- parser
             pos1 <- getPosition
-            if pos1 <= pos0
+            if (pos1 <= pos0)
             then failSGet $ "internal error: in-place success for " ++ elemname
             else go (n + pos0 - pos1) (x : xs)
 
