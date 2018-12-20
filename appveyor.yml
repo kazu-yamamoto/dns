@@ -7,7 +7,7 @@ environment:
   global:
     STACK_ROOT: "c:\\sr"
   matrix:
-    - stack_lts: "lts-7.19"
+    - stack_lts: "lts-12.24"
     - stack_lts: "nightly"
 
 matrix:
