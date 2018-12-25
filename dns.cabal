@@ -67,7 +67,6 @@ Library
     Build-Depends:    split
     C-Sources:        cbits/dns.c
     Extra-Libraries:  iphlpapi
-    Build-Tools:      hsc2hs
 
 Test-Suite network
   Type:                 exitcode-stdio-1.0
