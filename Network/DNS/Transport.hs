@@ -19,12 +19,11 @@ import Network.DNS.Imports
 import Network.DNS.Types
 import Network.DNS.Types.Internal
 
--- | Check response for a matching identifier and question.  If we ever do
+-- | Check response for a matching identifier.  If we ever do
 -- pipelined TCP, we'll need to handle out of order responses.  See:
 -- https://tools.ietf.org/html/rfc7766#section-7
-checkResp :: Question -> Identifier -> DNSMessage -> Bool
-checkResp q seqno resp =
-   identifier (header resp) == seqno && [q] == question resp
+checkResp :: Identifier -> DNSMessage -> Bool
+checkResp seqno resp = identifier (header resp) == seqno
 
 ----------------------------------------------------------------
 
@@ -173,7 +172,7 @@ udpLookup ident retry rcv ai q tm ctls = do
     --
     getAns sock = do
         mres <- rcv sock
-        if checkResp q ident mres
+        if checkResp ident mres
         then return mres
         else getAns sock
 
@@ -210,10 +209,10 @@ tcpLookup gen ai q tm ctls =
             sendVC vc qry
             receiveVC vc
         case mres of
-            Nothing                     -> E.throwIO TimeoutExpired
+            Nothing                   -> E.throwIO TimeoutExpired
             Just res
-                | checkResp q ident res -> return res
-                | otherwise             -> E.throwIO SequenceNumberMismatch
+                | checkResp ident res -> return res
+                | otherwise           -> E.throwIO SequenceNumberMismatch
 
 ----------------------------------------------------------------
 
