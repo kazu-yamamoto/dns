@@ -247,7 +247,7 @@ pattern CSYNC      = TYPE  62 -- RFC 7477
 -- | A request for all records the server/cache has available
 pattern ANY :: TYPE
 pattern ANY        = TYPE 255
--- | A request for all records the server/cache has available
+-- | Certificate Authority Authorization
 pattern CAA :: TYPE
 pattern CAA        = TYPE 257
 
