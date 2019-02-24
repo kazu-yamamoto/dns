@@ -201,18 +201,19 @@ tcpLookup gen ai q tm ctls =
         else return res
   where
     addr = addrAddress ai
+    receiveAndCheck vc ident = do
+        resp <- receiveVC vc
+        if checkResp ident resp
+        then return resp
+        else E.throwIO SequenceNumberMismatch
     perform cs vc = do
         ident <- gen
         let qry = encodeQuestion ident q cs
         mres <- timeout tm $ do
             connect vc addr
             sendVC vc qry
-            receiveVC vc
-        case mres of
-            Nothing                   -> E.throwIO TimeoutExpired
-            Just res
-                | checkResp ident res -> return res
-                | otherwise           -> E.throwIO SequenceNumberMismatch
+            receiveAndCheck vc ident
+        maybe (E.throwIO TimeoutExpired) return mres
 
 ----------------------------------------------------------------
 
