@@ -117,11 +117,15 @@ resolveOne ai gen q tm retry ctls rcv =
 -- UDP attempts must use the same ID and accept delayed answers
 -- but we use a fresh ID for each TCP lookup.
 --
+-- AXFR requests are only fulfilled over TCP.
+--
 udpTcpLookup :: IO Identifier -> UdpRslv
 udpTcpLookup gen retry rcv ai q tm ctls = do
     ident <- gen
-    udpLookup ident retry rcv ai q tm ctls `E.catch`
-            \TCPFallback -> tcpLookup gen ai q tm ctls
+    case qtype q of
+      AXFR -> tcpLookup gen ai q tm ctls
+      _    -> udpLookup ident retry rcv ai q tm ctls `E.catch`
+                 \TCPFallback -> tcpLookup gen ai q tm ctls
 
 ----------------------------------------------------------------
 
@@ -212,7 +216,27 @@ tcpLookup gen ai q tm ctls =
         mres <- timeout tm $ do
             connect vc addr
             sendVC vc qry
-            receiveAndCheck vc ident
+            case qtype q of
+                AXFR -> do
+                    -- The first AXFR response answer is the SOA record. The
+                    -- answers can be sent over one or multiple DNS messages. To
+                    -- detect the end of the AXFR response, the client needs to
+                    -- detect a DNS message ending with a repeat of the SOA
+                    -- record. Each DNS message can contain one or multiple
+                    -- answers. For details, see:
+                    -- https://cr.yp.to/djbdns/axfr-notes.html
+                    x <- receiveAndCheck vc ident
+                    -- Need to check if the first DNS message is also the last
+                    -- one. It is not sufficent to use `isAXFRLast`, in case the
+                    -- first DNS message contains a single answer, which has to
+                    -- be the SOA record.
+                    xs <- if length (answer x) > 1 && isAXFRLast x
+                          then return []
+                          else repeatUntilM isAXFRLast (receiveAndCheck vc ident)
+                    -- We remove the last answer record which is a repeat of the
+                    -- SOA record, also sent as the first answer record.
+                    return $ x { answer = init $ concatMap answer (x:xs) }
+                _ -> receiveAndCheck vc ident
         maybe (E.throwIO TimeoutExpired) return mres
 
 ----------------------------------------------------------------
@@ -232,3 +256,15 @@ isIllegal dom
   | any (\x -> BS.length x > 63)
         (BS.split '.' dom)      = True
   | otherwise                   = False
+
+repeatUntilM :: Monad m => (a -> Bool) -> m a -> m [a]
+repeatUntilM predicate x = go []
+  where go acc = do
+          val <- x
+          let acc' = val:acc
+          if predicate val
+            then return $ reverse acc'
+            else go acc'
+
+isAXFRLast :: DNSMessage -> Bool
+isAXFRLast = (== SOA) . rrtype . last . answer
