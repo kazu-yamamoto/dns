@@ -42,6 +42,7 @@ module Network.DNS.Types (
   , CDS
   , CDNSKEY
   , CSYNC
+  , AXFR
   , ANY
   , CAA
   )
@@ -244,12 +245,15 @@ pattern CDNSKEY    = TYPE  60 -- RFC 7344
 -- | Child-To-Parent Synchronization (RFC7477)
 pattern CSYNC :: TYPE
 pattern CSYNC      = TYPE  62 -- RFC 7477
+-- | Zone transfer (RFC5936)
+pattern AXFR :: TYPE
+pattern AXFR       = TYPE 252 -- RFC 5936
 -- | A request for all records the server/cache has available
 pattern ANY :: TYPE
 pattern ANY        = TYPE 255
--- | A request for all records the server/cache has available
+-- | Certification Authority Authorization (RFC6844)
 pattern CAA :: TYPE
-pattern CAA        = TYPE 257
+pattern CAA        = TYPE 257 -- RFC 6844
 
 -- | From number to type.
 toTYPE :: Word16 -> TYPE
@@ -278,9 +282,10 @@ data TYPE = A          -- ^ IPv4 address
           | CDS        -- ^ Child DS (RFC7344)
           | CDNSKEY    -- ^ DNSKEY(s) the Child wants reflected in DS (RFC7344)
           | CSYNC      -- ^ Child-To-Parent Synchronization (RFC7477)
+          | AXFR       -- ^ Zone transfer (RFC5936)
           | ANY        -- ^ A request for all records the server/cache
                        --   has available
-          | CAA        -- ^ Certification Authority Authorization
+          | CAA        -- ^ Certification Authority Authorization (RFC6844)
           | UnknownTYPE Word16  -- ^ Unknown type
           deriving (Eq, Ord, Read)
 
@@ -308,6 +313,7 @@ fromTYPE TLSA       = 52
 fromTYPE CDS        = 59
 fromTYPE CDNSKEY    = 60
 fromTYPE CSYNC      = 62
+fromTYPE AXFR       = 252
 fromTYPE ANY        = 255
 fromTYPE CAA        = 257
 fromTYPE (UnknownTYPE x) = x
@@ -336,6 +342,7 @@ toTYPE 52 = TLSA
 toTYPE 59 = CDS
 toTYPE 60 = CDNSKEY
 toTYPE 62 = CSYNC
+toTYPE 252 = AXFR
 toTYPE 255 = ANY
 toTYPE 257 = CAA
 toTYPE x   = UnknownTYPE x
@@ -364,6 +371,7 @@ instance Show TYPE where
     show CDS        = "CDS"
     show CDNSKEY    = "CDNSKEY"
     show CSYNC      = "CSYNC"
+    show AXFR       = "AXFR"
     show ANY        = "ANY"
     show CAA        = "CAA"
     show x          = "TYPE" ++ show (fromTYPE x)
@@ -375,6 +383,13 @@ data DNSError =
     -- | The sequence number of the answer doesn't match our query. This
     --   could indicate foul play.
     SequenceNumberMismatch
+    -- | The question section of the response doesn't match our query. This
+    --   could indicate foul play.
+  | QuestionMismatch
+    -- | A zone tranfer, i.e., a request of type AXFR, was attempted with the
+    -- "lookup" interface. Zone transfer is different enough from "normal"
+    -- requests that it requires a different interface.
+  | NonZoneTransferAXFRRequest
     -- | The number of retries for the request was exceeded.
   | RetryLimitExceeded
     -- | TCP fallback request timed out.

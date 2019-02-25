@@ -23,8 +23,17 @@ import Network.DNS.Types.Internal
 -- pipelined TCP, we'll need to handle out of order responses.  See:
 -- https://tools.ietf.org/html/rfc7766#section-7
 checkResp :: Question -> Identifier -> DNSMessage -> Bool
-checkResp q seqno resp =
-   identifier (header resp) == seqno && [q] == question resp
+checkResp q seqno = isNothing . checkRespM (Just q) seqno
+
+checkRespM :: Maybe Question -> Identifier -> DNSMessage -> Maybe DNSError
+checkRespM qM seqno resp =
+    if identifier (header resp) /= seqno
+    then Just SequenceNumberMismatch
+    else do
+      qs <- (:[]) <$> qM
+      if qs /= question resp
+      then Just QuestionMismatch
+      else Nothing
 
 ----------------------------------------------------------------
 
@@ -70,6 +79,7 @@ type UdpRslv = Int -- Retry
 resolve :: Domain -> TYPE -> Resolver -> Rslv0
 resolve dom typ rlv qctls rcv
   | isIllegal dom = return $ Left IllegalDomain
+  | typ == AXFR   = return $ Left NonZoneTransferAXFRRequest
   | onlyOne       = resolveOne        (head nss) (head gens) q tm retry ctls rcv
   | concurrent    = resolveConcurrent nss        gens        q tm retry ctls rcv
   | otherwise     = resolveSequential nss        gens        q tm retry ctls rcv
@@ -210,10 +220,8 @@ tcpLookup gen ai q tm ctls =
             sendVC vc qry
             receiveVC vc
         case mres of
-            Nothing                     -> E.throwIO TimeoutExpired
-            Just res
-                | checkResp q ident res -> return res
-                | otherwise             -> E.throwIO SequenceNumberMismatch
+            Nothing  -> E.throwIO TimeoutExpired
+            Just res -> maybe (return res) E.throwIO (checkRespM (Just q) ident res)
 
 ----------------------------------------------------------------
 
