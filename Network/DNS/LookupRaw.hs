@@ -233,6 +233,12 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --             additional = []})
 --  @
 --
+--  AXFR requests cannot be performed with this interface.
+--
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupRaw resolver "mew.org" AXFR
+--   Left NonZoneTransferAXFRRequest
+--
 lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
           -> Domain     -- ^ Query domain
           -> TYPE       -- ^ Query RRtype
