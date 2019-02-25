@@ -389,7 +389,7 @@ data DNSError =
     -- | A zone tranfer, i.e., a request of type AXFR, was attempted with the
     -- "lookup" interface. Zone transfer is different enough from "normal"
     -- requests that it requires a different interface.
-  | NonZoneTransferAXFRRequest
+  | InvalidAXFRLookup
     -- | The number of retries for the request was exceeded.
   | RetryLimitExceeded
     -- | TCP fallback request timed out.
