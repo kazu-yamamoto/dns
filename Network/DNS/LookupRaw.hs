@@ -237,7 +237,7 @@ isTypeOf t ResourceRecord{..} = rrtype == t
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupRaw resolver "mew.org" AXFR
---   Left NonZoneTransferAXFRRequest
+--   Left InvalidAXFRLookup
 --
 lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
           -> Domain     -- ^ Query domain
