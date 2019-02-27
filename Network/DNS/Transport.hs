@@ -4,6 +4,7 @@
 module Network.DNS.Transport (
     Resolver(..)
   , resolve
+  , tcpOpen
   ) where
 
 import Control.Concurrent.Async (async, waitAnyCancel)
