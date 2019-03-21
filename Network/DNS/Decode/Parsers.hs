@@ -59,7 +59,7 @@ getResponse = do
         -- | Extract EDNS information from an OPT RR.
         --
         optEDNS :: ResourceRecord -> Maybe (EDNS, Word16)
-        optEDNS (ResourceRecord "." OPT udpsiz ttl' (RD_OPT opts)) =
+        optEDNS (ResourceRecord "." OPT udpsiz ttl' _ (RD_OPT opts)) =
             let hrc      = fromIntegral rc .&. 0x0f
                 erc      = shiftR (ttl' .&. 0xff000000) 20 .|. hrc
                 secok    = ttl' `testBit` 15
@@ -133,7 +133,7 @@ getResourceRecord = do
     ttl <- get32
     len <- getInt16
     dat <- fitSGet len $ getRData typ len
-    return $ ResourceRecord dom typ cls ttl dat
+    return $ ResourceRecord dom typ cls ttl (fromIntegral len) dat
 
 ----------------------------------------------------------------
 

@@ -2,6 +2,7 @@
 
 module RoundTripSpec where
 
+import CollapseLength (shouldBeCL)
 import Control.Monad (replicateM)
 import qualified Data.IP
 import Data.IP (Addr, IP(..), IPv4, IPv6, toIPv4, toIPv6, makeAddrRange)
@@ -56,14 +57,14 @@ spec = do
 
     prop "ResourceRecord" . forAll genResourceRecord $ \ rr -> do
         let bs = encodeResourceRecord rr
-        decodeResourceRecord bs `shouldBe` Right rr
+        decodeResourceRecord bs `shouldBeCL` Right rr
         fmap encodeResourceRecord (decodeResourceRecord bs) `shouldBe` Right bs
 
     prop "DNSHeader" . forAll (genDNSHeader 0x0f) $ \ hdr ->
         decodeDNSHeader (encodeDNSHeader hdr) `shouldBe` Right hdr
 
     prop "DNSMessage" . forAll genDNSMessage $ \ msg ->
-        decode (encode msg) `shouldBe` Right msg
+        decode (encode msg) `shouldBeCL` Right msg
 
     prop "EDNS" . forAll genEDNSHeader $ \(edns, hdr) -> do
         let eh = EDNSheader edns
@@ -105,7 +106,7 @@ genResourceRecord = frequency
       dom <- genDomain
       t <- elements [A, AAAA, NS, TXT, MX, CNAME, SOA, PTR, SRV, DNAME, DS,
                      TLSA, NSEC, NSEC3]
-      ResourceRecord dom t classIN <$> genWord32 <*> mkRData dom t
+      ResourceRecord dom t classIN <$> genWord32 <*> pure 0 <*> mkRData dom t
 
 mkRData :: Domain -> TYPE -> Gen RData
 mkRData dom typ =

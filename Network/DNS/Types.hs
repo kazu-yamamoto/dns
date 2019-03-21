@@ -1222,11 +1222,14 @@ type TTL = Word32
 
 -- | Raw data format for resource records.
 data ResourceRecord = ResourceRecord {
-    rrname  :: !Domain -- ^ Name
-  , rrtype  :: !TYPE   -- ^ Resource record type
-  , rrclass :: !CLASS  -- ^ Resource record class
-  , rrttl   :: !TTL    -- ^ Time to live
-  , rdata   :: !RData  -- ^ Resource data
+    rrname   :: !Domain -- ^ Name
+  , rrtype   :: !TYPE   -- ^ Resource record type
+  , rrclass  :: !CLASS  -- ^ Resource record class
+  , rrttl    :: !TTL    -- ^ Time to live
+  , rrlength :: !Word16 -- ^ Encoded length of 'rdata' (as specified
+                        -- in the resource record header, even if only
+                        -- a prefix was decoded; ignored while encoding)
+  , rdata    :: !RData  -- ^ Resource data
   } deriving (Eq,Show)
 
 ----------------------------------------------------------------

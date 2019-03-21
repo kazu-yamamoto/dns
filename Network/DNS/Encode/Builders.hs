@@ -12,6 +12,7 @@ module Network.DNS.Encode.Builders (
   , putDomain
   , putMailbox
   , putResourceRecord
+  , putRData
   ) where
 
 import Control.Monad.State (State, modify, execState, gets)
@@ -57,8 +58,9 @@ putDNSMessage msg = putHeader hd
       where
         prependOpt ads = mapEDNS eh (fromEDNS ads $ fromRCODE rc) ads
           where
+            -- rrlength goes unused during encoding; hence we just use 0 here:
             fromEDNS :: AdditionalRecords -> Word16 -> EDNS -> AdditionalRecords
-            fromEDNS rrs rc' edns = ResourceRecord name' type' class' ttl' rdata' : rrs
+            fromEDNS rrs rc' edns = ResourceRecord name' type' class' ttl' 0 rdata' : rrs
               where
                 name'  = BS.singleton '.'
                 type'  = OPT

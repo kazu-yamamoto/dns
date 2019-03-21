@@ -156,23 +156,23 @@ encodeVC legacyQuery =
 -- be added to the response message, or else a 'FormatErr' response
 -- must be sent.  The response TTL defaults to 300 seconds, and
 -- should be updated (to the same value across all the RRs) if some
--- other TTL value is more appropriate.
+-- other TTL value is more appropriate.  The 'rrlength' fields equal 4.
 --
 responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
 responseA idt q ips = makeResponse idt q as
   where
     dom = qname q
-    as  = ResourceRecord dom A classIN 300 . RD_A <$> ips
+    as  = ResourceRecord dom A classIN 300 4 . RD_A <$> ips
 
 -- | Compose a response with a single IPv6 RRset.  If the query
 -- had an EDNS pseudo-header, a suitable EDNS pseudo-header must
 -- be added to the response message, or else a 'FormatErr' response
 -- must be sent.  The response TTL defaults to 300 seconds, and
 -- should be updated (to the same value across all the RRs) if some
--- other TTL value is more appropriate.
+-- other TTL value is more appropriate.  The 'rrlength' fields equal 16.
 --
 responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
 responseAAAA idt q ips = makeResponse idt q as
   where
     dom = qname q
-    as  = ResourceRecord dom AAAA classIN 300 . RD_AAAA <$> ips
+    as  = ResourceRecord dom AAAA classIN 300 16 . RD_AAAA <$> ips
