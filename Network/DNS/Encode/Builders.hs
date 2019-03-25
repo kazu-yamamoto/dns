@@ -12,7 +12,6 @@ module Network.DNS.Encode.Builders (
   , putDomain
   , putMailbox
   , putResourceRecord
-  , putRData
   ) where
 
 import Control.Monad.State (State, modify, execState, gets)
