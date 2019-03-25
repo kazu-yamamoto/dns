@@ -57,7 +57,7 @@ putDNSMessage msg = putHeader hd
       where
         prependOpt ads = mapEDNS eh (fromEDNS ads $ fromRCODE rc) ads
           where
-            -- rrlength goes unused during encoding; hence we just use 0 here:
+            -- rrlength is not used to encode; hence we just use 0 here:
             fromEDNS :: AdditionalRecords -> Word16 -> EDNS -> AdditionalRecords
             fromEDNS rrs rc' edns = ResourceRecord name' type' class' ttl' 0 rdata' : rrs
               where
