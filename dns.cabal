@@ -53,7 +53,6 @@ Library
                       , auto-update
                       , base16-bytestring
                       , base64-bytestring
-                      , binary
                       , bytestring
                       , containers
                       , cryptonite
@@ -62,7 +61,6 @@ Library
                       , mtl
                       , network >= 2.3
                       , psqueues
-                      , safe == 0.3.*
   if os(windows)
     Build-Depends:    split
     C-Sources:        cbits/dns.c
@@ -78,7 +76,6 @@ Test-Suite network
                         IOSpec
   Build-Depends:        dns
                       , base
-                      , bytestring
                       , hspec
                       , network
 
@@ -107,7 +104,6 @@ Test-Suite doctests
   Main-Is:              doctests.hs
   Build-Depends:        base
                       , doctest
-                      , dns
 
 Source-Repository head
   Type:                 git
