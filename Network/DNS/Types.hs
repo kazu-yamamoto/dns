@@ -140,6 +140,7 @@ module Network.DNS.Types (
 import Control.Exception (Exception, IOException)
 import Control.Applicative ((<|>))
 import qualified Data.ByteString.Char8 as BS
+import Data.Char (chr, ord)
 import Data.Function (on)
 import qualified Data.Hourglass as H
 import Data.IP (IP(..), IPv4, IPv6)
@@ -1368,7 +1369,7 @@ instance Show RData where
       RD_NULL                 bytes -> showOpaque bytes
       RD_PTR               ptrdname -> showDomain ptrdname
       RD_MX               pref exch -> showMX pref exch
-      RD_TXT             textstring -> BS.unpack textstring
+      RD_TXT             textstring -> showTXT textstring
       RD_AAAA               address -> show address
       RD_SRV        pri wei prt tgt -> showSRV pri wei prt tgt
       RD_DNAME               target -> showDomain target
@@ -1391,6 +1392,16 @@ instance Show RData where
           show retry ++ " " ++ show expire ++ " " ++ show minttl
       showMX preference exchange =
           show preference ++ " " ++ showDomain exchange
+      showTXT bs = '"' : doesc ['"'] (BS.reverse bs)
+        where
+          doesc s b = case BS.uncons b of
+              Nothing     -> s
+              Just (c, t) | c == '\\' || c == '"' -> doesc ('\\' : c : s) t
+                          | c >= '\32' && c <= '\126' -> doesc (c : s) t
+                          | otherwise -> doesc ('\\' : ddd (ord c)) t
+            where
+              ddd c = let (q, r) = c `divMod` 100 in chr(48 + q) : dd r
+              dd  c = let (q, r) = c `divMod`  10 in chr(48 + q) : chr(48 + r) : s
       showSRV priority weight port target =
           show priority ++ " " ++ show weight ++ " " ++
           show port ++ BS.unpack target

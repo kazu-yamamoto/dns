@@ -1,5 +1,14 @@
 # 4.0.0
 
+- Output format change: `show` for TXT RDATA now includes
+  enclosing double quotes, and escapes special characters.
+  This is consistent with the format of TXT records in zone
+  files and, e.g., dig(1) output. The DNS string quoting
+  syntax is similar to a proper subset of the Haskell string
+  quoting syntax, but its decimal escapes require exactly
+  three digits, while Haskell accepts 1 or more, and uses
+  `'\&'` as a null. Therefore, `read @String` does not
+  reliably decode the DNS text string presentation form.
 - Breaking change: the DNSMessage __component__ encoding
   functions are now internal.  They're still exported from
   the new 'Nework.DNS.Encode.Internal' module, but this
