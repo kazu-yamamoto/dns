@@ -139,8 +139,9 @@ module Network.DNS.Types (
 
 import Control.Exception (Exception, IOException)
 import Control.Applicative ((<|>))
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
-import Data.Char (chr, ord)
+import Data.Char (intToDigit, chr, ord)
 import Data.Function (on)
 import qualified Data.Hourglass as H
 import Data.IP (IP(..), IPv4, IPv6)
@@ -1392,16 +1393,21 @@ instance Show RData where
           show retry ++ " " ++ show expire ++ " " ++ show minttl
       showMX preference exchange =
           show preference ++ " " ++ showDomain exchange
-      showTXT bs = '"' : doesc ['"'] (BS.reverse bs)
+      showTXT bs = '"' : B.foldr dnsesc ['"'] bs
         where
-          doesc s b = case BS.uncons b of
-              Nothing     -> s
-              Just (c, t) | c == '\\' || c == '"' -> doesc ('\\' : c : s) t
-                          | c >= '\32' && c <= '\126' -> doesc (c : s) t
-                          | otherwise -> doesc ('\\' : ddd (ord c)) t
-            where
-              ddd c = let (q, r) = c `divMod` 100 in chr(48 + q) : dd r
-              dd  c = let (q, r) = c `divMod`  10 in chr(48 + q) : chr(48 + r) : s
+          c2w = fromIntegral . ord
+          w2c = chr . fromIntegral
+          doubleQuote = c2w '"'
+          backSlash   = c2w '\\'
+          dnsesc c s
+              | c == doubleQuote   = '\\' : w2c c : s
+              | c == backSlash     = '\\' : w2c c : s
+              | c >= 32 && c < 127 =        w2c c : s
+              | otherwise          = '\\' : ddd c   s
+          ddd c s =
+              let (q100, r100) = divMod (fromIntegral c) 100
+                  (q10, r10) = divMod r100 10
+               in intToDigit q100 : intToDigit q10 : intToDigit r10 : s
       showSRV priority weight port target =
           show priority ++ " " ++ show weight ++ " " ++
           show port ++ BS.unpack target
