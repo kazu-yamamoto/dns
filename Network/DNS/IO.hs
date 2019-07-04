@@ -19,10 +19,10 @@ module Network.DNS.IO (
 
 import qualified Control.Exception as E
 import Control.Monad (void)
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import Data.Char (ord)
 import Data.IP (IPv4, IPv6)
 import Time.System (timeCurrent)
 import Time.Types (Elapsed(..), Seconds(..))
@@ -66,8 +66,8 @@ receiveVC sock = do
         Left e    -> E.throwIO e
         Right msg -> return msg
   where
-    toLen bs = case map ord $ BS.unpack bs of
-        [hi, lo] -> 256 * hi + lo
+    toLen bs = case B.unpack bs of
+        [hi, lo] -> 256 * (fromIntegral hi) + (fromIntegral lo)
         _        -> 0              -- never reached
 
 recvDNS :: Socket -> Int -> IO ByteString

@@ -141,7 +141,7 @@ import Control.Exception (Exception, IOException)
 import Control.Applicative ((<|>))
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
-import Data.Char (intToDigit, chr, ord)
+import Data.Char (intToDigit)
 import Data.Function (on)
 import qualified Data.Hourglass as H
 import Data.IP (IP(..), IPv4, IPv6)
@@ -1434,8 +1434,8 @@ instance Show RData where
           show preference ++ " " ++ showDomain exchange
       showTXT bs = '"' : B.foldr dnsesc ['"'] bs
         where
-          c2w = fromIntegral . ord
-          w2c = chr . fromIntegral
+          c2w = fromIntegral . fromEnum
+          w2c = toEnum . fromIntegral
           doubleQuote = c2w '"'
           backSlash   = c2w '\\'
           dnsesc c s
