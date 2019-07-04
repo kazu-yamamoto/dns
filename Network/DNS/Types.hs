@@ -161,13 +161,52 @@ import Network.DNS.Imports
 
 ----------------------------------------------------------------
 
--- | Type for domain.
+-- | This type holds the /presentation form/ of fully-qualified DNS domain
+-- names encoded as ASCII A-labels, with \'.\' separators between labels.
+-- Non-printing characters are escaped as @\\DDD@ (a backslash, followed by
+-- three decimal digits). The special characters: @ \", \$, (, ), ;, \@,@ and
+-- @\\@ are escaped by prepending a backslash.  The trailing \'.\' is optional
+-- on input, but is recommended, and is always added when decoding from
+-- /wire form/.
+--
+-- The encoding of domain names to /wire form/, e.g. for transmission in a
+-- query, requires the input encodings to be valid, otherwise a 'DecodeError'
+-- may be thrown. Domain names received in wire form in DNS messages are
+-- escaped to this presentation form as part of decoding the 'DNSMessage'.
+--
+-- This form is ASCII-only. Any conversion between A-label 'ByteString's,
+-- and U-label 'Text' happens at whatever layer maps user input to DNS
+-- names, or presents /friendly/ DNS names to the user.  Not all users
+-- can read all scripts, and applications that default to U-label form
+-- should ideally give the user a choice to see the A-label form.
+-- Examples:
+--
+-- @
+-- www.example.org.           -- Ordinary DNS name.
+-- \_25.\_tcp.mx1.example.net.  -- TLSA RR initial labels have \_ prefixes.
+-- \\001.exotic.example.       -- First label is Ctrl-A!
+-- just\\.one\\.label.example.  -- First label is \"just.one.label\"
+-- @
+--
 type Domain = ByteString
 
 -- | Type for a mailbox encoded on the wire as a DNS name, but the first label
--- is conceptually the user name, and sometimes has contains internal periods
--- that are not label separators. Therefore, in mailboxes \@ is used as the
--- separator between the first and second labels.
+-- is conceptually the local part of an email address, and may contain internal
+-- periods that are not label separators. Therefore, in mailboxes \@ is used as
+-- the separator between the first and second labels, and any \'.\' characters
+-- in the first label are not escaped.  The encoding is otherwise the same as
+-- 'Domain' above. This is most commonly seen in the /mrname/ of @SOA@ records.
+-- On input, if there is no unescaped \@ character in the 'Mailbox', it is
+-- reparsed with \'.\' as the first label separator. Thus the traditional
+-- format with all labels separated by dots is also accepted, but decoding from
+-- wire form always uses \@ between the first label and the domain-part of the
+-- address.  Examples:
+--
+-- @
+-- hostmaster\@example.org.  -- First label is simply @hostmaster@
+-- john.smith\@examle.com.   -- First label is @john.smith@
+-- @
+--
 type Mailbox = ByteString
 
 ----------------------------------------------------------------

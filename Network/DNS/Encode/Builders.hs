@@ -332,11 +332,13 @@ putDomain' sep dom
                                 , putDomain' '.' tl
                                 ]
   where
-    (hd, tl') = case sep of
-        '.' -> BS.break (== '.') dom
-        _ | sep `BS.elem` dom -> BS.break (== sep) dom
-          | otherwise -> BS.break (== '.') dom
-    tl = if BS.null tl' then tl' else BS.drop 1 tl'
+    -- Try with the preferred separator if present, else fall back to '.'.
+    (hd, tl) =
+        let p = parseLabel (c2w sep) dom
+         in if sep /= '.' && BS.null (snd p)
+            then parseLabel (c2w '.') dom
+            else p
+    c2w = fromIntegral . fromEnum
 
 putPointer :: Int -> SPut
 putPointer pos = putInt16 (pos .|. 0xc000)

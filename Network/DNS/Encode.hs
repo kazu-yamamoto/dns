@@ -26,7 +26,9 @@ import Network.DNS.Encode.Builders
 
 -- | Encode a 'DNSMessage' for transmission over UDP.  For transmission over
 -- TCP encapsulate the result via 'Network.DNS.IO.encodeVC', or use
--- 'Network.DNS.IO.sendVC', which handles this internally.
+-- 'Network.DNS.IO.sendVC', which handles this internally.  If any
+-- 'ResourceRecord' in the message contains incorrectly encoded 'Domain' name
+-- ByteStrings, this function may raise a 'DecodeError'.
 --
 encode :: DNSMessage -> ByteString
 encode = runSPut . putDNSMessage

@@ -153,11 +153,11 @@ genIPv6 = toIPv6 <$> replicateM 8 (fromIntegral <$> genWord16)
 
 genByteString :: Gen BS.ByteString
 genByteString = elements
-    [ "", "a", "a.b", "abc", "a.b.c" ]
+    [ "", "a", "a.b", "abc", "a.b.c", "a\\.b.c", "\\001.a.b", "\\$.a.b" ]
 
 genMboxString :: Gen BS.ByteString
 genMboxString = elements
-    [ "", "a", "a@b", "abc", "a@b.c" ]
+    [ "", "a", "a@b", "abc", "a@b.c", "first.last@example.org" ]
 
 genDomain :: Gen Domain
 genDomain = do

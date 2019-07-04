@@ -392,7 +392,7 @@ getMailbox = getPosition >>= getDomain' '@'
 -- let input = "\6\3foo\192\0\3bar\0"
 --     parser = skipNBytes 1 >> getDomain' '.' 1
 --     Right (output, _) = runSGet parser input
---  in output == "foo.\003foo\192\000.bar."
+--  in output == "foo.\\003foo\\192\\000.bar."
 -- :}
 -- True
 --
@@ -445,16 +445,58 @@ getDomain' sep1 ptrLimit = do
       -- This may change some time in the future.
       | isExtLabel c = return ""
       | otherwise = do
-          hs <- getNByteString n
+          hs <- escLabel (c2w sep1) <$> getNByteString n
           ds <- getDomain' '.' ptrLimit
           let dom = case ds of -- avoid trailing ".."
                   "." -> hs `BS.append` "."
                   _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
           push pos dom
           return dom
+    c2w = fromIntegral . fromEnum
     getValue c = c .&. 0x3f
     isPointer c = testBit c 7 && testBit c 6
     isExtLabel c = not (testBit c 7) && testBit c 6
+
+
+-- | In the presentation form of DNS labels, these characters are escaped by
+-- prepending a backlash. (They have special meaning in zone files). Whitespace
+-- and other non-printable or non-ascii characters are encoded via "\DDD"
+-- decimal escapes. The separator character is also quoted in each label.
+-- Note that '@' is quoted even when not the separator.
+escSpecials :: ByteString
+escSpecials = "\"$();@\\"
+
+-- | How much space will each byte [0..255] take in an encoded label.
+escLen :: ByteString
+escLen = B.pack $ map len [0..255]
+  where
+    len w | w < 33               = 4
+          | w > 126              = 4
+          | B.elem w escSpecials = 2
+          | otherwise            = 1
+
+-- | Escape special and non-printable characters in a DNS label. Most labels
+-- don't need escaping, check and optimize for that case.
+escLabel :: Word8 -> ByteString -> ByteString
+escLabel sep label
+    | B.all ((== 1) . wlen) label = label
+    | otherwise   = fst $ B.unfoldrN (llen label) go ([], label)
+  where
+    wlen w = if w /= sep
+        then fromIntegral $ B.index escLen (fromIntegral w)
+        else 2 :: Int
+    llen = B.foldr' ((+) . wlen) 0
+    go (w:ws, rest) = Just (w, (ws, rest))
+    go (_,    rest) = case B.uncons rest of
+        Nothing     -> Nothing
+        Just (c, t) -> case wlen c of
+            1 -> Just (c, ([], t))
+            2 -> Just (92, ([c], t))
+            _ -> Just (92, (ddd c, t))
+    ddd c =
+        let (q100, r100) = divMod c 100
+            (q10, r10) = divMod r100 10
+         in [48 + q100, 48 + q10, 48 + r10]
 
 ignoreClass :: SGet ()
 ignoreClass = () <$ get16

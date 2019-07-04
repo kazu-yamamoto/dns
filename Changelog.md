@@ -1,5 +1,15 @@
 # 4.0.0
 
+- Breaking change: when `Domain` name ByteStrings are
+  parsed as a sequence of DNS labels, backslashed escapes
+  (single-character and 3-digit decimal) are decoded to
+  the corresponding character or byte. Therefore, `encode`
+  is not a total function, it may raise a `DecodeError`
+  when a `ResourceRecord` contains a malformed `Domain`.
+- Breaking change: when wire-form DNS names are converted
+  to `Domain` ByteStrings, special characters in DNS labels
+  are now encoded as `\c` (single-character backslash escapes)
+  and non-printing characters as `\DDD` (3-digit decimal escapes).
 - Output format change: `show` for TXT RDATA now includes
   enclosing double quotes, and escapes special characters.
   This is consistent with the format of TXT records in zone

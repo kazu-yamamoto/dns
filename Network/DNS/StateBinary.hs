@@ -42,13 +42,16 @@ module Network.DNS.StateBinary (
   , getNBytes
   , getNoctets
   , skipNBytes
+  , parseLabel
   ) where
 
+import qualified Control.Exception as E
 import Control.Monad.State.Strict (State, StateT)
 import qualified Control.Monad.State.Strict as ST
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.Types as T
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as S8
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as LB
@@ -311,3 +314,39 @@ runSGetWithLeftovers = runSGetWithLeftoversAt dnsTimeMid
 
 runSPut :: SPut -> ByteString
 runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState
+
+----------------------------------------------------------------
+
+-- | Decode a domain name in A-label form to a leading label and a tail with
+-- the remaining labels, unescaping backlashed chars and decimal triples along
+-- the way. Any  U-label conversion belongs at the layer above this code.
+--
+-- This function is pure, but is not total, it throws an error when presented
+-- with malformed input
+--
+parseLabel :: Word8 -> ByteString -> (ByteString, ByteString)
+parseLabel sep dom =
+    toResult $ A.parse labelParser dom
+  where
+    toResult (A.Partial c) = toResult (c BS.empty)
+    toResult (A.Done t r) | not (BS.null r) || BS.null t = (r, t)
+    toResult _ = E.throw $ DecodeError $ "invalid domain: " ++ S8.unpack dom
+
+    labelParser = do
+        ws <- A.many' (simple <|> escaped)
+        A.endOfInput <|> A.skip (== sep)
+        pure $ BS.pack ws
+
+    simple = A.satisfy notSepOrBslash
+      where
+        notSepOrBslash w = w /= sep && w /= 92
+
+    escaped = do
+        A.skip (== 92) -- '\\'
+        either s2n pure =<< A.eitherP digit A.anyWord8
+      where
+        s2n d = (+) . (d * 100 +) . (10 *) <$> digit <*> digit
+        digit = d2i <$> A.satisfy isd
+          where
+            isd w = w >= 48 && w <= 57
+            d2i d = d - 48
