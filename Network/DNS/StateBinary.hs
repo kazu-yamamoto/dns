@@ -346,10 +346,16 @@ labelParser sep acc = do
         A.skip (== 92) -- '\\'
         either decodeDec pure =<< A.eitherP digit A.anyWord8
       where
-        digit = A.satisfyWith (\n -> n - 48) (<=9)
-        decodeDec d = trigraph d <$> digit <*> digit
+        digit = fromIntegral <$> A.satisfyWith (\n -> n - 48) (<=9)
+        decodeDec d =
+            safeWord8 =<< trigraph d <$> digit <*> digit
           where
+            trigraph :: Word -> Word -> Word -> Word
             trigraph x y z = 100 * x + 10 * y + z
+
+            safeWord8 :: Word -> A.Parser Word8
+            safeWord8 n | n > 255 = mzero
+                        | otherwise = pure $ fromIntegral n
 
 labelEnd :: Word8 -> ByteString -> A.Parser ByteString
 labelEnd sep acc =
