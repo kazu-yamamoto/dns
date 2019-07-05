@@ -326,27 +326,32 @@ runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState
 --
 parseLabel :: Word8 -> ByteString -> (ByteString, ByteString)
 parseLabel sep dom =
-    toResult $ A.parse labelParser dom
+    toResult $ A.parse (labelParser sep mempty) dom
   where
-    toResult (A.Partial c) = toResult (c BS.empty)
+    toResult (A.Partial c) = toResult (c mempty)
     toResult (A.Done t r) | not (BS.null r) || BS.null t = (r, t)
     toResult _ = E.throw $ DecodeError $ "invalid domain: " ++ S8.unpack dom
 
-    labelParser = do
-        ws <- A.many' (simple <|> escaped)
-        A.endOfInput <|> A.skip (== sep)
-        pure $ BS.pack ws
-
-    simple = A.satisfy notSepOrBslash
+labelParser :: Word8 -> ByteString -> A.Parser ByteString
+labelParser sep acc = do
+    acc' <- mappend acc <$> A.option mempty simple
+    labelEnd sep acc' <|> (escaped >>= labelParser sep . BS.snoc acc')
+  where
+    simple = fst <$> A.match skipUnescaped
       where
+        skipUnescaped = A.skipMany1 $ A.satisfy notSepOrBslash
         notSepOrBslash w = w /= sep && w /= 92
 
     escaped = do
         A.skip (== 92) -- '\\'
-        either s2n pure =<< A.eitherP digit A.anyWord8
+        either decodeDec pure =<< A.eitherP digit A.anyWord8
       where
-        s2n d = (+) . (d * 100 +) . (10 *) <$> digit <*> digit
-        digit = d2i <$> A.satisfy isd
+        digit = A.satisfyWith (\n -> n - 48) (<=9)
+        decodeDec d = trigraph d <$> digit <*> digit
           where
-            isd w = w >= 48 && w <= 57
-            d2i d = d - 48
+            trigraph x y z = 100 * x + 10 * y + z
+
+labelEnd :: Word8 -> ByteString -> A.Parser ByteString
+labelEnd sep acc =
+    A.satisfy (== sep) *> pure acc <|>
+    A.endOfInput       *> pure acc
