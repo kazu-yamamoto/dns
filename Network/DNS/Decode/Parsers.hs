@@ -375,6 +375,9 @@ getOData opc len = UnknownOData (fromOptCode opc) <$> getNByteString len
 -- bound, and is set here to the position at the start of parsing the domain
 -- or mailbox.
 --
+-- Note: the separator passed to 'getDomain'' is required to be either \'.\' or
+-- \'\@\', or else 'unparseLabel' needs to be modified to handle the new value.
+--
 getDomain :: SGet Domain
 getDomain = getPosition >>= getDomain' '.'
 
@@ -407,9 +410,12 @@ getMailbox = getPosition >>= getDomain' '@'
 -- :}
 -- "invalid name compression pointer"
 
--- | Get a domain name, using sep1 as the separate between the 1st and 2nd
+-- | Get a domain name, using sep1 as the separator between the 1st and 2nd
 -- label.  Subsequent labels (and always the trailing label) are terminated
 -- with a ".".
+--
+-- Note: the separator is required to be either \'.\' or \'\@\', or else
+-- 'unparseLabel' needs to be modified to handle the new value.
 --
 -- Domain name compression pointers must always refer to a position that
 -- precedes the start of the current domain name.  The starting offsets form a
@@ -445,7 +451,7 @@ getDomain' sep1 ptrLimit = do
       -- This may change some time in the future.
       | isExtLabel c = return ""
       | otherwise = do
-          hs <- escLabel (c2w sep1) <$> getNByteString n
+          hs <- unparseLabel (c2w sep1) <$> getNByteString n
           ds <- getDomain' '.' ptrLimit
           let dom = case ds of -- avoid trailing ".."
                   "." -> hs `BS.append` "."
@@ -457,46 +463,6 @@ getDomain' sep1 ptrLimit = do
     isPointer c = testBit c 7 && testBit c 6
     isExtLabel c = not (testBit c 7) && testBit c 6
 
-
--- | In the presentation form of DNS labels, these characters are escaped by
--- prepending a backlash. (They have special meaning in zone files). Whitespace
--- and other non-printable or non-ascii characters are encoded via "\DDD"
--- decimal escapes. The separator character is also quoted in each label.
--- Note that '@' is quoted even when not the separator.
-escSpecials :: ByteString
-escSpecials = "\"$();@\\"
-
--- | How much space will each byte [0..255] take in an encoded label.
-escLen :: ByteString
-escLen = B.pack $ map len [0..255]
-  where
-    len w | w < 33               = 4
-          | w > 126              = 4
-          | B.elem w escSpecials = 2
-          | otherwise            = 1
-
--- | Escape special and non-printable characters in a DNS label. Most labels
--- don't need escaping, check and optimize for that case.
-escLabel :: Word8 -> ByteString -> ByteString
-escLabel sep label
-    | B.all ((== 1) . wlen) label = label
-    | otherwise   = fst $ B.unfoldrN (llen label) go ([], label)
-  where
-    wlen w = if w /= sep
-        then fromIntegral $ B.index escLen (fromIntegral w)
-        else 2 :: Int
-    llen = B.foldr' ((+) . wlen) 0
-    go (w:ws, rest) = Just (w, (ws, rest))
-    go (_,    rest) = case B.uncons rest of
-        Nothing     -> Nothing
-        Just (c, t) -> case wlen c of
-            1 -> Just (c, ([], t))
-            2 -> Just (92, ([c], t))
-            _ -> Just (92, (ddd c, t))
-    ddd c =
-        let (q100, r100) = divMod c 100
-            (q10, r10) = divMod r100 10
-         in [48 + q100, 48 + q10, 48 + r10]
 
 ignoreClass :: SGet ()
 ignoreClass = () <$ get16

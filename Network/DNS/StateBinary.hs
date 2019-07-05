@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
 module Network.DNS.StateBinary (
     PState(..)
@@ -43,6 +44,7 @@ module Network.DNS.StateBinary (
   , getNoctets
   , skipNBytes
   , parseLabel
+  , unparseLabel
   ) where
 
 import qualified Control.Exception as E
@@ -361,3 +363,64 @@ labelEnd :: Word8 -> ByteString -> A.Parser ByteString
 labelEnd sep acc =
     A.satisfy (== sep) *> pure acc <|>
     A.endOfInput       *> pure acc
+
+----------------------------------------------------------------
+
+-- | Convert a wire-form label to presentation-form by escaping
+-- the separator, special and non-printing characters.  For simple
+-- labels with no bytes that require escaping we get back the input
+-- bytestring asis with no copying or re-construction.
+--
+-- Note: the separator is required to be either \'.\' or \'\@\', but this
+-- constraint is the caller's responsibility and is not checked here.
+--
+unparseLabel :: Word8 -> ByteString -> ByteString
+unparseLabel sep label = do
+    toResult $ A.parse (labelUnparser sep mempty) label
+  where
+    toResult (A.Partial c) = toResult (c mempty)
+    toResult (A.Done _ r) = r
+    toResult _ = E.throw UnknownDNSError -- can't happen
+
+labelUnparser :: Word8 -> ByteString -> A.Parser ByteString
+labelUnparser sep acc = do
+    acc' <- mappend acc <$> A.option mempty asis
+    A.endOfInput *> pure acc' <|> (esc >>= labelUnparser sep . mappend acc')
+  where
+    -- Non-printables are escaped as decimal trigraphs, while printable
+    -- specials just get a backslash prefix.
+    esc = do
+        w <- A.anyWord8
+        if w <= 32 || w >= 127
+        then let (q100, r100) = w `divMod` 100
+                 (q10, r10) = r100 `divMod` 10
+              in pure $ BS.pack [ 92, 48 + q100, 48 + q10, 48 + r10 ]
+        else pure $ BS.pack [ 92, w ]
+
+    -- Runs of plain bytes are recognized as a single chunk, typically
+    -- the entire label, which is then returned as-is.  The tests are
+    -- ordered to succeed or fail quickly in the most common cases.
+    -- Note: the separator is assumed to be either '.' or '@' and so
+    -- not matched by any of the first three fast-path 'True' cases.
+    asis = fst <$> A.match skipPlain
+      where
+        skipPlain = A.skipMany1 $ A.satisfy isPlain
+        isPlain w | w >= 127           = False -- <DEL> + non-ASCII
+                  | w >=  93           = True  -- ']'..'_'..'a'..'z'..'~'
+                  | w >=  48 && w < 59 = True  -- '0'..'9'..':'
+                  | w >=  65 && w < 92 = True  -- 'A'..'Z'..'['
+                  | w <=  32           = False -- non-printables
+                  | isSpecial sep w    = False -- one of the specials
+                  | otherwise          = True  -- plain punctuation
+
+-- | In the presentation form of DNS labels, these characters are escaped by
+-- prepending a backlash. (They have special meaning in zone files). Whitespace
+-- and other non-printable or non-ascii characters are encoded via "\DDD"
+-- decimal escapes. The separator character is also quoted in each label. Note
+-- that '@' is quoted even when not the separator.
+escSpecials :: ByteString
+escSpecials = "\"$();@\\"
+
+-- | Is the given byte the separator or one of the specials?
+isSpecial :: Word8 -> Word8 -> Bool
+isSpecial sep w = w == sep || BS.elemIndex w escSpecials /= Nothing
