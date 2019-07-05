@@ -328,11 +328,18 @@ runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState
 --
 parseLabel :: Word8 -> ByteString -> (ByteString, ByteString)
 parseLabel sep dom =
-    toResult $ A.parse (labelParser sep mempty) dom
+    if BS.any (== 92) dom
+    then toResult $ A.parse (labelParser sep mempty) dom
+    else check $ safeTail <$> BS.break (== sep) dom
   where
-    toResult (A.Partial c) = toResult (c mempty)
-    toResult (A.Done t r) | not (BS.null r) || BS.null t = (r, t)
-    toResult _ = E.throw $ DecodeError $ "invalid domain: " ++ S8.unpack dom
+    toResult (A.Partial c)  = toResult (c mempty)
+    toResult (A.Done tl hd) = check (hd, tl)
+    toResult _ = bottom
+    safeTail bs | BS.null bs = mempty
+                | otherwise = BS.tail bs
+    check r@(hd, tl) | not (BS.null hd) || BS.null tl = r
+                     | otherwise = bottom
+    bottom = E.throw $ DecodeError $ "invalid domain: " ++ S8.unpack dom
 
 labelParser :: Word8 -> ByteString -> A.Parser ByteString
 labelParser sep acc = do
@@ -375,8 +382,10 @@ labelEnd sep acc =
 -- constraint is the caller's responsibility and is not checked here.
 --
 unparseLabel :: Word8 -> ByteString -> ByteString
-unparseLabel sep label = do
-    toResult $ A.parse (labelUnparser sep mempty) label
+unparseLabel sep label =
+    if BS.all (isPlain sep) label
+    then label
+    else toResult $ A.parse (labelUnparser sep mempty) label
   where
     toResult (A.Partial c) = toResult (c mempty)
     toResult (A.Done _ r) = r
@@ -397,21 +406,9 @@ labelUnparser sep acc = do
               in pure $ BS.pack [ 92, 48 + q100, 48 + q10, 48 + r10 ]
         else pure $ BS.pack [ 92, w ]
 
-    -- Runs of plain bytes are recognized as a single chunk, typically
-    -- the entire label, which is then returned as-is.  The tests are
-    -- ordered to succeed or fail quickly in the most common cases.
-    -- Note: the separator is assumed to be either '.' or '@' and so
-    -- not matched by any of the first three fast-path 'True' cases.
-    asis = fst <$> A.match skipPlain
-      where
-        skipPlain = A.skipMany1 $ A.satisfy isPlain
-        isPlain w | w >= 127           = False -- <DEL> + non-ASCII
-                  | w >=  93           = True  -- ']'..'_'..'a'..'z'..'~'
-                  | w >=  48 && w < 59 = True  -- '0'..'9'..':'
-                  | w >=  65 && w < 92 = True  -- 'A'..'Z'..'['
-                  | w <=  32           = False -- non-printables
-                  | isSpecial sep w    = False -- one of the specials
-                  | otherwise          = True  -- plain punctuation
+    -- Runs of plain bytes are recognized as a single chunk, which is then
+    -- returned as-is.
+    asis = fmap fst $ A.match $ A.skipMany1 $ A.satisfy $ isPlain sep
 
 -- | In the presentation form of DNS labels, these characters are escaped by
 -- prepending a backlash. (They have special meaning in zone files). Whitespace
@@ -424,3 +421,16 @@ escSpecials = "\"$();@\\"
 -- | Is the given byte the separator or one of the specials?
 isSpecial :: Word8 -> Word8 -> Bool
 isSpecial sep w = w == sep || BS.elemIndex w escSpecials /= Nothing
+
+-- | Is the given byte a plain byte that reqires no escaping.
+-- The tests are ordered to succeed or fail quickly in the most common cases.
+-- Note: the separator is assumed to be either '.' or '@' and so not matched by
+-- any of the first three fast-path 'True' cases.
+isPlain :: Word8 -> Word8 -> Bool
+isPlain sep w | w >= 127           = False -- <DEL> + non-ASCII
+              | w >=  93           = True  -- ']'..'_'..'a'..'z'..'~'
+              | w >=  48 && w < 59 = True  -- '0'..'9'..':'
+              | w >=  65 && w < 92 = True  -- 'A'..'Z'..'['
+              | w <=  32           = False -- non-printables
+              | isSpecial sep w    = False -- one of the specials
+              | otherwise          = True  -- plain punctuation
