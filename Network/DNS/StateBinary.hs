@@ -328,7 +328,7 @@ runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState
 --
 parseLabel :: Word8 -> ByteString -> (ByteString, ByteString)
 parseLabel sep dom =
-    if BS.any (== 92) dom
+    if BS.any (== bslash) dom
     then toResult $ A.parse (labelParser sep mempty) dom
     else check $ safeTail <$> BS.break (== sep) dom
   where
@@ -349,13 +349,13 @@ labelParser sep acc = do
     simple = fst <$> A.match skipUnescaped
       where
         skipUnescaped = A.skipMany1 $ A.satisfy notSepOrBslash
-        notSepOrBslash w = w /= sep && w /= 92
+        notSepOrBslash w = w /= sep && w /= bslash
 
     escaped = do
-        A.skip (== 92) -- '\\'
+        A.skip (== bslash)
         either decodeDec pure =<< A.eitherP digit A.anyWord8
       where
-        digit = fromIntegral <$> A.satisfyWith (\n -> n - 48) (<=9)
+        digit = fromIntegral <$> A.satisfyWith (\n -> n - zero) (<=9)
         decodeDec d =
             safeWord8 =<< trigraph d <$> digit <*> digit
           where
@@ -403,8 +403,8 @@ labelUnparser sep acc = do
         if w <= 32 || w >= 127
         then let (q100, r100) = w `divMod` 100
                  (q10, r10) = r100 `divMod` 10
-              in pure $ BS.pack [ 92, 48 + q100, 48 + q10, 48 + r10 ]
-        else pure $ BS.pack [ 92, w ]
+              in pure $ BS.pack [ bslash, zero + q100, zero + q10, zero + r10 ]
+        else pure $ BS.pack [ bslash, w ]
 
     -- Runs of plain bytes are recognized as a single chunk, which is then
     -- returned as-is.
@@ -422,15 +422,23 @@ escSpecials = "\"$();@\\"
 isSpecial :: Word8 -> Word8 -> Bool
 isSpecial sep w = w == sep || BS.elemIndex w escSpecials /= Nothing
 
--- | Is the given byte a plain byte that reqires no escaping.
--- The tests are ordered to succeed or fail quickly in the most common cases.
+-- | Is the given byte a plain byte that reqires no escaping. The tests are
+-- ordered to succeed or fail quickly in the most common cases. The test
+-- ranges assume the expected numeric values of the named special characters.
 -- Note: the separator is assumed to be either '.' or '@' and so not matched by
 -- any of the first three fast-path 'True' cases.
 isPlain :: Word8 -> Word8 -> Bool
-isPlain sep w | w >= 127           = False -- <DEL> + non-ASCII
-              | w >=  93           = True  -- ']'..'_'..'a'..'z'..'~'
-              | w >=  48 && w < 59 = True  -- '0'..'9'..':'
-              | w >=  65 && w < 92 = True  -- 'A'..'Z'..'['
-              | w <=  32           = False -- non-printables
-              | isSpecial sep w    = False -- one of the specials
-              | otherwise          = True  -- plain punctuation
+isPlain sep w | w >= 127                 = False -- <DEL> + non-ASCII
+              | w > bslash               = True  -- ']'..'_'..'a'..'z'..'~'
+              | w >= zero && w < semi    = True  -- '0'..'9'..':'
+              | w > atsign && w < bslash = True  -- 'A'..'Z'..'['
+              | w <= 32                  = False -- non-printables
+              | isSpecial sep w          = False -- one of the specials
+              | otherwise                = True  -- plain punctuation
+
+-- | Some numeric byte constants.
+zero, semi, atsign, bslash :: Word8
+zero = fromIntegral $ fromEnum '0'    -- 48
+semi = fromIntegral $ fromEnum ';'    -- 59
+atsign = fromIntegral $ fromEnum '@'  -- 64
+bslash = fromIntegral $ fromEnum '\\' -- 92

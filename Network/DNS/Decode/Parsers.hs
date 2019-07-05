@@ -121,6 +121,8 @@ getQuery :: SGet Question
 getQuery = Question <$> getDomain
                     <*> getTYPE
                     <*  ignoreClass
+  where
+    ignoreClass = get16
 
 getResourceRecords :: Int -> SGet [ResourceRecord]
 getResourceRecords n = replicateM n getResourceRecord
@@ -378,11 +380,16 @@ getOData opc len = UnknownOData (fromOptCode opc) <$> getNByteString len
 -- Note: the separator passed to 'getDomain'' is required to be either \'.\' or
 -- \'\@\', or else 'unparseLabel' needs to be modified to handle the new value.
 --
+
 getDomain :: SGet Domain
-getDomain = getPosition >>= getDomain' '.'
+getDomain = getPosition >>= getDomain' dot
 
 getMailbox :: SGet Mailbox
-getMailbox = getPosition >>= getDomain' '@'
+getMailbox = getPosition >>= getDomain' atsign
+
+dot, atsign :: Word8
+dot    = fromIntegral $ fromEnum '.' -- 46
+atsign = fromIntegral $ fromEnum '@' -- 64
 
 -- $
 -- Pathological case: pointer embedded inside a label!  The pointer points
@@ -393,7 +400,7 @@ getMailbox = getPosition >>= getDomain' '@'
 --
 -- >>> :{
 -- let input = "\6\3foo\192\0\3bar\0"
---     parser = skipNBytes 1 >> getDomain' '.' 1
+--     parser = skipNBytes 1 >> getDomain' dot 1
 --     Right (output, _) = runSGet parser input
 --  in output == "foo.\\003foo\\192\\000.bar."
 -- :}
@@ -404,7 +411,7 @@ getMailbox = getPosition >>= getDomain' '@'
 --
 -- >>> :{
 -- let input = "\6\3foo\192\1\3bar\0"
---     parser = skipNBytes 1 >> getDomain' '.' 1
+--     parser = skipNBytes 1 >> getDomain' dot 1
 --     Left (DecodeError err) = runSGet parser input
 --  in err
 -- :}
@@ -421,7 +428,7 @@ getMailbox = getPosition >>= getDomain' '@'
 -- precedes the start of the current domain name.  The starting offsets form a
 -- strictly decreasing sequence, which prevents pointer loops.
 --
-getDomain' :: Char -> Int -> SGet ByteString
+getDomain' :: Word8 -> Int -> SGet ByteString
 getDomain' sep1 ptrLimit = do
     pos <- getPosition
     c <- getInt8
@@ -451,18 +458,13 @@ getDomain' sep1 ptrLimit = do
       -- This may change some time in the future.
       | isExtLabel c = return ""
       | otherwise = do
-          hs <- unparseLabel (c2w sep1) <$> getNByteString n
-          ds <- getDomain' '.' ptrLimit
+          hs <- unparseLabel sep1 <$> getNByteString n
+          ds <- getDomain' dot ptrLimit
           let dom = case ds of -- avoid trailing ".."
-                  "." -> hs `BS.append` "."
-                  _   -> hs `BS.append` BS.singleton sep1 `BS.append` ds
+                  "." -> hs <> "."
+                  _   -> hs <> B.singleton sep1 <> ds
           push pos dom
           return dom
-    c2w = fromIntegral . fromEnum
     getValue c = c .&. 0x3f
     isPointer c = testBit c 7 && testBit c 6
     isExtLabel c = not (testBit c 7) && testBit c 6
-
-
-ignoreClass :: SGet ()
-ignoreClass = () <$ get16
