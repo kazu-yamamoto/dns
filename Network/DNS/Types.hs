@@ -1712,7 +1712,7 @@ toOptCode x = UnknownOptCode x
 
 ----------------------------------------------------------------
 
--- | RData formats for a few EDNS options, and an opaque catcall
+-- | RData formats for a few EDNS options, and an opaque catchall
 data OData =
       -- | Name Server Identifier (RFC5001).  Bidirectional, empty from client.
       -- (opaque octet-string).  May contain binary data, which MUST be empty
