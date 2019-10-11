@@ -133,9 +133,10 @@ udpTcpLookup gen retry rcv ai q tm ctls = do
 ----------------------------------------------------------------
 
 ioErrorToDNSError :: AddrInfo -> String -> IOError -> IO DNSMessage
-ioErrorToDNSError ai tag ioe = throwIO $ NetworkFailure aioe
+ioErrorToDNSError ai protoName ioe = throwIO $ NetworkFailure aioe
   where
-    aioe = annotateIOError ioe (show ai) Nothing $ Just tag
+    loc = protoName ++ "@" ++ show (addrAddress ai)
+    aioe = annotateIOError ioe loc Nothing Nothing
 
 ----------------------------------------------------------------
 
@@ -149,7 +150,7 @@ udpOpen ai = do
 udpLookup :: Identifier -> UdpRslv
 udpLookup ident retry rcv ai q tm ctls = do
     let qry = encodeQuestion ident q ctls
-    E.handle (ioErrorToDNSError ai "UDP") $
+    E.handle (ioErrorToDNSError ai "udp") $
       bracket (udpOpen ai) close (loop qry ctls 0 RetryLimitExceeded)
   where
     loop qry lctls cnt err sock
@@ -197,7 +198,7 @@ tcpOpen peer = case peer of
 -- This throws DNSError only.
 tcpLookup :: IO Identifier -> TcpRslv
 tcpLookup gen ai q tm ctls =
-    E.handle (ioErrorToDNSError ai "TCP") $ do
+    E.handle (ioErrorToDNSError ai "tcp") $ do
         res <- bracket (tcpOpen addr) close (perform ctls)
         let rc = rcode $ flags $ header res
             eh = ednsHeader res
