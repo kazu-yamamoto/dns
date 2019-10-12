@@ -23,7 +23,6 @@ install:
  - "ghc --version"
  - "cabal %CABOPTS% update -vverbose+nowrap"
  - "cabal %CABOPTS% install hspec-discover"
- - "cabal %CABOPTS% install cabal-doctest"
 
 build: off
 deploy: off

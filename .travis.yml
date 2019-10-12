@@ -55,8 +55,22 @@ install:
  - rm -fv cabal.project.local
  - "echo 'packages: .' > cabal.project"
  - rm -f cabal.project.freeze
- - cabal install hspec-discover
- - cabal install cabal-doctest
+ - cabal new-install hspec-discover
+ - cabal new-install array
+ - cabal new-install async
+ - cabal new-install attoparsec
+ - cabal new-install auto-update
+ - cabal new-install base16-bytestring
+ - cabal new-install base64-bytestring
+ - cabal new-install bytestring
+ - cabal new-install containers
+ - cabal new-install cryptonite
+ - cabal new-install doctest
+ - cabal new-install hourglass
+ - cabal new-install iproute
+ - cabal new-install mtl
+ - cabal new-install network
+ - cabal new-install psqueues
  - cabal new-build -w ${HC} ${TEST} ${BENCH} --dep -j2 all
  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --dep -j2 all
 
