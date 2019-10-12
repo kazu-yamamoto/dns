@@ -137,9 +137,11 @@ putRData rd = case rd of
     RD_DNAME               dname -> putDomain dname
     RD_OPT               options -> mconcat $ fmap putOData options
     RD_DS             kt ka dt d -> putDS kt ka dt d
+    RD_CDS            kt ka dt d -> putDS kt ka dt d
     RD_RRSIG               rrsig -> putRRSIG rrsig
     RD_NSEC           next types -> putDomain next <> putNsecTypes types
     RD_DNSKEY        f p alg key -> putDNSKEY f p alg key
+    RD_CDNSKEY       f p alg key -> putDNSKEY f p alg key
     RD_NSEC3     a f i s h types -> putNSEC3 a f i s h types
     RD_NSEC3PARAM  a f iter salt -> putNSEC3PARAM a f iter salt
     RD_TLSA           u s m dgst -> putTLSA u s m dgst

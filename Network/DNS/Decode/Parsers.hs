@@ -198,6 +198,16 @@ getRData DS len = RD_DS <$> decodeTag
     decodeDtyp = get8
     decodeDval = getNByteString (len - 4)
 --
+getRData CDS len = RD_CDS <$> decodeTag
+                          <*> decodeAlg
+                          <*> decodeDtyp
+                          <*> decodeDval
+  where
+    decodeTag  = get16
+    decodeAlg  = get8
+    decodeDtyp = get8
+    decodeDval = getNByteString (len - 4)
+--
 getRData RRSIG len = RD_RRSIG <$> decodeRRSIG
   where
     decodeRRSIG = do
@@ -235,6 +245,16 @@ getRData DNSKEY len = RD_DNSKEY <$> decodeKeyFlags
                                 <*> decodeKeyProto
                                 <*> decodeKeyAlg
                                 <*> decodeKeyBytes
+  where
+    decodeKeyFlags  = get16
+    decodeKeyProto  = get8
+    decodeKeyAlg    = get8
+    decodeKeyBytes  = getNByteString (len - 4)
+--
+getRData CDNSKEY len = RD_CDNSKEY <$> decodeKeyFlags
+                                  <*> decodeKeyProto
+                                  <*> decodeKeyAlg
+                                  <*> decodeKeyBytes
   where
     decodeKeyFlags  = get16
     decodeKeyProto  = get8

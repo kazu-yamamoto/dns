@@ -1394,8 +1394,10 @@ data RData = RD_A IPv4           -- ^ IPv4 address
                                  -- ^ NSEC3 zone parameters (RFC5155)
            | RD_TLSA Word8 Word8 Word8 ByteString
                                  -- ^ TLSA (RFC6698)
-           --RD_CDS
-           --RD_CDNSKEY
+           | RD_CDS Word16 Word8 Word8 ByteString
+                                 -- ^ Child DS (RFC7344)
+           | RD_CDNSKEY Word16 Word8 Word8 ByteString
+                                 -- ^ Child DNSKEY (RFC7344)
            --RD_CSYNC
            | UnknownRData ByteString   -- ^ Unknown resource data
     deriving (Eq, Ord)
@@ -1421,6 +1423,8 @@ instance Show RData where
       RD_NSEC3      a f i s h types -> showNSEC3 a f i s h types
       RD_NSEC3PARAM         a f i s -> showNSEC3PARAM a f i s
       RD_TLSA               u s m d -> showTLSA u s m d
+      RD_CDS         tag alg dalg d -> showDS tag alg dalg d
+      RD_CDNSKEY            f p a k -> showDNSKEY f p a k
       UnknownRData            bytes -> showOpaque bytes
     where
       showSalt ""    = "-"
