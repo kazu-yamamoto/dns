@@ -90,11 +90,11 @@ import Network.DNS.Types
 --   A straightforward example:
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupA resolver "www.mew.org"
---   Right [210.130.207.72]
+--   >>> withResolver rs $ \resolver -> lookupA resolver "192.0.2.1.nip.io"
+--   Right [192.0.2.1]
 --
 --   This function will also follow a CNAME and resolve its target if
---   one exists for the queries hostname:
+--   one exists for the queried hostname:
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupA resolver "www.kame.net"
@@ -139,14 +139,14 @@ lookupAAAA rlv dom = do
 --   constitute an MX record: a hostname , and an integer priority. We
 --   therefore return each record as a @('Domain', Int)@.
 --
---   In this first example, we look up the MX for the domain
---   \"example.com\". It has no MX (to prevent a deluge of spam from
---   examples posted on the internet). But remember, \"no results\" is
---   still a successful result.
+--   In this first example, we look up the MX for the domain \"example.com\".
+--   It has an RFC7505 NULL MX (to prevent a deluge of spam from examples
+--   posted on the internet).
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupMX resolver "example.com"
---   Right []
+--   Right [(".",0)]
+--
 --
 --   The domain \"mew.org\" does however have a single MX:
 --
@@ -156,6 +156,13 @@ lookupAAAA rlv dom = do
 --
 --   Also note that all hostnames are returned with a trailing dot to
 --   indicate the DNS root.
+--
+--   However the MX host itself has no need for an MX record, so its MX RRset
+--   is empty.  But, \"no results\" is still a successful result.
+--
+--   >>> rs <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs $ \resolver -> lookupMX resolver "mail.mew.org"
+--   Right []
 --
 lookupMX :: Resolver -> Domain -> IO (Either DNSError [(Domain,Int)])
 lookupMX rlv dom = do
@@ -323,8 +330,9 @@ lookupTXT rlv dom = do
 --   using the \'rname\` as a contact email address.
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupSOA resolver "mew.org"
---   Right [("ns1.mew.org.","kazu@mew.org.",201406240,3600,300,3600000,3600)]
+--   >>> soa <- withResolver rs $ \resolver -> lookupSOA resolver "mew.org"
+--   >>> map (\ (mn, rn, _, _, _, _, _) -> (mn, rn)) <$> soa
+--   Right [("ns1.mew.org.","kazu@mew.org.")]
 --
 lookupSOA :: Resolver -> Domain -> IO (Either DNSError [(Domain,Mailbox,Word32,Word32,Word32,Word32,Word32)])
 lookupSOA rlv dom = do

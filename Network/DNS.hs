@@ -9,8 +9,8 @@
 --   Examples:
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupA resolver "www.mew.org"
---   Right [210.130.207.72]
+--   >>> withResolver rs $ \resolver -> lookupA resolver "192.0.2.1.nip.io"
+--   Right [192.0.2.1]
 module Network.DNS (
   -- * High level
     module Network.DNS.Lookup
