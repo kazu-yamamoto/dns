@@ -5,7 +5,7 @@ environment:
   global:
     CABOPTS:  "--store-dir=C:\\SR --http-transport=plain-http"
   matrix:
-    - GHCVER: "8.6.4"
+    - GHCVER: "8.6.5"
 
 platform:
 #  - x86 # We may want to test x86 as well, but it would double the 23min build time.
@@ -23,7 +23,6 @@ install:
  - "ghc --version"
  - "cabal %CABOPTS% update -vverbose+nowrap"
  - "cabal %CABOPTS% install hspec-discover"
- - "cabal %CABOPTS% install cabal-doctest"
 
 build: off
 deploy: off
@@ -32,5 +31,8 @@ test_script:
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap --dry all
  - ps: Push-AppveyorArtifact dist-newstyle\cache\plan.json
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap all
- - cabal %CABOPTS% new-test  -j1 -vnormal+nowrap all
+ # On Windows, doctests don't yet work due to missing cbits
+ # dependency, so we run just the 'network' and 'spec' tests.
+ - cabal %CABOPTS% new-test  -j1 -vnormal+nowrap network
+ - cabal %CABOPTS% new-test  -j1 -vnormal+nowrap spec
  - ps: ls dns*.log -recurse | %{ Push-AppveyorArtifact $_}
