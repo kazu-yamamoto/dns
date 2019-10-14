@@ -21,7 +21,7 @@ module Network.DNS.Encode (
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
-import Network.DNS.Types
+import Network.DNS.Types.Internal
 import Network.DNS.Encode.Builders
 
 -- | Encode a 'DNSMessage' for transmission over UDP.  For transmission over
