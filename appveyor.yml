@@ -31,8 +31,7 @@ test_script:
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap --dry all
  - ps: Push-AppveyorArtifact dist-newstyle\cache\plan.json
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap all
- # On Windows, doctests don't yet work due to missing cbits
- # dependency, so we run just the 'network' and 'spec' tests.
- - cabal %CABOPTS% new-test  -j1 -vnormal+nowrap network
- - cabal %CABOPTS% new-test  -j1 -vnormal+nowrap spec
+ - cabal %CABOPTS% new-test -vnormal+nowrap network
+ - cabal %CABOPTS% new-test -vnormal+nowrap spec
+ - cabal %CABOPTS% new-run  -vnormal+nowrap doctests -- -liphlpapi
  - ps: ls dns*.log -recurse | %{ Push-AppveyorArtifact $_}
