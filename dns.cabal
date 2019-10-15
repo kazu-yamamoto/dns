@@ -20,6 +20,14 @@ Tested-With:            GHC == 8.2.2
 Custom-Setup
   Setup-Depends:        base, Cabal, cabal-doctest >=1.0.6 && <1.1
 
+Executable test-case
+  Hs-Source-Dirs:       test3
+  Ghc-Options:          -Wall
+  Main-Is:              Main.hs
+  Build-Depends:        base
+                      , conduit
+                      , dns
+
 Library
   Default-Language:     Haskell2010
   GHC-Options:          -Wall
@@ -34,6 +42,8 @@ Library
                         Network.DNS.Encode
                         Network.DNS.Encode.Internal
                         Network.DNS.IO
+                        Network.DNS.ZoneTransfer
+                        Network.DNS.ZoneTransfer.Conduit
   Other-Modules:        Network.DNS.Base32Hex
                         Network.DNS.Decode.Parsers
                         Network.DNS.Encode.Builders
@@ -52,6 +62,7 @@ Library
                       , base16-bytestring
                       , base64-bytestring
                       , bytestring
+                      , conduit
                       , containers
                       , cryptonite
                       , hourglass
