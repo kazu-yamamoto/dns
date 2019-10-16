@@ -155,10 +155,6 @@ import qualified Data.ByteString.Base64 as B64
 
 import Network.DNS.Imports
 
--- $setup
--- >>> :set -XOverloadedStrings
--- >>> import Network.DNS
-
 ----------------------------------------------------------------
 
 -- | This type holds the /presentation form/ of fully-qualified DNS domain

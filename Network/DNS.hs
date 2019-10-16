@@ -53,6 +53,3 @@ import Network.DNS.LookupRaw
 import Network.DNS.Resolver
 import Network.DNS.Types.Internal
 import Network.DNS.Utils
-
--- $setup
--- >>> :set -XOverloadedStrings

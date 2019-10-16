@@ -20,9 +20,6 @@ import Network.DNS.Imports
 import Network.DNS.StateBinary
 import Network.DNS.Types.Internal
 
--- $setup
--- >>> :set -XOverloadedStrings
-
 ----------------------------------------------------------------
 
 getResponse :: SGet DNSMessage

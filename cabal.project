@@ -1,0 +1,3 @@
+packages: .
+optimization: True
+write-ghc-environment-files: always
