@@ -1,14 +1,23 @@
+{-# LANGUAGE CPP #-}
+
 module Main where
 
-import Build_doctests (flags, pkgs, module_sources)
-import Test.DocTest (doctest)
+import Test.DocTest
+import System.Environment
 
+-- | List of modules to run through doctests
+modules :: [String]
+modules =
+  [ "-XOverloadedStrings"
+  , "-XCPP"
+  , "-i", "-i.", "-iInternal"
+  , "Network/DNS.hs"
+  ]
+
+-- | Run doctests only non-windows systems with GHC 8.4 or later
 main :: IO ()
 main = do
-    putStrLn $ unwords $ "\ndoctest args: " : args
-    doctest args
-  where
-    args = [ "-XCPP" ] ++
-           flags ++
-           pkgs ++
-           module_sources
+#if !defined(mingw32_HOST_OS) && MIN_TOOL_VERSION_ghc(8,4,0)
+    getArgs >>= doctest . (++ modules)
+#endif
+    return ()

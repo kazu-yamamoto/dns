@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -30,12 +29,6 @@ module Network.DNS.Resolver (
   , withResolvers
   ) where
 
-#if !defined(mingw32_HOST_OS)
-#define POSIX
-#else
-#define WIN
-#endif
-
 import Control.Exception as E
 import qualified Crypto.Random as C
 import qualified Data.ByteString as BS
@@ -45,19 +38,12 @@ import qualified Data.List.NonEmpty as NE
 import Network.Socket (AddrInfoFlag(..), AddrInfo(..), PortNumber, HostName, SocketType(Datagram), getAddrInfo, defaultHints)
 import Prelude
 
-#if defined(WIN)
-import qualified Data.List.Split as Split
-import Foreign.C.String
-import Foreign.Marshal.Alloc (allocaBytes)
-#else
-import Data.Char (isSpace)
-#endif
-
 import Network.DNS.Imports
 import Network.DNS.Memo
 import Network.DNS.Transport
-import Network.DNS.Types
 import Network.DNS.Types.Internal
+import Network.DNS.Types.Resolver
+import Network.DNS.Resolver.Internal
 
 ----------------------------------------------------------------
 
@@ -78,27 +64,6 @@ makeResolvSeed conf = ResolvSeed conf <$> findAddresses
         RCFilePath file          -> getDefaultDnsServers file >>= mkAddrs
     mkAddrs []     = E.throwIO BadConfiguration
     mkAddrs (l:ls) = (:|) <$> makeAddrInfo l Nothing <*> forM ls (`makeAddrInfo` Nothing)
-
-getDefaultDnsServers :: FilePath -> IO [String]
-#if defined(WIN)
-foreign import ccall "getWindowsDefDnsServers" getWindowsDefDnsServers :: CString -> Int -> IO Word32
-getDefaultDnsServers _ = do
-  allocaBytes 128 $ \cString -> do
-     res <- getWindowsDefDnsServers cString 128
-     case res of
-       0 -> do
-         addresses <- peekCString cString
-         return $ filter (not . null) . Split.splitOn "," $ addresses
-       _ -> do
-         -- TODO: Do proper error handling here.
-         return mempty
-#else
-getDefaultDnsServers file = toAddresses <$> readFile file
-  where
-    toAddresses :: String -> [String]
-    toAddresses cs = map extract (filter ("nameserver" `isPrefixOf`) (lines cs))
-    extract = reverse . dropWhile isSpace . reverse . dropWhile isSpace . drop 11
-#endif
 
 makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
 makeAddrInfo addr mport = do

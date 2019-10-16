@@ -18,7 +18,7 @@ import Data.List (partition)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
-import Network.DNS.Types
+import Network.DNS.Types.Internal
 
 -- $setup
 -- >>> :set -XOverloadedStrings

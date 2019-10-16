@@ -35,7 +35,7 @@ import System.IO.Error
 import Network.DNS.Decode (decodeAt)
 import Network.DNS.Encode (encode)
 import Network.DNS.Imports
-import Network.DNS.Types
+import Network.DNS.Types.Internal
 
 ----------------------------------------------------------------
 

@@ -78,7 +78,7 @@ import Data.IP (IPv4, IPv6)
 import Network.DNS.Imports
 import Network.DNS.LookupRaw as DNS
 import Network.DNS.Resolver as DNS
-import Network.DNS.Types
+import Network.DNS.Types.Internal
 
 -- $setup
 -- >>> :set -XOverloadedStrings
