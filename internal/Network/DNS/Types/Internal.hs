@@ -150,6 +150,9 @@ import qualified Data.Semigroup as Sem
 import qualified Network.DNS.Base32Hex as B32
 import Network.DNS.Imports
 
+-- $setup
+-- >>> import Network.DNS
+
 ----------------------------------------------------------------
 
 -- | This type holds the /presentation form/ of fully-qualified DNS domain
