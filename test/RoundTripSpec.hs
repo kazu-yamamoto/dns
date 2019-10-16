@@ -2,27 +2,21 @@
 
 module RoundTripSpec where
 
-import Control.Monad (replicateM)
 import qualified Data.IP
 import Data.IP (Addr, IP(..), IPv4, IPv6, toIPv4, toIPv6, makeAddrRange)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
+import Test.Hspec
+import Test.Hspec.QuickCheck
+import Test.QuickCheck (Gen, arbitrary, elements, forAll, frequency, listOf, oneof)
+import GHC.Exts (the, groupWith)
+
 import Network.DNS.Decode
 import Network.DNS.Decode.Internal
 import Network.DNS.Encode
 import Network.DNS.Encode.Internal
+import Network.DNS.Imports
 import Network.DNS.Types
-import Test.Hspec
-import Test.Hspec.QuickCheck
-import Test.QuickCheck (Gen, arbitrary, elements, forAll, frequency, listOf, oneof)
-import Data.Word (Word8, Word16, Word32)
-import Data.Monoid ((<>))
-import GHC.Exts (the, groupWith)
-
-#if __GLASGOW_HASKELL__ < 709
-import Control.Applicative
-#endif
-
 
 spec :: Spec
 spec = do

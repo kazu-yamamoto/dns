@@ -12,8 +12,8 @@ module Network.DNS.LookupRaw (
   ) where
 
 import Data.Hourglass (timeAdd, Seconds)
-import Time.System (timeCurrent)
 import Prelude hiding (lookup)
+import Time.System (timeCurrent)
 
 import Network.DNS.IO
 import Network.DNS.Imports hiding (lookup)

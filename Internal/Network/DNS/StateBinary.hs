@@ -53,9 +53,9 @@ import qualified Control.Monad.State.Strict as ST
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.Types as T
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as S8
 import Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.IntMap (IntMap)
