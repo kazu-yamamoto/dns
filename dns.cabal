@@ -12,11 +12,13 @@ Category:               Network
 Cabal-Version:          >= 2.0
 Build-Type:             Simple
 Extra-Source-Files:     Changelog.md
+                        cabal.project
                         cbits/dns.c
 Tested-With:            GHC == 8.0.2
-                        GHC == 8.2.2
+                      , GHC == 8.2.2
                       , GHC == 8.4.4
                       , GHC == 8.6.5
+                      , GHC == 8.8.1
 
 Library dns-internal
   Default-Language:     Haskell2010
