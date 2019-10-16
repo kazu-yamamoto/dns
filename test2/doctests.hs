@@ -2,8 +2,10 @@
 
 module Main where
 
+#if !defined(mingw32_HOST_OS) && MIN_TOOL_VERSION_ghc(8,4,0)
 import Test.DocTest
 import System.Environment
+#endif
 
 -- | List of modules to run through doctests
 modules :: [String]

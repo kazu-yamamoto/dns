@@ -40,10 +40,10 @@ import Prelude
 
 import Network.DNS.Imports
 import Network.DNS.Memo
+import Network.DNS.Resolver.Internal
 import Network.DNS.Transport
 import Network.DNS.Types.Internal
 import Network.DNS.Types.Resolver
-import Network.DNS.Resolver.Internal
 
 ----------------------------------------------------------------
 

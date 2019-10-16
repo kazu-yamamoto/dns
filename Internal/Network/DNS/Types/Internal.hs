@@ -138,21 +138,16 @@ module Network.DNS.Types.Internal (
   ) where
 
 import Control.Exception (Exception, IOException)
-import Control.Applicative ((<|>))
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Base16 as B16
+import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (intToDigit)
-import Data.Function (on)
 import qualified Data.Hourglass as H
 import Data.IP (IP(..), IPv4, IPv6)
-import qualified Data.List as List
-import           Data.Maybe (fromMaybe)
 import qualified Data.Semigroup as Sem
 
-import qualified Data.ByteString.Base16 as B16
 import qualified Network.DNS.Base32Hex as B32
-import qualified Data.ByteString.Base64 as B64
-
 import Network.DNS.Imports
 
 -- $setup
@@ -670,7 +665,7 @@ showFlag _  FlagKeep  = skipDefault
 -- | Combine a list of options for display, skipping default values
 --
 showOpts :: [String] -> String
-showOpts os = List.intercalate "," $ List.filter (/= skipDefault) os
+showOpts os = intercalate "," $ filter (/= skipDefault) os
 
 ----------------------------------------------------------------
 
@@ -740,7 +735,7 @@ data ODataOp = ODataAdd [OData] -- ^ Add the specified options to the list.
 --
 odataDedup :: ODataOp -> [OData]
 odataDedup op =
-    List.nubBy ((==) `on` odataToOptCode) $
+    nubBy ((==) `on` odataToOptCode) $
         case op of
             ODataAdd os -> os
             ODataSet os -> os
@@ -824,7 +819,7 @@ instance Show EdnsControls where
         showOdOp :: String -> [String] -> String
         showOdOp nm os = case os of
             [] -> ""
-            _  -> nm ++ ":[" ++ List.intercalate "," os ++ "]"
+            _  -> nm ++ ":[" ++ intercalate "," os ++ "]"
 
 -- | Construct a list of 0 or 1 EDNS OPT RRs based on EdnsControls setting.
 --
@@ -1769,7 +1764,7 @@ instance Show OData where
     show (UnknownOData code bs) = showUnknown code bs
 
 showAlgList :: String -> [Word8] -> String
-showAlgList nm ws = nm ++ " " ++ List.intercalate "," (map show ws)
+showAlgList nm ws = nm ++ " " ++ intercalate "," (map show ws)
 
 showNSID :: ByteString -> String
 showNSID nsid = "NSID" ++ " " ++ b16encode nsid ++ ";" ++ printable nsid

@@ -7,13 +7,14 @@ import qualified Data.ByteString.Char8 as BC
 #if !MIN_VERSION_bytestring(0,10,0)
 import qualified Data.ByteString as BS
 #endif
-import Data.Monoid ((<>))
 import Data.Word8
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (plusPtr)
 import Foreign.Storable (peek, poke, peekByteOff)
-import Network.DNS
 import Test.Hspec
+
+import Network.DNS
+import Network.DNS.Imports
 
 ----------------------------------------------------------------
 
