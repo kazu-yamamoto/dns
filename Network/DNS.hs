@@ -22,7 +22,7 @@ module Network.DNS (
   , module Network.DNS.Resolver
   -- | Resolver related data types.
 
-  , module Network.DNS.Types.Internal
+  , module Network.DNS.Types
   -- | All of the types that the other modules use.
 
   , module Network.DNS.Utils
@@ -51,5 +51,5 @@ import Network.DNS.IO
 import Network.DNS.Lookup
 import Network.DNS.LookupRaw
 import Network.DNS.Resolver
-import Network.DNS.Types.Internal
+import Network.DNS.Types
 import Network.DNS.Utils

@@ -1,141 +1,11 @@
+{-# OPTIONS_HADDOCK hide #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE CPP #-}
 
--- | Data types for DNS Query and Response.
---   For more information, see <http://www.ietf.org/rfc/rfc1035>.
-
-module Network.DNS.Types.Internal (
-  -- * Resource Records
-    ResourceRecord (..)
-  , Answers
-  , AuthorityRecords
-  , AdditionalRecords
-  -- ** Types
-  , Domain
-  , CLASS
-  , classIN
-  , TTL
-  -- ** Resource Record Types
-  , TYPE (
-    A
-  , NS
-  , CNAME
-  , SOA
-  , NULL
-  , PTR
-  , MX
-  , TXT
-  , AAAA
-  , SRV
-  , DNAME
-  , OPT
-  , DS
-  , RRSIG
-  , NSEC
-  , DNSKEY
-  , NSEC3
-  , NSEC3PARAM
-  , TLSA
-  , CDS
-  , CDNSKEY
-  , CSYNC
-  , AXFR
-  , ANY
-  , CAA
-  )
-  , fromTYPE
-  , toTYPE
-  -- ** Resource Data
-  , RData (..)
-  , RD_RRSIG(..)
-  , dnsTime
-  -- * DNS Message
-  , DNSMessage (..)
-  -- ** Query
-  , makeQuery
-  , makeEmptyQuery
-  , defaultQuery
-  -- ** Query Controls
-  , QueryControls
-  , rdFlag
-  , adFlag
-  , cdFlag
-  , doFlag
-  , ednsEnabled
-  , ednsSetVersion
-  , ednsSetUdpSize
-  , ednsSetOptions
-  -- *** Flag and OData control operations
-  , FlagOp(..)
-  , ODataOp(..)
-  -- ** Response
-  , defaultResponse
-  , makeResponse
-  -- ** DNS Header
-  , DNSHeader (..)
-  , Identifier
-  -- *** DNS flags
-  , DNSFlags (..)
-  , QorR (..)
-  , defaultDNSFlags
-  -- *** OPCODE and RCODE
-  , OPCODE (..)
-  , fromOPCODE
-  , toOPCODE
-  , RCODE (
-    NoErr
-  , FormatErr
-  , ServFail
-  , NameErr
-  , NotImpl
-  , Refused
-  , YXDomain
-  , YXRRSet
-  , NXRRSet
-  , NotAuth
-  , NotZone
-  , BadVers
-  , BadKey
-  , BadTime
-  , BadMode
-  , BadName
-  , BadAlg
-  , BadTrunc
-  , BadCookie
-  , BadRCODE
-  )
-  , fromRCODE
-  , toRCODE
-  -- ** EDNS Pseudo-Header
-  , EDNSheader(..)
-  , ifEDNS
-  , mapEDNS
-  -- *** EDNS record
-  , EDNS(..)
-  , defaultEDNS
-  , maxUdpSize
-  , minUdpSize
-  -- *** EDNS options
-  , OData (..)
-  , OptCode (
-    ClientSubnet
-  , DAU
-  , DHU
-  , N3U
-  , NSID
-  )
-  , fromOptCode
-  , toOptCode
-  -- ** DNS Body
-  , Question (..)
-  -- * DNS Error
-  , DNSError (..)
-  -- * Other types
-  , Mailbox
-  ) where
+module Network.DNS.Types.Internal where
 
 import Control.Exception (Exception, IOException)
 import qualified Data.ByteString as B
@@ -621,14 +491,6 @@ data FlagOp = FlagSet   -- ^ Set the flag to 1
             | FlagKeep  -- ^ Leave the flag unchanged
             deriving (Eq, Show)
 
--- | Apply the given 'FlagOp' to a default boolean value to produce the final
--- setting.
---
-applyFlag :: FlagOp -> Bool -> Bool
-applyFlag FlagSet   _ = True
-applyFlag FlagClear _ = False
-applyFlag _         v = v
-
 -- $
 -- Test associativity of the semigroup operation:
 --
@@ -650,21 +512,21 @@ instance Monoid FlagOp where
 
 -- | We don't show options left at their default value.
 --
-skipDefault :: String
-skipDefault = ""
+_skipDefault :: String
+_skipDefault = ""
 
 -- | Show non-default flag values
 --
-showFlag :: String -> FlagOp -> String
-showFlag nm FlagSet   = nm ++ ":1"
-showFlag nm FlagClear = nm ++ ":0"
-showFlag _  FlagReset = skipDefault
-showFlag _  FlagKeep  = skipDefault
+_showFlag :: String -> FlagOp -> String
+_showFlag nm FlagSet   = nm ++ ":1"
+_showFlag nm FlagClear = nm ++ ":0"
+_showFlag _  FlagReset = _skipDefault
+_showFlag _  FlagKeep  = _skipDefault
 
 -- | Combine a list of options for display, skipping default values
 --
-showOpts :: [String] -> String
-showOpts os = intercalate "," $ filter (/= skipDefault) os
+_showOpts :: [String] -> String
+_showOpts os = intercalate "," $ filter (/= _skipDefault) os
 
 ----------------------------------------------------------------
 
@@ -692,33 +554,10 @@ instance Monoid HeaderControls where
 
 instance Show HeaderControls where
     show (HeaderControls rd ad cd) =
-        showOpts
-             [ showFlag "rd" rd
-             , showFlag "ad" ad
-             , showFlag "cd" cd ]
-
--- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
--- resulting 'DNSFlags' suitable for making queries with the requested flag
--- settings.  This is only needed if you're creating your own 'DNSMessage',
--- the 'Network.DNS.LookupRaw.lookupRawCtl' function takes a 'QueryControls'
--- argument and handles this conversion internally.
---
--- Default overrides can be specified in the resolver configuration by setting
--- the 'Network.DNS.resolvQueryControls' field of the
--- 'Network.DNS.Resolver.ResolvConf' argument to
--- 'Network.DNS.Resolver.makeResolvSeed'.  These then apply to lookups via
--- resolvers based on the resulting configuration, with the exception of
--- 'Network.DNS.LookupRaw.lookupRawCtl' which takes an additional
--- 'QueryControls' argument to augment the default overrides.
---
-queryDNSFlags :: HeaderControls -> DNSFlags
-queryDNSFlags (HeaderControls rd ad cd) = d {
-      recDesired = applyFlag rd $ recDesired d
-    , authenData = applyFlag ad $ authenData d
-    , chkDisable = applyFlag cd $ chkDisable d
-    }
-  where
-    d = defaultDNSFlags
+        _showOpts
+             [ _showFlag "rd" rd
+             , _showFlag "ad" ad
+             , _showFlag "cd" cd ]
 
 ----------------------------------------------------------------
 
@@ -732,9 +571,9 @@ data ODataOp = ODataAdd [OData] -- ^ Add the specified options to the list.
 -- | Since any given option code can appear at most once in the list, we
 -- de-duplicate by the OPTION CODE when combining lists.
 --
-odataDedup :: ODataOp -> [OData]
-odataDedup op =
-    nubBy ((==) `on` odataToOptCode) $
+_odataDedup :: ODataOp -> [OData]
+_odataDedup op =
+    nubBy ((==) `on` _odataToOptCode) $
         case op of
             ODataAdd os -> os
             ODataSet os -> os
@@ -804,34 +643,21 @@ instance Monoid EdnsControls where
 
 instance Show EdnsControls where
     show (EdnsControls en vn sz d0 od) =
-        showOpts
-            [ showFlag "edns.enabled" en
-            , showWord "edns.version" vn
-            , showWord "edns.udpsize" sz
-            , showFlag "edns.dobit"   d0
-            , showOdOp "edns.options" $ map (show. odataToOptCode)
-                                      $ odataDedup od ]
+        _showOpts
+            [ _showFlag "edns.enabled" en
+            , _showWord "edns.version" vn
+            , _showWord "edns.udpsize" sz
+            , _showFlag "edns.dobit"   d0
+            , _showOdOp "edns.options" $ map (show. _odataToOptCode)
+                                       $ _odataDedup od ]
       where
-        showWord :: Show a => String -> Maybe a -> String
-        showWord nm w = maybe skipDefault (\s -> nm ++ ":" ++ show s) w
+        _showWord :: Show a => String -> Maybe a -> String
+        _showWord nm w = maybe _skipDefault (\s -> nm ++ ":" ++ show s) w
 
-        showOdOp :: String -> [String] -> String
-        showOdOp nm os = case os of
+        _showOdOp :: String -> [String] -> String
+        _showOdOp nm os = case os of
             [] -> ""
             _  -> nm ++ ":[" ++ intercalate "," os ++ "]"
-
--- | Construct a list of 0 or 1 EDNS OPT RRs based on EdnsControls setting.
---
-queryEdns :: EdnsControls -> EDNSheader
-queryEdns (EdnsControls en vn sz d0 od) =
-    let d  = defaultEDNS
-     in if en == FlagClear
-        then NoEDNS
-        else EDNSheader $ d { ednsVersion = fromMaybe (ednsVersion d) vn
-                            , ednsUdpSize = fromMaybe (ednsUdpSize d) sz
-                            , ednsDnssecOk = applyFlag d0 (ednsDnssecOk d)
-                            , ednsOptions  = odataDedup od
-                            }
 
 ----------------------------------------------------------------
 
@@ -893,7 +719,7 @@ instance Monoid QueryControls where
 #endif
 
 instance Show QueryControls where
-    show (QueryControls fl ex) = showOpts [ show fl, show ex ]
+    show (QueryControls fl ex) = _showOpts [ show fl, show ex ]
 
 ----------------------------------------------------------------
 
@@ -1278,41 +1104,6 @@ dnsTime tdns tnow =
            then tnow - (0x100000000 - fromIntegral delta)
            else tnow + fromIntegral delta
 
--- | Convert epoch time to a YYYYMMDDHHMMSS string:
---
--- >>> :{
--- let testVector =
---         [ ( "19230704085602", -1467299038)
---         , ( "19331017210945", -1142563815)
---         , ( "19480919012827", -671668293 )
---         , ( "19631210171455", -191227505 )
---         , ( "20060819001740", 1155946660 )
---         , ( "20180723061122", 1532326282 )
---         , ( "20281019005024", 1855529424 )
---         , ( "20751108024632", 3340406792 )
---         , ( "21240926071415", 4883008455 )
---         , ( "21270331070215", 4962150135 )
---         , ( "21371220015305", 5300560385 )
---         , ( "21680118121052", 6249787852 )
---         , ( "21811012210032", 6683202032 )
---         , ( "22060719093224", 7464648744 )
---         , ( "22100427121648", 7583717808 )
---         , ( "22530821173957", 8950757997 )
---         , ( "23010804210243", 10463979763)
---         , ( "23441111161706", 11829514626)
---         , ( "23750511175551", 12791843751)
---         , ( "23860427060801", 13137746881) ]
---  in (==) <$> map (showTime.snd) <*> map fst $ testVector
--- :}
--- True
---
-
-showTime :: Int64 -> String
-showTime t = H.timePrint fmt $ H.Elapsed $ H.Seconds t
-  where
-    fmt = [ H.Format_Year4, H.Format_Month2, H.Format_Day2
-          , H.Format_Hour,  H.Format_Minute, H.Format_Second ]
-
 -- | RRSIG representation.
 --
 -- As noted in
@@ -1359,8 +1150,14 @@ instance Show RD_RRSIG where
         , showTime rrsigInception
         , show rrsigKeyTag
         , BS.unpack rrsigZone
-        , b64encode rrsigValue
+        , _b64encode rrsigValue
         ]
+      where
+        showTime :: Int64 -> String
+        showTime t = H.timePrint fmt $ H.Elapsed $ H.Seconds t
+          where
+            fmt = [ H.Format_Year4, H.Format_Month2, H.Format_Day2
+                  , H.Format_Hour,  H.Format_Minute, H.Format_Second ]
 
 -- | Raw data format for each type.
 data RData = RD_A IPv4           -- ^ IPv4 address
@@ -1422,7 +1219,7 @@ instance Show RData where
       UnknownRData            bytes -> showOpaque bytes
     where
       showSalt ""    = "-"
-      showSalt salt  = b16encode salt
+      showSalt salt  = _b16encode salt
       showDomain = BS.unpack
       showSOA mname mrname serial refresh retry expire minttl =
           showDomain mname ++ " " ++ showDomain mrname ++ " " ++
@@ -1450,29 +1247,29 @@ instance Show RData where
           show port ++ BS.unpack target
       showDS keytag alg digestType digest =
           show keytag ++ " " ++ show alg ++ " " ++
-          show digestType ++ " " ++ b16encode digest
+          show digestType ++ " " ++ _b16encode digest
       showNSEC next types =
           unwords $ showDomain next : map show types
       showDNSKEY flags protocol alg key =
           show flags ++ " " ++ show protocol ++ " " ++
-          show alg ++ " " ++ b64encode key
+          show alg ++ " " ++ _b64encode key
       -- | <https://tools.ietf.org/html/rfc5155#section-3.2>
       showNSEC3 hashalg flags iterations salt nexthash types =
           unwords $ show hashalg : show flags : show iterations :
-                    showSalt salt : b32encode nexthash : map show types
+                    showSalt salt : _b32encode nexthash : map show types
       showNSEC3PARAM hashAlg flags iterations salt =
           show hashAlg ++ " " ++ show flags ++ " " ++
           show iterations ++ " " ++ showSalt salt
       showTLSA usage selector mtype digest =
           show usage ++ " " ++ show selector ++ " " ++
-          show mtype ++ " " ++ b16encode digest
+          show mtype ++ " " ++ _b16encode digest
       -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
-      showOpaque bs = unwords ["\\#", show (BS.length bs), b16encode bs]
+      showOpaque bs = unwords ["\\#", show (BS.length bs), _b16encode bs]
 
-b16encode, b32encode, b64encode :: ByteString -> String
-b16encode = BS.unpack. B16.encode
-b32encode = BS.unpack. B32.encode
-b64encode = BS.unpack. B64.encode
+_b16encode, _b32encode, _b64encode :: ByteString -> String
+_b16encode = BS.unpack. B16.encode
+_b32encode = BS.unpack. B32.encode
+_b64encode = BS.unpack. B64.encode
 
 -- | Type alias for resource records in the answer section.
 type Answers = [ResourceRecord]
@@ -1547,6 +1344,50 @@ makeEmptyQuery ctls = defaultQuery {
     hctls = qctlHeader ctls
     ehctls = qctlEdns ctls
     header' = (header defaultQuery) { flags = queryDNSFlags hctls }
+
+    -- | Apply the given 'FlagOp' to a default boolean value to produce the final
+    -- setting.
+    --
+    applyFlag :: FlagOp -> Bool -> Bool
+    applyFlag FlagSet   _ = True
+    applyFlag FlagClear _ = False
+    applyFlag _         v = v
+
+    -- | Construct a list of 0 or 1 EDNS OPT RRs based on EdnsControls setting.
+    --
+    queryEdns :: EdnsControls -> EDNSheader
+    queryEdns (EdnsControls en vn sz d0 od) =
+        let d  = defaultEDNS
+         in if en == FlagClear
+            then NoEDNS
+            else EDNSheader $ d { ednsVersion = fromMaybe (ednsVersion d) vn
+                                , ednsUdpSize = fromMaybe (ednsUdpSize d) sz
+                                , ednsDnssecOk = applyFlag d0 (ednsDnssecOk d)
+                                , ednsOptions  = _odataDedup od
+                                }
+
+    -- | Apply all the query flag overrides to 'defaultDNSFlags', returning the
+    -- resulting 'DNSFlags' suitable for making queries with the requested flag
+    -- settings.  This is only needed if you're creating your own 'DNSMessage',
+    -- the 'Network.DNS.LookupRaw.lookupRawCtl' function takes a 'QueryControls'
+    -- argument and handles this conversion internally.
+    --
+    -- Default overrides can be specified in the resolver configuration by setting
+    -- the 'Network.DNS.resolvQueryControls' field of the
+    -- 'Network.DNS.Resolver.ResolvConf' argument to
+    -- 'Network.DNS.Resolver.makeResolvSeed'.  These then apply to lookups via
+    -- resolvers based on the resulting configuration, with the exception of
+    -- 'Network.DNS.LookupRaw.lookupRawCtl' which takes an additional
+    -- 'QueryControls' argument to augment the default overrides.
+    --
+    queryDNSFlags :: HeaderControls -> DNSFlags
+    queryDNSFlags (HeaderControls rd ad cd) = d {
+          recDesired = applyFlag rd $ recDesired d
+        , authenData = applyFlag ad $ authenData d
+        , chkDisable = applyFlag cd $ chkDisable d
+        }
+      where
+        d = defaultDNSFlags
 
 -- | Construct a complete query 'DNSMessage', by combining the 'defaultQuery'
 -- template with the specified 'Identifier', and 'Question'.  The
@@ -1743,37 +1584,35 @@ data OData =
 
 -- | Recover the (often implicit) 'OptCode' from a value of the 'OData' sum
 -- type.
-odataToOptCode :: OData -> OptCode
-odataToOptCode OD_NSID {}            = NSID
-odataToOptCode OD_DAU {}             = DAU
-odataToOptCode OD_DHU {}             = DHU
-odataToOptCode OD_N3U {}             = N3U
-odataToOptCode OD_ClientSubnet {}    = ClientSubnet
-odataToOptCode OD_ECSgeneric {}      = ClientSubnet
-odataToOptCode (UnknownOData code _) = toOptCode code
+_odataToOptCode :: OData -> OptCode
+_odataToOptCode OD_NSID {}            = NSID
+_odataToOptCode OD_DAU {}             = DAU
+_odataToOptCode OD_DHU {}             = DHU
+_odataToOptCode OD_N3U {}             = N3U
+_odataToOptCode OD_ClientSubnet {}    = ClientSubnet
+_odataToOptCode OD_ECSgeneric {}      = ClientSubnet
+_odataToOptCode (UnknownOData code _) = toOptCode code
 
 instance Show OData where
-    show (OD_NSID nsid) = showNSID nsid
-    show (OD_DAU as)    = showAlgList "DAU" as
-    show (OD_DHU hs)    = showAlgList "DHU" hs
-    show (OD_N3U hs)    = showAlgList "N3U" hs
-    show (OD_ClientSubnet b1 b2 ip@(IPv4 _)) = showECS 1 b1 b2 $ show ip
-    show (OD_ClientSubnet b1 b2 ip@(IPv6 _)) = showECS 2 b1 b2 $ show ip
-    show (OD_ECSgeneric fam b1 b2 a) = showECS fam b1 b2 $ b16encode a
-    show (UnknownOData code bs) = showUnknown code bs
+    show (OD_NSID nsid) = _showNSID nsid
+    show (OD_DAU as)    = _showAlgList "DAU" as
+    show (OD_DHU hs)    = _showAlgList "DHU" hs
+    show (OD_N3U hs)    = _showAlgList "N3U" hs
+    show (OD_ClientSubnet b1 b2 ip@(IPv4 _)) = _showECS 1 b1 b2 $ show ip
+    show (OD_ClientSubnet b1 b2 ip@(IPv6 _)) = _showECS 2 b1 b2 $ show ip
+    show (OD_ECSgeneric fam b1 b2 a) = _showECS fam b1 b2 $ _b16encode a
+    show (UnknownOData code bs) =
+        "UnknownOData " ++ show code ++ " " ++ _b16encode bs
 
-showAlgList :: String -> [Word8] -> String
-showAlgList nm ws = nm ++ " " ++ intercalate "," (map show ws)
+_showAlgList :: String -> [Word8] -> String
+_showAlgList nm ws = nm ++ " " ++ intercalate "," (map show ws)
 
-showNSID :: ByteString -> String
-showNSID nsid = "NSID" ++ " " ++ b16encode nsid ++ ";" ++ printable nsid
+_showNSID :: ByteString -> String
+_showNSID nsid = "NSID" ++ " " ++ _b16encode nsid ++ ";" ++ printable nsid
   where
     printable = BS.unpack. BS.map (\c -> if c < ' ' || c > '~' then '?' else c)
 
-showECS :: Word16 -> Word8 -> Word8 -> String -> String
-showECS family srcBits scpBits address =
+_showECS :: Word16 -> Word8 -> Word8 -> String -> String
+_showECS family srcBits scpBits address =
     show family ++ " " ++ show srcBits
                 ++ " " ++ show scpBits ++ " " ++ address
-
-showUnknown :: Word16 -> ByteString -> String
-showUnknown code bs = "UnknownOData " ++ show code ++ " " ++ b16encode bs
