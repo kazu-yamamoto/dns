@@ -14,6 +14,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.IP
 import Data.IP (IP(..), toIPv4, toIPv6b, makeAddrRange)
+import Data.List (partition)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary

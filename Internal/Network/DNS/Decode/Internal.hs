@@ -10,10 +10,10 @@ module Network.DNS.Decode.Internal (
   , decodeResourceRecord
   ) where
 
-import Network.DNS.Decode.Parsers
 import Network.DNS.Imports
 import Network.DNS.StateBinary
 import Network.DNS.Types.Internal
+import Network.DNS.Decode.Parsers
 
 ----------------------------------------------------------------
 

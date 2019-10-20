@@ -2,12 +2,11 @@
 
 module IOSpec where
 
-import Network.Socket
-import Test.Hspec
-
+import Data.Monoid ((<>))
 import Network.DNS.IO as DNS
-import Network.DNS.Imports
 import Network.DNS.Types as DNS
+import Network.Socket hiding (send)
+import Test.Hspec
 
 spec :: Spec
 spec = describe "send/receive" $ do

@@ -2,9 +2,8 @@
 
 module LookupSpec where
 
-import Test.Hspec
-
 import Network.DNS as DNS
+import Test.Hspec
 
 spec :: Spec
 spec = describe "lookup" $ do

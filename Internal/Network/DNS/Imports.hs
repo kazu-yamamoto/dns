@@ -5,7 +5,6 @@ module Network.DNS.Imports (
   , module Control.Applicative
   , module Control.Monad
   , module Data.Bits
-  , module Data.Function
   , module Data.List
   , module Data.Maybe
   , module Data.Monoid
@@ -19,7 +18,6 @@ import Control.Applicative
 import Control.Monad
 import Data.Bits
 import Data.ByteString (ByteString)
-import Data.Function
 import Data.Int (Int64)
 import Data.List
 import Data.List.NonEmpty (NonEmpty(..))

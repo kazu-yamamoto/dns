@@ -19,6 +19,7 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.IP
+import Data.List (foldl')
 import Data.IP (IP(..), fromIPv4, fromIPv6b, makeAddrRange)
 import GHC.Exts (the, groupWith)
 

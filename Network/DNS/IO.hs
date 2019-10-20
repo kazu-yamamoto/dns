@@ -18,6 +18,7 @@ module Network.DNS.IO (
   ) where
 
 import qualified Control.Exception as E
+import Control.Monad (void)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
@@ -29,6 +30,7 @@ import Network.Socket (Socket)
 import Network.Socket.ByteString (recv)
 import qualified Network.Socket.ByteString as Socket
 import System.IO.Error
+
 
 import Network.DNS.Decode (decodeAt)
 import Network.DNS.Encode (encode)

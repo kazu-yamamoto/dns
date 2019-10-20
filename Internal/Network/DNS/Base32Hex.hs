@@ -1,11 +1,11 @@
 module Network.DNS.Base32Hex (encode) where
 
+import Control.Monad (when)
 import qualified Data.Array.MArray as A
 import qualified Data.Array.IArray as A
 import qualified Data.Array.ST     as A
 import qualified Data.ByteString   as B
-
-import Network.DNS.Imports
+import Data.Bits
 
 -- | Encode ByteString using the
 -- <https://tools.ietf.org/html/rfc4648#section-7 RFC4648 base32hex>
