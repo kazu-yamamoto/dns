@@ -16,8 +16,8 @@ import System.Timeout (timeout)
 
 import Network.DNS.IO
 import Network.DNS.Imports
+import Network.DNS.Types
 import Network.DNS.Types.Internal
-import Network.DNS.Types.Resolver
 
 -- | Check response for a matching identifier and question.  If we ever do
 -- pipelined TCP, we'll need to handle out of order responses.  See:

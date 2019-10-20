@@ -28,7 +28,7 @@ import qualified Data.ByteString as B
 import Network.DNS.Decode.Parsers
 import Network.DNS.Imports
 import Network.DNS.StateBinary
-import Network.DNS.Types.Internal
+import Network.DNS.Types
 
 ----------------------------------------------------------------
 

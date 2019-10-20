@@ -1,10 +1,10 @@
-module Network.DNS.Types.Resolver where
+module Network.DNS.Types.Internal where
 
 import Network.Socket (AddrInfo(..), PortNumber, HostName)
 
 import Network.DNS.Imports
 import Network.DNS.Memo
-import Network.DNS.Types.Internal
+import Network.DNS.Types
 
 ----------------------------------------------------------------
 

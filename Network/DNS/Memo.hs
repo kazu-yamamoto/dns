@@ -10,7 +10,7 @@ import qualified Data.OrdPSQ as PSQ
 import Time.System (timeCurrent)
 
 import Network.DNS.Imports
-import Network.DNS.Types.Internal
+import Network.DNS.Types
 
 data Section = Answer | Authority deriving (Eq, Ord, Show)
 

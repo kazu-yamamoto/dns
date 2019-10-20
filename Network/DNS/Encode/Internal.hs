@@ -12,7 +12,7 @@ module Network.DNS.Encode.Internal (
 import Network.DNS.Encode.Builders
 import Network.DNS.Imports
 import Network.DNS.StateBinary
-import Network.DNS.Types.Internal
+import Network.DNS.Types
 
 -- | Encode DNS flags.
 encodeDNSFlags :: DNSFlags -> ByteString

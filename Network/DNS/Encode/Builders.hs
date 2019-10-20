@@ -25,7 +25,7 @@ import GHC.Exts (the, groupWith)
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
-import Network.DNS.Types.Internal
+import Network.DNS.Types
 
 ----------------------------------------------------------------
 

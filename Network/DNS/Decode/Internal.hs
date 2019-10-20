@@ -12,7 +12,7 @@ module Network.DNS.Decode.Internal (
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
-import Network.DNS.Types.Internal
+import Network.DNS.Types
 import Network.DNS.Decode.Parsers
 
 ----------------------------------------------------------------

@@ -9,7 +9,7 @@ module Network.DNS.Utils (
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (toLower)
 
-import Network.DNS.Types.Internal (Domain)
+import Network.DNS.Types (Domain)
 
 
 -- | Perform both 'normalizeCase' and 'normalizeRoot' on the given
