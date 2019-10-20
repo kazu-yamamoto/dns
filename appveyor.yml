@@ -5,7 +5,7 @@ environment:
   global:
     CABOPTS:  "--store-dir=C:\\SR --http-transport=plain-http"
   matrix:
-    - GHCVER: "8.6.4"
+    - GHCVER: "8.6.5"
 
 platform:
 #  - x86 # We may want to test x86 as well, but it would double the 23min build time.
@@ -21,9 +21,8 @@ install:
  - "set PATH=C:\\msys64\\mingw64\\bin;C:\\msys64\\usr\\bin;C:\\ghc\\ghc-%GHCVER%\\bin;%PATH%"
  - "cabal --version"
  - "ghc --version"
- - "cabal %CABOPTS% update -vverbose+nowrap"
- - "cabal %CABOPTS% install hspec-discover"
- - "cabal %CABOPTS% install cabal-doctest"
+ - "cabal %CABOPTS% new-update"
+ - "cabal %CABOPTS% new-install hspec-discover"
 
 build: off
 deploy: off

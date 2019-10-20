@@ -33,11 +33,11 @@ matrix:
     - compiler: "ghc-8.6.5"
     # env: TEST=--disable-tests BENCH=--disable-benchmarks
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.4,ghc-8.6.5], sources: [hvr-ghc]}}
-    - compiler: "ghc-head"
+    - compiler: "ghc-8.8.1"
     # env: TEST=--disable-tests BENCH=--disable-benchmarks
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-3.0,ghc-8.8.1], sources: [hvr-ghc]}}
   allow_failures:
-    - compiler: "ghc-head"
+    # - compiler: "ghc-8.8.1"
 
 before_install:
  - HC=${CC}
@@ -56,7 +56,6 @@ install:
  - "echo 'packages: .' > cabal.project"
  - rm -f cabal.project.freeze
  - cabal install hspec-discover
- - cabal install cabal-doctest
  - cabal new-build -w ${HC} ${TEST} ${BENCH} --dep -j2 all
  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --dep -j2 all
 
@@ -65,7 +64,7 @@ install:
 script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
  - rm -rf .ghc.environment.* dist/
- - cabal sdist # test that a source-distribution can be generated
+ - mkdir dist; cabal v2-sdist -o dist # test that a source-distribution can be generated
  - cd dist/
  - SRCTAR=(${PKGNAME}-*.tar.gz)
  - SRC_BASENAME="${SRCTAR/%.tar.gz}"
