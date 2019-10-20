@@ -33,11 +33,11 @@ matrix:
     - compiler: "ghc-8.6.5"
     # env: TEST=--disable-tests BENCH=--disable-benchmarks
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.4,ghc-8.6.5], sources: [hvr-ghc]}}
-    - compiler: "ghc-8.8.1"
+    - compiler: "ghc-head"
     # env: TEST=--disable-tests BENCH=--disable-benchmarks
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-3.0,ghc-8.8.1], sources: [hvr-ghc]}}
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-head], sources: [hvr-ghc]}}
   allow_failures:
-    # - compiler: "ghc-8.8.1"
+    - compiler: "ghc-head"
 
 before_install:
  - HC=${CC}
@@ -53,8 +53,10 @@ install:
  - travis_retry cabal update -v
  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
  - rm -fv cabal.project.local
+ - "echo 'packages: .' > cabal.project"
  - rm -f cabal.project.freeze
  - cabal install hspec-discover
+ - cabal install cabal-doctest
  - cabal new-build -w ${HC} ${TEST} ${BENCH} --dep -j2 all
  - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --dep -j2 all
 
@@ -63,7 +65,7 @@ install:
 script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
  - rm -rf .ghc.environment.* dist/
- - mkdir dist; cabal v2-sdist -o dist # test that a source-distribution can be generated
+ - cabal sdist # test that a source-distribution can be generated
  - cd dist/
  - SRCTAR=(${PKGNAME}-*.tar.gz)
  - SRC_BASENAME="${SRCTAR/%.tar.gz}"
@@ -71,9 +73,10 @@ script:
  - cd "$SRC_BASENAME/"
 ## from here on, CWD is inside the extracted source-tarball
  - rm -fv cabal.project.local
+ - "echo 'packages: .' > cabal.project"
  # this builds all libraries and executables (without tests/benchmarks)
  - rm -f cabal.project.freeze
- - cabal new-build -w ${HC} -vnormal+nowrap --disable-tests --disable-benchmarks all
+ - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
  # this builds all libraries and executables (including tests/benchmarks)
  # - rm -rf ./dist-newstyle
 
