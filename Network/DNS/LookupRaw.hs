@@ -23,6 +23,7 @@ import Network.DNS.Types.Internal
 import Network.DNS.Types.Resolver
 
 -- $setup
+-- >>> :set -XOverloadedStrings
 -- >>> import Network.DNS.Resolver
 
 ----------------------------------------------------------------

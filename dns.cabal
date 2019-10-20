@@ -13,8 +13,7 @@ Cabal-Version:          >= 2.0
 Build-Type:             Simple
 Extra-Source-Files:     Changelog.md
                         cbits/dns.c
-Tested-With:            GHC == 8.0.2
-                        GHC == 8.2.2
+Tested-With:            GHC == 8.2.2
                       , GHC == 8.4.4
                       , GHC == 8.6.5
 
@@ -120,7 +119,6 @@ Test-Suite doctests
   Hs-Source-Dirs:       test2
   Ghc-Options:          -Wall -threaded
   Main-Is:              doctests.hs
-  Other-Modules:        Paths_dns
   Build-Depends:        base
                       , doctest
 
