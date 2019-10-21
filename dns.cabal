@@ -22,8 +22,8 @@ Tested-With:            GHC == 8.0.2
 
 Library dns-internal
   Default-Language:     Haskell2010
-  GHC-Options:          -Wall
-  hs-source-dirs:       Internal
+  GHC-Options:          -Wall -O
+  hs-source-dirs:       internal
   Exposed-Modules:      Network.DNS.Imports
                         Network.DNS.Types.Internal
                         Network.DNS.Types.Resolver
@@ -56,7 +56,7 @@ Library dns-internal
 
 Library
   Default-Language:     Haskell2010
-  GHC-Options:          -Wall
+  GHC-Options:          -Wall -O
   Exposed-Modules:      Network.DNS
                         Network.DNS.Lookup
                         Network.DNS.LookupRaw
@@ -120,7 +120,7 @@ Test-Suite doctests
   Type:                 exitcode-stdio-1.0
   Default-Language:     Haskell2010
   Hs-Source-Dirs:       test2
-  Ghc-Options:          -Wall -threaded
+  Ghc-Options:          -Wall -O -threaded
   Main-Is:              doctests.hs
   Other-Modules:        Paths_dns
   Build-Depends:        base

@@ -9,24 +9,17 @@
 module Main where
 
 #if !defined(mingw32_HOST_OS) && MIN_TOOL_VERSION_ghc(8,4,0)
-import Data.Version
-import Paths_dns
 import Test.DocTest
 import System.Environment
-
-libraryPackageId, internalLibrary :: String
-libraryPackageId = "dns-" ++ showVersion version ++ "-inplace"
-internalLibrary = "dns-internal"
 
 -- | Expose precompiled library modules.
 modules :: [String]
 modules =
   [ "-XOverloadedStrings"
   , "-XCPP"
+  , "-i","-i.","-iinternal"
   , "-threaded"
-  , "-i", "-i."
-  , "-package-id=" ++ libraryPackageId
-  , "-package-id=" ++ libraryPackageId ++ "-" ++ internalLibrary
+  , "-package=dns"
   , "Network/DNS.hs"
   ]
 
