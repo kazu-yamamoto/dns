@@ -1452,7 +1452,7 @@ data EDNS = EDNS {
 -- @
 -- defaultEDNS = EDNS
 --     { ednsVersion = 0      -- The default EDNS version is 0
---     , ednsUdpSize = 1216   -- IPv6-safe UDP MTU
+--     , ednsUdpSize = 1232   -- IPv6-safe UDP MTU (RIPE recommendation)
 --     , ednsDnssecOk = False -- We don't do DNSSEC validation
 --     , ednsOptions = []     -- No EDNS options by default
 --     }
@@ -1461,7 +1461,7 @@ data EDNS = EDNS {
 defaultEDNS :: EDNS
 defaultEDNS = EDNS
     { ednsVersion = 0      -- The default EDNS version is 0
-    , ednsUdpSize = 1216   -- IPv6-safe UDP MTU
+    , ednsUdpSize = 1232   -- IPv6-safe UDP MTU
     , ednsDnssecOk = False -- We don't do DNSSEC validation
     , ednsOptions = []     -- No EDNS options by default
     }
