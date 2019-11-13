@@ -52,6 +52,8 @@ module Network.DNS.Types (
   , makeQuery
   , makeEmptyQuery
   , defaultQuery
+  -- ** NOTIFY
+  , notifyMessage
   -- ** Query Controls
   , QueryControls
   , rdFlag

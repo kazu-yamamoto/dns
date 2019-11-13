@@ -1330,6 +1330,35 @@ defaultResponse = DNSMessage {
   , additional = []
   }
 
+-- | A 'DNSMessage' template for NOTIFY queries for the given zone,
+-- as per RFC-1996.
+
+notifyMessage :: ByteString -> DNSMessage
+notifyMessage zoneName = DNSMessage {
+  header = DNSHeader {
+      identifier = 0
+    , flags = DNSFlags {
+             qOrR = QR_Query
+           , opcode = OP_NOTIFY
+           , authAnswer = True
+           , trunCation = False
+           , recDesired = True
+           , recAvailable = False
+           , rcode = NoErr
+           , authenData = False
+           , chkDisable = False
+      }
+    }
+    , ednsHeader = EDNSheader defaultEDNS
+    , question = [ Question { qname = zoneName
+                            , qtype = SOA
+                            }
+                 ]
+    , answer = []
+    , authority = []
+    , additional = []
+  }
+
 -- | A query template with 'QueryControls' overrides applied,
 -- with just the 'Question' and query 'Identifier' remaining
 -- to be filled in.
