@@ -53,7 +53,7 @@ module Network.DNS.Types (
   , makeEmptyQuery
   , defaultQuery
   -- ** NOTIFY
-  , notifyMessage
+  , notifyRequestMessage
   -- ** Query Controls
   , QueryControls
   , rdFlag

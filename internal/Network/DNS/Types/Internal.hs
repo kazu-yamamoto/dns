@@ -1330,28 +1330,28 @@ defaultResponse = DNSMessage {
   , additional = []
   }
 
--- | A 'DNSMessage' template for NOTIFY queries for the given zone,
--- as per RFC-1996.
+-- | A 'DNSMessage' template for NOTIFY Request queries for the
+-- given zone, as per RFC-1996 (Section 4.5).
 
-notifyMessage :: ByteString -> DNSMessage
-notifyMessage zoneName = DNSMessage {
+notifyRequestMessage :: ByteString -> DNSMessage
+notifyRequestMessage zoneName = DNSMessage {
   header = DNSHeader {
       identifier = 0
     , flags = DNSFlags {
              qOrR = QR_Query
-           , opcode = OP_NOTIFY
-           , authAnswer = True
-           , trunCation = False
-           , recDesired = True
-           , recAvailable = False
-           , rcode = NoErr
-           , authenData = False
-           , chkDisable = False
+           , opcode = OP_NOTIFY                -- RFC-1996 4.5
+           , authAnswer = True                 -- RFC-1996 4.5
+           , trunCation = False                -- RFC-1996 3.2
+           , recDesired = False                -- RFC-1996 3.2
+           , recAvailable = False              -- RFC-1996 3.2
+           , rcode = NoErr                     -- RFC-1996 4.5
+           , authenData = False                -- RFC-1996 3.2
+           , chkDisable = False                -- RFC-1996 3.2
       }
     }
-    , ednsHeader = EDNSheader defaultEDNS
-    , question = [ Question { qname = zoneName
-                            , qtype = SOA
+    , ednsHeader = NoEDNS
+    , question = [ Question { qname = zoneName -- RFC-1996 4.5
+                            , qtype = SOA      -- RFC-1996 4.5
                             }
                  ]
     , answer = []
