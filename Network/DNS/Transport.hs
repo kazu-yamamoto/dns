@@ -22,12 +22,18 @@ import Network.DNS.Types.Resolver
 -- | Check response for a matching identifier and question.  If we ever do
 -- pipelined TCP, we'll need to handle out of order responses.  See:
 -- https://tools.ietf.org/html/rfc7766#section-7
+--
 checkResp :: Question -> Identifier -> DNSMessage -> Bool
 checkResp q seqno = isNothing . checkRespM q seqno
 
+-- When the response 'RCODE' is 'FormatErr', the server did not understand our
+-- query packet, and so is not expected to return a matching question.
+--
 checkRespM :: Question -> Identifier -> DNSMessage -> Maybe DNSError
 checkRespM q seqno resp
   | identifier (header resp) /= seqno = Just SequenceNumberMismatch
+  | FormatErr <- rcode $ flags $ header resp
+  , []        <- question resp        = Nothing
   | [q] /= question resp              = Just QuestionMismatch
   | otherwise                         = Nothing
 
@@ -179,9 +185,9 @@ udpLookup ident retry rcv ai q tm ctls = do
     -- instead we'll time out if no matching answer arrives.
     --
     getAns sock = do
-        mres <- rcv sock
-        if checkResp q ident mres
-        then return mres
+        resp <- rcv sock
+        if checkResp q ident resp
+        then return resp
         else getAns sock
 
 ----------------------------------------------------------------
