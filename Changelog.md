@@ -1,3 +1,26 @@
+# 4.0.1
+
+- Bugfix: Retry without EDNS on empty FormatErr responses. Non-EDNS resolvers
+  may return a FormErr response with an empty question section. Such a response
+  must be accepted as a valid signal to switch to non-EDNS queries, even though
+  the response does not contain a matching question.
+- Feature: New RData constructors RD_CDS and RD_CDNSKEY
+- Usability: More friendly network errors, instead of reporting the error
+  location as an overly verbose "addrinfo" it is now just the essential
+  "tcp@address" or "udp@address".
+- BCP: The EDNS UDP buffer size has been changed to the RIPE recommended
+  default of 1232 bytes.  Note that this recomendation is for a default value,
+  to be used when better information is not available.  Users can still
+  configure larger values if their networks support larger data frames and they
+  are certain there is no risk of IP fragmentation.
+- CI: Linux tests now pass with GHC 8.0.2, 8.2.2, 8.4.4, 8.6.5 and 8.8.1.
+  Windows tests now build and run, but pass only intermittently.  The Windows
+  doctests hang most of the time, perhaps a bug or portability issue in the
+  doctest code, rather than the DNS library?
+- Build: Internal modules are no longer exposed outside the build, this uses
+  Cabal 2.0 or later features to expose internal modules only to the test
+  executables.
+
 # 4.0.0
 
 - Breaking change: when `Domain` name ByteStrings are
