@@ -9,7 +9,7 @@ Description:
   A thread-safe DNS library for both clients and servers written
   in pure Haskell.
 Category:               Network
-Cabal-Version:          >= 2.0
+Cabal-Version:          2.0
 Build-Type:             Simple
 Extra-Source-Files:     Changelog.md
                         cabal.project
@@ -22,8 +22,8 @@ Tested-With:            GHC == 8.0.2
 
 Library dns-internal
   Default-Language:     Haskell2010
-  GHC-Options:          -Wall -O
-  hs-source-dirs:       internal
+  GHC-Options:          -Wall
+  Hs-Source-Dirs:       internal
   Exposed-Modules:      Network.DNS.Imports
                         Network.DNS.Types.Internal
                         Network.DNS.Types.Resolver
@@ -35,7 +35,7 @@ Library dns-internal
                         Network.DNS.StateBinary
                         Network.DNS.Memo
                         Network.DNS.Base32Hex
-  build-depends:        base
+  Build-Depends:        base
                       , array
                       , async
                       , attoparsec
@@ -56,7 +56,7 @@ Library dns-internal
 
 Library
   Default-Language:     Haskell2010
-  GHC-Options:          -Wall -O
+  GHC-Options:          -Wall
   Exposed-Modules:      Network.DNS
                         Network.DNS.Lookup
                         Network.DNS.LookupRaw
@@ -120,9 +120,10 @@ Test-Suite doctests
   Type:                 exitcode-stdio-1.0
   Default-Language:     Haskell2010
   Hs-Source-Dirs:       test2
-  Ghc-Options:          -Wall -O -threaded
+  Ghc-Options:          -Wall -threaded
   Main-Is:              doctests.hs
   Other-Modules:        Paths_dns
+  Autogen-Modules:      Paths_dns
   Build-Depends:        base
                       , doctest
 
