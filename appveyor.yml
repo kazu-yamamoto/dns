@@ -5,7 +5,9 @@ environment:
   global:
     CABOPTS:  "--store-dir=C:\\SR --http-transport=plain-http"
   matrix:
+    - GHCVER: "8.4.4"
     - GHCVER: "8.6.5"
+    - GHCVER: "8.8.2"
 
 platform:
 #  - x86 # We may want to test x86 as well, but it would double the 23min build time.
