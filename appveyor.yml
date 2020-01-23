@@ -28,6 +28,7 @@ build: off
 deploy: off
 
 test_script:
+ - chcp 65001
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap --dry all
  - ps: Push-AppveyorArtifact dist-newstyle\cache\plan.json
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap all
