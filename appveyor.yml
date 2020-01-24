@@ -5,8 +5,10 @@ environment:
   global:
     CABOPTS:  "--store-dir=C:\\SR --http-transport=plain-http"
   matrix:
-    - GHCVER: "8.8.1"
+#   - GHCVER: "8.8.1"
     - GHCVER: "8.6.5"
+#   - GHCVER: "8.4.4" -- disabled, doctest hangs
+#   For other available versions see: https://chocolatey.org/packages/ghc#versionhistory
 
 platform:
 #  - x86 # We may want to test x86 as well, but it would double the 23min build time.
@@ -29,7 +31,7 @@ build: off
 deploy: off
 
 test_script:
- - chcp 65001
+ - chcp
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap --dry all
  - ps: Push-AppveyorArtifact dist-newstyle\cache\plan.json
  - cabal %CABOPTS% new-build -j1 -vnormal+nowrap all
