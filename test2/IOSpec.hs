@@ -2,7 +2,7 @@
 
 module IOSpec where
 
-import Network.Socket
+import Network.Socket hiding (send)
 import Test.Hspec
 
 import Network.DNS.IO as DNS
