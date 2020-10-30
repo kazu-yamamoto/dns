@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, OverloadedStrings #-}
+{-# LANGUAGE BangPatterns, LambdaCase, OverloadedStrings #-}
 
 module Network.DNS.Decode.Parsers (
     getResponse
@@ -451,6 +451,23 @@ getDomain' sep1 ptrLimit = do
     let n = getValue c
     getdomain pos c n
   where
+    -- Reprocess the same ByteString starting at the pointer
+    -- target (offset).
+    getPtr pos offset = do
+        msg <- getInput
+        let parser = skipNBytes offset >> getDomain' sep1 offset
+        case runSGet parser msg of
+            Left (DecodeError err) -> failSGet err
+            Left err               -> fail $ show err
+            Right o                -> do
+                -- Cache only the presentation form decoding of domain names,
+                -- mailboxes (SOA rname) are less frequently reused, and have 
+                -- a different presentation form, so must not share the same
+                -- cache.
+                when (sep1 == dot) $
+                    push pos (fst o)
+                return (fst o)
+
     getdomain pos c n
       | c == 0 = return "." -- Perhaps the root domain?
       | isPointer c = do
@@ -458,18 +475,11 @@ getDomain' sep1 ptrLimit = do
           let offset = n * 256 + d
           when (offset >= ptrLimit) $
               failSGet "invalid name compression pointer"
-          mo <- pop offset
-          case mo of
-              Nothing -> do
-                  msg <- getInput
-                  -- Reprocess the same ByteString starting at the pointer
-                  -- target (offset).
-                  let parser = skipNBytes offset >> getDomain' sep1 offset
-                  case runSGet parser msg of
-                      Left (DecodeError err) -> failSGet err
-                      Left err               -> fail $ show err
-                      Right o  -> push pos (fst o) >> return (fst o)
-              Just o -> push pos o >> return o
+          if sep1 /= dot
+              then getPtr pos offset
+              else pop offset >>= \case
+                  Nothing -> getPtr pos offset
+                  Just o  -> return o
       -- As for now, extended labels have no use.
       -- This may change some time in the future.
       | isExtLabel c = return ""

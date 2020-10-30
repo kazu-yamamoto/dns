@@ -42,6 +42,28 @@ test_mx = "f03681800001000100000001036d6577036f726700000f0001c00c000f000100000df
 --              , authority = []
 --              , additional = [OptRecord {orudpsize = 4096, ordnssecok = False, orversion = 0, rdata = []}]})
 
+-- Message with question domain == SOA rname, testing correct decoding of
+-- of the rname to presentation form when it encoded in compressed form
+-- as a pointer to the question domain.
+test_soa_in :: DNSMessage
+test_soa_in =
+    let soard = RD_SOA "ns1.example.com." "hostmaster.example.com." 0 0 0 0 0
+        soarr = ResourceRecord "example.com." SOA 1 3600 soard
+     in defaultResponse { question = [Question "hostmaster.example.com." A]
+                        , authority = [soarr] }
+
+-- Expected decoded presentation form of the 'test_soa' message.
+test_soa_out :: DNSMessage
+test_soa_out =
+    let soard = RD_SOA "ns1.example.com." "hostmaster@example.com." 0 0 0 0 0
+        soarr = ResourceRecord "example.com." SOA 1 3600 soard
+     in defaultResponse { question = [Question "hostmaster.example.com." A]
+                        , authority = [soarr] }
+
+-- Expected compressed encoding of the 'test_soa' message
+test_soa_bytes :: ByteString
+test_soa_bytes = "0000858000010000000100000a686f73746d6173746572076578616d706c6503636f6d0000010001c0170006000100000e10001c036e7331c017c00c0000000000000000000000000000000000000000"
+
 ----------------------------------------------------------------
 
 spec :: Spec
@@ -63,6 +85,15 @@ spec = do
             case decode (BC.init $ encode defaultQuery) of
                 Left (DecodeError {}) -> True
                 _ -> error "Excess input not detected"
+        it "soa mailbox presentation form" $
+            case encode test_soa_in of
+                enc | enc /= fromHexString test_soa_bytes
+                    -> error "Unexpected test_soa encoding"
+                    | otherwise -> case decode enc of
+                        Left err  -> error $ "Error decoding test_soa: " ++ show err
+                        Right m | m /= test_soa_out
+                                  -> error $ "Wrong decode of test_soa: " ++ show m
+                                | otherwise -> True
 
 tripleDecodeTest :: ByteString -> IO ()
 tripleDecodeTest hexbs =
