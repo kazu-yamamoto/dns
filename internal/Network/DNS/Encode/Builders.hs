@@ -15,6 +15,7 @@ module Network.DNS.Encode.Builders (
   ) where
 
 import Control.Monad.State (State, modify, execState, gets)
+import qualified Control.Exception as E
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -334,11 +335,13 @@ putDomain' sep dom
                                 ]
   where
     -- Try with the preferred separator if present, else fall back to '.'.
-    (hd, tl) =
-        let p = parseLabel (c2w sep) dom
-         in if sep /= '.' && BS.null (snd p)
-            then parseLabel (c2w '.') dom
-            else p
+    (hd, tl) = loop (c2w sep)
+      where
+        loop w = case parseLabel w dom of
+            Right p | w /= 0x2e && BS.null (snd p) -> loop 0x2e
+                    | otherwise -> p
+            Left e -> E.throw e
+
     c2w = fromIntegral . fromEnum
 
 putPointer :: Int -> SPut

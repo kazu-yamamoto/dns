@@ -1,3 +1,12 @@
+# TBD
+
+- Feature: New `splitDomain` function splits a domain name
+  at the firt label break, unescaping the first label to
+  a raw ByteString.
+- Feature: New `splitMailbox` function splits a domain name
+  at the firt label break, unescaping the first label to
+  a raw ByteString.
+
 # 4.0.1
 
 - Bugfix: Retry without EDNS on empty FormatErr responses. Non-EDNS resolvers

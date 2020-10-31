@@ -4,12 +4,15 @@ module Network.DNS.Utils (
     normalize
   , normalizeCase
   , normalizeRoot
+  , splitDomain
+  , splitMailbox
   ) where
 
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (toLower)
 
-import Network.DNS.Types.Internal (Domain)
+import Network.DNS.Types.Internal (DNSError, Domain, Mailbox)
+import Network.DNS.StateBinary (parseLabel)
 
 
 -- | Perform both 'normalizeCase' and 'normalizeRoot' on the given
@@ -130,3 +133,45 @@ normalizeRoot d
   | otherwise = d `BS.append` trailing_dot
     where
       trailing_dot = BS.pack "."
+
+-- | Split a domain name in A-label form into its initial label and the rest of
+-- the domain.  Returns an error if the initial label is malformed.  When no
+-- more labels remain, the initial label will satisfy 'BS.null'.
+--
+-- This also decodes any escaped characters in the initial label, which may
+-- therefore contain whitespace, binary data, or unescaped internal dots.  To
+-- reconstruct the original domain, the initial label may sometimes require
+-- correct escaping of special characters.
+--
+-- ==== __Examples__
+--
+-- >>> import Data.ByteString.Char8 as BS
+-- >>> splitDomain $ BS.pack "abc\\.def.xyz"
+-- Right ("abc.def","xyz")
+--
+-- >>> splitDomain $ BS.pack ".abc.def.xyz"
+-- Left (DecodeError "invalid domain: .abc.def.xyz")
+-- 
+splitDomain :: Domain -> Either DNSError (BS.ByteString, Domain)
+splitDomain = parseLabel 0x2e
+
+-- | Split a 'Mailbox' in A-label form into its initial label 'BS.ByteString'
+-- (the /localpart/ of the email address) and the remaining 'Domain' (the
+-- /domainpart/ of the email address, with a possible trailing @'.'@).  Returns
+-- an error if the initial label is malformed.  When no more labels remain, the
+-- initial label will satisfy 'BS.null'.  The remaining labels can be obtained
+-- by applying 'splitDomain' the returned domain part.
+--
+-- This also decodes any escaped characters in the initial label, which may
+-- therefore contain whitespace, binary data, or unescaped internal dots.  To
+-- reconstruct the original mailbox, the initial label may sometimes require
+-- correct escaping of special characters.
+--
+-- ==== __Example__
+--
+-- >>> import Data.ByteString.Char8 as BS
+-- >>> splitMailbox $ BS.pack "Joe.Admin@example.com."
+-- Right ("Joe.Admin","example.com.")
+--
+splitMailbox :: Mailbox -> Either DNSError (BS.ByteString, Domain)
+splitMailbox = parseLabel 0x40
