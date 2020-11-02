@@ -323,10 +323,7 @@ runSPut = LBS.toStrict . BB.toLazyByteString . flip ST.evalState initialWState
 -- the remaining labels, unescaping backlashed chars and decimal triples along
 -- the way. Any  U-label conversion belongs at the layer above this code.
 --
--- This function is pure, but is not total, it throws an error when presented
--- with malformed input
---
-parseLabel :: Word8 -> ByteString -> (ByteString, ByteString)
+parseLabel :: Word8 -> ByteString -> Either DNSError (ByteString, ByteString)
 parseLabel sep dom =
     if BS.any (== bslash) dom
     then toResult $ A.parse (labelParser sep mempty) dom
@@ -337,9 +334,9 @@ parseLabel sep dom =
     toResult _ = bottom
     safeTail bs | BS.null bs = mempty
                 | otherwise = BS.tail bs
-    check r@(hd, tl) | not (BS.null hd) || BS.null tl = r
+    check r@(hd, tl) | not (BS.null hd) || BS.null tl = Right r
                      | otherwise = bottom
-    bottom = E.throw $ DecodeError $ "invalid domain: " ++ S8.unpack dom
+    bottom = Left $ DecodeError $ "invalid domain: " ++ S8.unpack dom
 
 labelParser :: Word8 -> ByteString -> A.Parser ByteString
 labelParser sep acc = do
