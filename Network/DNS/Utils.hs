@@ -151,7 +151,7 @@ normalizeRoot d
 --
 -- >>> splitDomain $ BS.pack ".abc.def.xyz"
 -- Left (DecodeError "invalid domain: .abc.def.xyz")
--- 
+--
 splitDomain :: Domain -> Either DNSError (BS.ByteString, Domain)
 splitDomain = parseLabel 0x2e
 

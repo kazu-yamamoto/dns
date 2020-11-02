@@ -461,7 +461,7 @@ getDomain' sep1 ptrLimit = do
             Left err               -> fail $ show err
             Right o                -> do
                 -- Cache only the presentation form decoding of domain names,
-                -- mailboxes (SOA rname) are less frequently reused, and have 
+                -- mailboxes (SOA rname) are less frequently reused, and have
                 -- a different presentation form, so must not share the same
                 -- cache.
                 when (sep1 == dot) $
