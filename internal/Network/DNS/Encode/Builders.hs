@@ -329,7 +329,9 @@ putDomain' sep dom
         cur <- gets wsPosition
         case mpos of
             Just pos -> putPointer pos
-            Nothing  -> wsPush dom cur >>
+            Nothing  -> do
+                        -- Pointers are limited to 14-bits!
+                        when (cur <= 0x3fff) $ wsPush dom cur
                         mconcat [ putPartialDomain hd
                                 , putDomain' '.' tl
                                 ]
