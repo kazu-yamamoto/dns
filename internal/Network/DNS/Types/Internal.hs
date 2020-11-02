@@ -1244,7 +1244,7 @@ instance Show RData where
                in intToDigit q100 : intToDigit q10 : intToDigit r10 : s
       showSRV priority weight port target =
           show priority ++ " " ++ show weight ++ " " ++
-          show port ++ BS.unpack target
+          show port ++ " " ++ BS.unpack target
       showDS keytag alg digestType digest =
           show keytag ++ " " ++ show alg ++ " " ++
           show digestType ++ " " ++ _b16encode digest
