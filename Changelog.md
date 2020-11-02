@@ -6,6 +6,10 @@
 - Feature: New `splitMailbox` function splits a domain name
   at the firt label break, unescaping the first label to
   a raw ByteString.
+- Bugfix: Encoding of large packets could produce invalid
+  compression pointers.
+- Bugfix: SRV record presentation form (RD_SRV show instance)
+  was missing a space between the port and the target.
 
 # 4.0.1
 
