@@ -1,3 +1,5 @@
+![GitHub Actions status](https://github.com/kazu-yamamoto/dns/workflows/ci/badge.svg)
+
 # Highly concurrent DNS library purely in Haskell
 
 ## Features
