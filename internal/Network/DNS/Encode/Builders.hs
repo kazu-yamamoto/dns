@@ -132,6 +132,7 @@ putRData rd = case rd of
     RD_PTR              ptrdname -> putDomain ptrdname
     RD_MX              pref exch -> mconcat [put16 pref, putDomain exch]
     RD_TXT            textstring -> putTXT textstring
+    RD_RP             mbox dname -> putMailbox mbox <> putDomain dname
     RD_AAAA              address -> mconcat $ map putInt8 (fromIPv6b address)
     RD_SRV       pri wei prt tgt -> putSRV pri wei prt tgt
     RD_DNAME               dname -> putDomain dname

@@ -28,7 +28,7 @@ encodeDomain = runSPut . putDomain
 
 -- | Encode a mailbox name.  The first label is separated from the remaining
 -- labels by an @'\@'@ rather than a @.@.  This is used for the contact
--- address in the @SOA@ record.
+-- address in the @SOA@ and @RP@ records.
 --
 encodeMailbox :: Mailbox -> ByteString
 encodeMailbox = runSPut . putMailbox

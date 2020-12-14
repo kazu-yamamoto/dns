@@ -59,7 +59,8 @@ type Domain = ByteString
 -- periods that are not label separators. Therefore, in mailboxes \@ is used as
 -- the separator between the first and second labels, and any \'.\' characters
 -- in the first label are not escaped.  The encoding is otherwise the same as
--- 'Domain' above. This is most commonly seen in the /mrname/ of @SOA@ records.
+-- 'Domain' above. This is most commonly seen in the /rname/ of @SOA@ records,
+-- and is also employed in the @mbox-dname@ field of @RP@ records.
 -- On input, if there is no unescaped \@ character in the 'Mailbox', it is
 -- reparsed with \'.\' as the first label separator. Thus the traditional
 -- format with all labels separated by dots is also accepted, but decoding from
@@ -108,6 +109,9 @@ pattern MX         = TYPE  15
 -- | Text strings
 pattern TXT :: TYPE
 pattern TXT        = TYPE  16
+-- | Responsible Person
+pattern RP :: TYPE
+pattern RP         = TYPE  17
 -- | IPv6 Address
 pattern AAAA :: TYPE
 pattern AAAA       = TYPE  28
@@ -173,6 +177,7 @@ data TYPE = A          -- ^ IPv4 address
           | PTR        -- ^ A domain name pointer
           | MX         -- ^ Mail exchange
           | TXT        -- ^ Text strings
+          | RP         -- ^ Responsible Person (RFC1183)
           | AAAA       -- ^ IPv6 Address
           | SRV        -- ^ Server Selection (RFC2782)
           | DNAME      -- ^ DNAME (RFC6672)
@@ -204,6 +209,7 @@ fromTYPE NULL       = 10
 fromTYPE PTR        = 12
 fromTYPE MX         = 15
 fromTYPE TXT        = 16
+fromTYPE RP         = 17
 fromTYPE AAAA       = 28
 fromTYPE SRV        = 33
 fromTYPE DNAME      = 39
@@ -233,6 +239,7 @@ toTYPE 10 = NULL
 toTYPE 12 = PTR
 toTYPE 15 = MX
 toTYPE 16 = TXT
+toTYPE 17 = RP
 toTYPE 28 = AAAA
 toTYPE 33 = SRV
 toTYPE 39 = DNAME
@@ -262,6 +269,7 @@ instance Show TYPE where
     show PTR        = "PTR"
     show MX         = "MX"
     show TXT        = "TXT"
+    show RP         = "RP"
     show AAAA       = "AAAA"
     show SRV        = "SRV"
     show DNAME      = "DNAME"
@@ -1169,6 +1177,7 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_PTR Domain       -- ^ A domain name pointer
            | RD_MX Word16 Domain -- ^ Mail exchange
            | RD_TXT ByteString   -- ^ Text strings
+           | RD_RP Mailbox Domain -- ^ Responsible Person (RFC1183)
            | RD_AAAA IPv6        -- ^ IPv6 Address
            | RD_SRV Word16 Word16 Word16 Domain
                                  -- ^ Server Selection (RFC2782)
@@ -1203,6 +1212,7 @@ instance Show RData where
       RD_PTR               ptrdname -> showDomain ptrdname
       RD_MX               pref exch -> showMX pref exch
       RD_TXT             textstring -> showTXT textstring
+      RD_RP              mbox dname -> showRP mbox dname
       RD_AAAA               address -> show address
       RD_SRV        pri wei prt tgt -> showSRV pri wei prt tgt
       RD_DNAME               target -> showDomain target
@@ -1221,8 +1231,8 @@ instance Show RData where
       showSalt ""    = "-"
       showSalt salt  = _b16encode salt
       showDomain = BS.unpack
-      showSOA mname mrname serial refresh retry expire minttl =
-          showDomain mname ++ " " ++ showDomain mrname ++ " " ++
+      showSOA mname rname serial refresh retry expire minttl =
+          showDomain mname ++ " " ++ showDomain rname ++ " " ++
           show serial ++ " " ++ show refresh ++ " " ++
           show retry ++ " " ++ show expire ++ " " ++ show minttl
       showMX preference exchange =
@@ -1242,6 +1252,7 @@ instance Show RData where
               let (q100, r100) = divMod (fromIntegral c) 100
                   (q10, r10) = divMod r100 10
                in intToDigit q100 : intToDigit q10 : intToDigit r10 : s
+      showRP mbox dname = showDomain mbox ++ " " ++ showDomain dname
       showSRV priority weight port target =
           show priority ++ " " ++ show weight ++ " " ++
           show port ++ " " ++ BS.unpack target
