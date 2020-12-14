@@ -1,5 +1,6 @@
 # TBD
 
+- Feature: Support for RP resource record type
 - Feature: New `splitDomain` function splits a domain name
   at the firt label break, unescaping the first label to
   a raw ByteString.
