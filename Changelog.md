@@ -1,5 +1,8 @@
 # TBD
 
+- Breaking change: GHC 7.x and earlier no longer supported.
+  We now require support for PatternSynonyms, available since
+  GHC 8.0.
 - Feature: Support for RP resource record type
 - Feature: New `splitDomain` function splits a domain name
   at the firt label break, unescaping the first label to
