@@ -1,12 +1,9 @@
-{-# LANGUAGE OverloadedStrings, CPP #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module DecodeSpec where
 
 import Data.ByteString.Internal (ByteString(..), unsafeCreate)
 import qualified Data.ByteString.Char8 as BC
-#if !MIN_VERSION_bytestring(0,10,0)
-import qualified Data.ByteString as BS
-#endif
 import Data.Word8
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (plusPtr)
