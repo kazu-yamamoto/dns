@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, CPP, TransformListComp #-}
+{-# LANGUAGE OverloadedStrings, TransformListComp #-}
 
 module RoundTripSpec where
 

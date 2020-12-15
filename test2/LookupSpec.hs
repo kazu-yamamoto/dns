@@ -26,7 +26,7 @@ spec = describe "lookup" $ do
     it "lookupAAAA with emty result" $ do
         rs <- makeResolvSeed defaultResolvConf
         withResolver rs $ \resolver -> do
-            addrs <- DNS.lookupAAAA resolver "mew.org"
+            addrs <- DNS.lookupAAAA resolver "ipv4.tlund.se"
             -- mew.org does not have any IPv6 addresses
             fmap null addrs `shouldBe` Right True
 

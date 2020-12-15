@@ -64,6 +64,7 @@ copy (RD_PTR dom)         = RD_PTR $ B.copy dom
 copy (RD_NULL bytes)      = RD_NULL $ B.copy bytes
 copy (RD_MX prf dom)      = RD_MX prf $ B.copy dom
 copy (RD_TXT txt)         = RD_TXT $ B.copy txt
+copy (RD_RP mbox dname)   = RD_RP (B.copy mbox) (B.copy dname)
 copy r@(RD_AAAA _)        = r
 copy (RD_SRV a b c dom)   = RD_SRV a b c $ B.copy dom
 copy (RD_DNAME dom)       = RD_DNAME $ B.copy dom

@@ -59,7 +59,8 @@ type Domain = ByteString
 -- periods that are not label separators. Therefore, in mailboxes \@ is used as
 -- the separator between the first and second labels, and any \'.\' characters
 -- in the first label are not escaped.  The encoding is otherwise the same as
--- 'Domain' above. This is most commonly seen in the /mrname/ of @SOA@ records.
+-- 'Domain' above. This is most commonly seen in the /rname/ of @SOA@ records,
+-- and is also employed in the @mbox-dname@ field of @RP@ records.
 -- On input, if there is no unescaped \@ character in the 'Mailbox', it is
 -- reparsed with \'.\' as the first label separator. Thus the traditional
 -- format with all labels separated by dots is also accepted, but decoding from
@@ -75,7 +76,6 @@ type Mailbox = ByteString
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
 -- | Types for resource records.
 newtype TYPE = TYPE {
     -- | From type to number.
@@ -108,6 +108,9 @@ pattern MX         = TYPE  15
 -- | Text strings
 pattern TXT :: TYPE
 pattern TXT        = TYPE  16
+-- | Responsible Person
+pattern RP :: TYPE
+pattern RP         = TYPE  17
 -- | IPv6 Address
 pattern AAAA :: TYPE
 pattern AAAA       = TYPE  28
@@ -163,95 +166,6 @@ pattern CAA        = TYPE 257 -- RFC 6844
 -- | From number to type.
 toTYPE :: Word16 -> TYPE
 toTYPE = TYPE
-#else
--- | Types for resource records.
-data TYPE = A          -- ^ IPv4 address
-          | NS         -- ^ An authoritative name serve
-          | CNAME      -- ^ The canonical name for an alias
-          | SOA        -- ^ Marks the start of a zone of authority
-          | NULL       -- ^ A null RR (EXPERIMENTAL)
-          | PTR        -- ^ A domain name pointer
-          | MX         -- ^ Mail exchange
-          | TXT        -- ^ Text strings
-          | AAAA       -- ^ IPv6 Address
-          | SRV        -- ^ Server Selection (RFC2782)
-          | DNAME      -- ^ DNAME (RFC6672)
-          | OPT        -- ^ OPT (RFC6891)
-          | DS         -- ^ Delegation Signer (RFC4034)
-          | RRSIG      -- ^ RRSIG (RFC4034)
-          | NSEC       -- ^ NSEC (RFC4034)
-          | DNSKEY     -- ^ DNSKEY (RFC4034)
-          | NSEC3      -- ^ NSEC3 (RFC5155)
-          | NSEC3PARAM -- ^ NSEC3PARAM (RFC5155)
-          | TLSA       -- ^ TLSA (RFC6698)
-          | CDS        -- ^ Child DS (RFC7344)
-          | CDNSKEY    -- ^ DNSKEY(s) the Child wants reflected in DS (RFC7344)
-          | CSYNC      -- ^ Child-To-Parent Synchronization (RFC7477)
-          | AXFR       -- ^ Zone transfer (RFC5936)
-          | ANY        -- ^ A request for all records the server/cache
-                       --   has available
-          | CAA        -- ^ Certification Authority Authorization (RFC6844)
-          | UnknownTYPE Word16  -- ^ Unknown type
-          deriving (Eq, Ord, Read)
-
--- | From type to number.
-fromTYPE :: TYPE -> Word16
-fromTYPE A          =  1
-fromTYPE NS         =  2
-fromTYPE CNAME      =  5
-fromTYPE SOA        =  6
-fromTYPE NULL       = 10
-fromTYPE PTR        = 12
-fromTYPE MX         = 15
-fromTYPE TXT        = 16
-fromTYPE AAAA       = 28
-fromTYPE SRV        = 33
-fromTYPE DNAME      = 39
-fromTYPE OPT        = 41
-fromTYPE DS         = 43
-fromTYPE RRSIG      = 46
-fromTYPE NSEC       = 47
-fromTYPE DNSKEY     = 48
-fromTYPE NSEC3      = 50
-fromTYPE NSEC3PARAM = 51
-fromTYPE TLSA       = 52
-fromTYPE CDS        = 59
-fromTYPE CDNSKEY    = 60
-fromTYPE CSYNC      = 62
-fromTYPE AXFR       = 252
-fromTYPE ANY        = 255
-fromTYPE CAA        = 257
-fromTYPE (UnknownTYPE x) = x
-
--- | From number to type.
-toTYPE :: Word16 -> TYPE
-toTYPE  1 = A
-toTYPE  2 = NS
-toTYPE  5 = CNAME
-toTYPE  6 = SOA
-toTYPE 10 = NULL
-toTYPE 12 = PTR
-toTYPE 15 = MX
-toTYPE 16 = TXT
-toTYPE 28 = AAAA
-toTYPE 33 = SRV
-toTYPE 39 = DNAME
-toTYPE 41 = OPT
-toTYPE 43 = DS
-toTYPE 46 = RRSIG
-toTYPE 47 = NSEC
-toTYPE 48 = DNSKEY
-toTYPE 50 = NSEC3
-toTYPE 51 = NSEC3PARAM
-toTYPE 52 = TLSA
-toTYPE 59 = CDS
-toTYPE 60 = CDNSKEY
-toTYPE 62 = CSYNC
-toTYPE 252 = AXFR
-toTYPE 255 = ANY
-toTYPE 257 = CAA
-toTYPE x   = UnknownTYPE x
-#endif
 
 instance Show TYPE where
     show A          = "A"
@@ -262,6 +176,7 @@ instance Show TYPE where
     show PTR        = "PTR"
     show MX         = "MX"
     show TXT        = "TXT"
+    show RP         = "RP"
     show AAAA       = "AAAA"
     show SRV        = "SRV"
     show DNAME      = "DNAME"
@@ -825,7 +740,6 @@ fromOPCODE OP_UPDATE = 5
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
 -- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
 -- bits.  With EDNS this stores the combined error code from the DNS header and
 -- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
@@ -952,112 +866,6 @@ instance Show RCODE where
 -- are reserved for private use.
 toRCODE :: Word16 -> RCODE
 toRCODE = RCODE
-#else
--- | EDNS extended 12-bit response code.  Non-EDNS messages use only the low 4
--- bits.  With EDNS this stores the combined error code from the DNS header and
--- and the EDNS psuedo-header. See 'EDNSheader' for more detail.
-data RCODE
-  = NoErr     -- ^ No error condition.
-  | FormatErr -- ^ Format error - The name server was
-              --   unable to interpret the query.
-  | ServFail  -- ^ Server failure - The name server was
-              --   unable to process this query due to a
-              --   problem with the name server.
-  | NameErr   -- ^ Name Error - Meaningful only for
-              --   responses from an authoritative name
-              --   server, this code signifies that the
-              --   domain name referenced in the query does
-              --   not exist.
-  | NotImpl   -- ^ Not Implemented - The name server does
-              --   not support the requested kind of query.
-  | Refused   -- ^ Refused - The name server refuses to
-              --   perform the specified operation for
-              --   policy reasons.  For example, a name
-              --   server may not wish to provide the
-              --   information to the particular requester,
-              --   or a name server may not wish to perform
-              --   a particular operation (e.g., zone
-              --   transfer) for particular data.
-  | YXDomain  -- ^ Dynamic update response, a pre-requisite
-              --   domain that should not exist, does exist.
-  | YXRRSet   -- ^ Dynamic update response, a pre-requisite
-              --   RRSet that should not exist, does exist.
-  | NXRRSet   -- ^ Dynamic update response, a pre-requisite
-              --   RRSet that should exist, does not exist.
-  | NotAuth   -- ^ Dynamic update response, the server is not
-              --   authoritative for the zone named in the Zone Section.
-  | NotZone   -- ^ Dynamic update response, a name used in the
-              --   Prerequisite or Update Section is not within the zone
-              --   denoted by the Zone Section.
-  | BadVers   -- ^ Bad OPT Version (RFC 6891)
-  | BadKey    -- ^ Key not recognized [RFC2845]
-  | BadTime   -- ^ Signature out of time window [RFC2845]
-  | BadMode   -- ^ Bad TKEY Mode [RFC2930]
-  | BadName   -- ^ Duplicate key name [RFC2930]
-  | BadAlg    -- ^ Algorithm not supported [RFC2930]
-  | BadTrunc  -- ^ Bad Truncation [RFC4635]
-  | BadCookie -- ^ Bad/missing Server Cookie [RFC7873]
-  | BadRCODE  -- ^ Malformed (peer) EDNS message, no RCODE available.  This is
-              -- not an RCODE that can be sent by a peer.  It lies outside the
-              -- 12-bit range expressible via EDNS.  The low bits are chosen to
-              -- coincide with 'FormatErr'.  When an EDNS message is malformed,
-              -- and we're unable to extract the extended RCODE, the header
-              -- 'rcode' is set to 'BadRCODE'.
-  | UnknownRCODE Word16
-  deriving (Eq, Ord, Show)
-
--- | Convert an 'RCODE' to its numeric value.
-fromRCODE :: RCODE -> Word16
-fromRCODE NoErr     =  0
-fromRCODE FormatErr =  1
-fromRCODE ServFail  =  2
-fromRCODE NameErr   =  3
-fromRCODE NotImpl   =  4
-fromRCODE Refused   =  5
-fromRCODE YXDomain  =  6
-fromRCODE YXRRSet   =  7
-fromRCODE NXRRSet   =  8
-fromRCODE NotAuth   =  9
-fromRCODE NotZone   = 10
-fromRCODE BadVers   = 16
-fromRCODE BadKey    = 17
-fromRCODE BadTime   = 18
-fromRCODE BadMode   = 19
-fromRCODE BadName   = 20
-fromRCODE BadAlg    = 21
-fromRCODE BadTrunc  = 22
-fromRCODE BadCookie = 23
-fromRCODE BadRCODE  = 0x1001
-fromRCODE (UnknownRCODE x) = x
-
--- | Convert a numeric value to a corresponding 'RCODE'.  The behaviour
--- is undefined for values outside the range @[0 .. 0xFFF]@ since the
--- EDNS extended RCODE is a 12-bit value.  Values in the range
--- @[0xF01 .. 0xFFF]@ are reserved for private use.
---
-toRCODE :: Word16 -> RCODE
-toRCODE  0 = NoErr
-toRCODE  1 = FormatErr
-toRCODE  2 = ServFail
-toRCODE  3 = NameErr
-toRCODE  4 = NotImpl
-toRCODE  5 = Refused
-toRCODE  6 = YXDomain
-toRCODE  7 = YXRRSet
-toRCODE  8 = NXRRSet
-toRCODE  9 = NotAuth
-toRCODE 10 = NotZone
-toRCODE 16 = BadVers
-toRCODE 17 = BadKey
-toRCODE 18 = BadTime
-toRCODE 19 = BadMode
-toRCODE 20 = BadName
-toRCODE 21 = BadAlg
-toRCODE 22 = BadTrunc
-toRCODE 23 = BadCookie
-toRCODE 0x1001 = BadRCODE
-toRCODE  x = UnknownRCODE x
-#endif
 
 ----------------------------------------------------------------
 
@@ -1169,6 +977,7 @@ data RData = RD_A IPv4           -- ^ IPv4 address
            | RD_PTR Domain       -- ^ A domain name pointer
            | RD_MX Word16 Domain -- ^ Mail exchange
            | RD_TXT ByteString   -- ^ Text strings
+           | RD_RP Mailbox Domain -- ^ Responsible Person (RFC1183)
            | RD_AAAA IPv6        -- ^ IPv6 Address
            | RD_SRV Word16 Word16 Word16 Domain
                                  -- ^ Server Selection (RFC2782)
@@ -1203,6 +1012,7 @@ instance Show RData where
       RD_PTR               ptrdname -> showDomain ptrdname
       RD_MX               pref exch -> showMX pref exch
       RD_TXT             textstring -> showTXT textstring
+      RD_RP              mbox dname -> showRP mbox dname
       RD_AAAA               address -> show address
       RD_SRV        pri wei prt tgt -> showSRV pri wei prt tgt
       RD_DNAME               target -> showDomain target
@@ -1221,8 +1031,8 @@ instance Show RData where
       showSalt ""    = "-"
       showSalt salt  = _b16encode salt
       showDomain = BS.unpack
-      showSOA mname mrname serial refresh retry expire minttl =
-          showDomain mname ++ " " ++ showDomain mrname ++ " " ++
+      showSOA mname rname serial refresh retry expire minttl =
+          showDomain mname ++ " " ++ showDomain rname ++ " " ++
           show serial ++ " " ++ show refresh ++ " " ++
           show retry ++ " " ++ show expire ++ " " ++ show minttl
       showMX preference exchange =
@@ -1242,6 +1052,7 @@ instance Show RData where
               let (q100, r100) = divMod (fromIntegral c) 100
                   (q10, r10) = divMod r100 10
                in intToDigit q100 : intToDigit q10 : intToDigit r10 : s
+      showRP mbox dname = showDomain mbox ++ " " ++ showDomain dname
       showSRV priority weight port target =
           show priority ++ " " ++ show weight ++ " " ++
           show port ++ " " ++ BS.unpack target
@@ -1486,7 +1297,6 @@ minUdpSize = 512
 
 ----------------------------------------------------------------
 
-#if __GLASGOW_HASKELL__ >= 800
 -- | EDNS Option Code (RFC 6891).
 newtype OptCode = OptCode {
     -- | From option code to number.
@@ -1520,34 +1330,6 @@ instance Show OptCode where
 -- | From number to option code.
 toOptCode :: Word16 -> OptCode
 toOptCode = OptCode
-#else
--- | Option Code (RFC 6891).
-data OptCode = NSID                  -- ^ Name Server Identifier (RFC5001)
-             | DAU                   -- ^ DNSSEC Algorithm understood (RFC6975)
-             | DHU                   -- ^ DNSSEC Hash Understood (RFC6975)
-             | N3U                   -- ^ NSEC3 Hash Understood (RFC6975)
-             | ClientSubnet          -- ^ Client subnet (RFC7871)
-             | UnknownOptCode Word16 -- ^ Unknown option code
-    deriving (Eq, Ord, Show)
-
--- | From option code to number.
-fromOptCode :: OptCode -> Word16
-fromOptCode NSID         = 3
-fromOptCode DAU          = 5
-fromOptCode DHU          = 6
-fromOptCode N3U          = 7
-fromOptCode ClientSubnet = 8
-fromOptCode (UnknownOptCode x) = x
-
--- | From number to option code.
-toOptCode :: Word16 -> OptCode
-toOptCode 3 = NSID
-toOptCode 5 = DAU
-toOptCode 6 = DHU
-toOptCode 7 = N3U
-toOptCode 8 = ClientSubnet
-toOptCode x = UnknownOptCode x
-#endif
 
 ----------------------------------------------------------------
 

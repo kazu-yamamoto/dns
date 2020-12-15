@@ -172,6 +172,10 @@ getRData SRV _ = RD_SRV <$> decodePriority
     decodePriority = get16
     decodeWeight   = get16
     decodePort     = get16
+--
+getRData RP _   = RD_RP <$> getMailbox
+                        <*> getDomain
+--
 getRData OPT len   = RD_OPT <$> getOpts len
 --
 getRData TLSA len = RD_TLSA <$> decodeUsage
@@ -461,9 +465,9 @@ getDomain' sep1 ptrLimit = do
             Left err               -> fail $ show err
             Right o                -> do
                 -- Cache only the presentation form decoding of domain names,
-                -- mailboxes (SOA rname) are less frequently reused, and have
-                -- a different presentation form, so must not share the same
-                -- cache.
+                -- mailboxes (e.g. SOA rname) are less frequently reused, and
+                -- have a different presentation form, so must not share the
+                -- same cache.
                 when (sep1 == dot) $
                     push pos (fst o)
                 return (fst o)

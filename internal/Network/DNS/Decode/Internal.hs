@@ -36,7 +36,7 @@ decodeDNSHeader bs = fst <$> runSGet getHeader bs
 decodeDomain :: ByteString -> Either DNSError Domain
 decodeDomain bs = fst <$> runSGet getDomain bs
 
--- | Decode a mailbox name (the SOA record /mrname/ field).  Since DNS names
+-- | Decode a mailbox name (e.g. the SOA record /rname/ field).  Since DNS names
 -- may use name compression, it is not generally possible to decode the names
 -- separately from the enclosing DNS message.  This is an internal function.
 --

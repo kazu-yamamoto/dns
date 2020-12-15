@@ -150,7 +150,7 @@ cacheNegative cconf c key v ans = case soas of
     soas = filter (SOA `isTypeOf`) $ authority ans
 
 insertNegative :: CacheConf -> Cache -> Key -> Entry -> TTL -> IO ()
-insertNegative CacheConf{..} c k v ttl = when (ttl /= 0) $ do
+insertNegative _ c k v ttl = when (ttl /= 0) $ do
     ctime <- timeCurrent
     let tim = ctime `timeAdd` life
     insertCache k tim v c
