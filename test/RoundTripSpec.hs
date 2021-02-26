@@ -118,6 +118,7 @@ mkRData dom typ =
         NSEC -> RD_NSEC <$> genDomain <*> genNsecTypes
         NSEC3 -> genNSEC3
         TLSA -> RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString
+        CAA -> RD_CAA <$> genWord8 <*> genByteString <*> genByteString
 
         _ -> pure . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
   where
