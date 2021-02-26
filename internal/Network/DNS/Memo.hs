@@ -82,6 +82,7 @@ copy (RD_RRSIG sig)       = RD_RRSIG $ copysig sig
     copysig s@RDREP_RRSIG{..} =
         s { rrsigZone = B.copy rrsigZone
           , rrsigValue = B.copy rrsigValue }
+copy (RD_CAA f t v)       = RD_CAA f (B.copy t) (B.copy v)
 copy (UnknownRData is)    = UnknownRData $ B.copy is
 
 copyOData :: OData -> OData

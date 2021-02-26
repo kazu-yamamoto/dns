@@ -998,6 +998,8 @@ data RData = RD_A IPv4           -- ^ IPv4 address
                                  -- ^ Child DS (RFC7344)
            | RD_CDNSKEY Word16 Word8 Word8 ByteString
                                  -- ^ Child DNSKEY (RFC7344)
+           | RD_CAA Word8 ByteString ByteString
+                                 -- ^ CAA (RFC 6844)
            --RD_CSYNC
            | UnknownRData ByteString   -- ^ Unknown resource data
     deriving (Eq, Ord)
@@ -1026,6 +1028,7 @@ instance Show RData where
       RD_TLSA               u s m d -> showTLSA u s m d
       RD_CDS         tag alg dalg d -> showDS tag alg dalg d
       RD_CDNSKEY            f p a k -> showDNSKEY f p a k
+      RD_CAA                  f t v -> showCAA f t v
       UnknownRData            bytes -> showOpaque bytes
     where
       showSalt ""    = "-"
@@ -1074,6 +1077,9 @@ instance Show RData where
       showTLSA usage selector mtype digest =
           show usage ++ " " ++ show selector ++ " " ++
           show mtype ++ " " ++ _b16encode digest
+      showCAA flags tag value =
+          show flags ++ " " ++ show tag ++ " " ++
+          show value
       -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
       showOpaque bs = unwords ["\\#", show (BS.length bs), _b16encode bs]
 
