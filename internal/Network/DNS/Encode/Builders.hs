@@ -146,6 +146,7 @@ putRData rd = case rd of
     RD_NSEC3     a f i s h types -> putNSEC3 a f i s h types
     RD_NSEC3PARAM  a f iter salt -> putNSEC3PARAM a f iter salt
     RD_TLSA           u s m dgst -> putTLSA u s m dgst
+    RD_CAA                 f t v -> putCAA f t v
     UnknownRData           bytes -> putByteString bytes
   where
     putSOA mn mr serial refresh retry expire minttl = mconcat
@@ -211,6 +212,11 @@ putRData rd = case rd of
         , put8 selector
         , put8 mtype
         , putByteString assocData
+        ]
+    putCAA flags tag value = mconcat
+        [ put8 flags
+        , putByteStringWithLength tag
+        , putByteString value
         ]
 
 -- | Encode DNSSEC NSEC type bits
