@@ -95,7 +95,7 @@ import Network.DNS.Types.Internal
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupA resolver "www.kame.net"
---   Right [203.178.141.194]
+--   Right [210.155.141.200]
 --
 lookupA :: Resolver -> Domain -> IO (Either DNSError [IPv4])
 lookupA rlv dom = do
@@ -116,7 +116,7 @@ lookupA rlv dom = do
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupAAAA resolver "www.wide.ad.jp"
---   Right [2001:200:dff:fff1:216:3eff:fe4b:651c]
+--   Right [2001:200:0:180c:20c:29ff:fec9:9d61]
 --
 lookupAAAA :: Resolver -> Domain -> IO (Either DNSError [IPv6])
 lookupAAAA rlv dom = do
@@ -353,7 +353,7 @@ lookupSOA rlv dom = do
 --   210.130.137.80, i.e., 80.137.130.210.in-addr.arpa:
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupPTR resolver "164.2.232.202.in-addr.arpa"
+--   >>> withResolver rs $ \resolver -> lookupPTR resolver "180.2.232.202.in-addr.arpa"
 --   Right ["www.iij.ad.jp."]
 --
 --   The 'lookupRDNS' function is more suited to this particular task.
@@ -378,7 +378,7 @@ lookupPTR rlv dom = do
 --   address directly:
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupRDNS resolver "202.232.2.164"
+--   >>> withResolver rs $ \resolver -> lookupRDNS resolver "202.232.2.180"
 --   Right ["www.iij.ad.jp."]
 --
 lookupRDNS :: Resolver -> Domain -> IO (Either DNSError [Domain])

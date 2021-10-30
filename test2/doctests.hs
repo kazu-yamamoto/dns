@@ -17,6 +17,8 @@ modules :: [String]
 modules =
   [ "-XOverloadedStrings"
   , "-XCPP"
+  , "-XLambdaCase"
+  , "-XPatternSynonyms"
   , "-i","-i.","-iinternal"
   , "-threaded"
   , "-package=dns"
