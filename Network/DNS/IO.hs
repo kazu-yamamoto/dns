@@ -46,8 +46,12 @@ import Network.DNS.Types.Internal
 --
 receive :: Socket -> IO DNSMessage
 receive sock = do
-    (msg, _) <- receiveFrom sock
-    return msg
+    let bufsiz = fromIntegral maxUdpSize
+    bs <- recv sock bufsiz `E.catch` \e -> E.throwIO $ NetworkFailure e
+    Elapsed (Seconds now) <- timeCurrent
+    case decodeAt now bs of
+        Left  e   -> E.throwIO e
+        Right msg -> return msg
 
 -- | Receive and decode a single 'DNSMessage' from a UDP 'Socket'.  Messages
 -- longer than 'maxUdpSize' are silently truncated, but this should not occur
