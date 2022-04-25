@@ -7,6 +7,7 @@ module Network.DNS.LookupRaw (
   -- * Lookups returning DNS Messages
   , lookupRaw
   , lookupRawCtl
+  , lookupRawCtlRecv
   -- * DNS Message procesing
   , fromDNSMessage
   ) where
@@ -14,6 +15,7 @@ module Network.DNS.LookupRaw (
 import Data.Hourglass (timeAdd, Seconds)
 import Prelude hiding (lookup)
 import Time.System (timeCurrent)
+import Network.Socket (Socket)
 
 import Network.DNS.IO
 import Network.DNS.Imports hiding (lookup)
@@ -254,6 +256,19 @@ lookupRawCtl :: Resolver      -- ^ Resolver obtained via 'withResolver'
              -> QueryControls -- ^ Query flag and EDNS overrides
              -> IO (Either DNSError DNSMessage)
 lookupRawCtl rslv dom typ ctls = resolve rslv dom typ ctls receive
+
+-- | Similar to 'lookupRawCtl', but the recv action can be replaced with
+-- something other than `Network.DNS.IO.receive`.
+-- For example, in an environment where frequent retrieval of the current time
+-- is a performance issue, you can pass the time from outside instead of
+-- having `Network.DNS.IO.receive` retrieve the current time.
+lookupRawCtlRecv :: Resolver                  -- ^ Resolver obtained via 'withResolver'
+                 -> Domain                    -- ^ Query domain
+                 -> TYPE                      -- ^ Query RRtype
+                 -> QueryControls             -- ^ Query flag and EDNS overrides
+                 -> (Socket -> IO DNSMessage) -- ^ Action to receive message from socket
+                 -> IO (Either DNSError DNSMessage)
+lookupRawCtlRecv = resolve
 
 ----------------------------------------------------------------
 
