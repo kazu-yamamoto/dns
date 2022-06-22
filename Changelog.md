@@ -5,10 +5,10 @@
   GHC 8.0.
 - Feature: Support for RP resource record type
 - Feature: New `splitDomain` function splits a domain name
-  at the firt label break, unescaping the first label to
+  at the first label break, unescaping the first label to
   a raw ByteString.
 - Feature: New `splitMailbox` function splits a domain name
-  at the firt label break, unescaping the first label to
+  at the first label break, unescaping the first label to
   a raw ByteString.
 - Bugfix: Encoding of large packets could produce invalid
   compression pointers.
