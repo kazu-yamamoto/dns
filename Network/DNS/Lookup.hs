@@ -183,7 +183,7 @@ lookupMX rlv dom = do
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> ips <- withResolver rs $ \resolver -> lookupAviaMX resolver "wide.ad.jp"
 --   >>> fmap sort ips
---   Right [133.138.10.39,203.178.136.30]
+--   Right [203.178.136.30]
 --
 --   Since there is more than one result, it is necessary to sort the
 --   list in order to check for equality.
