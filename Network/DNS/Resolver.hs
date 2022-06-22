@@ -67,12 +67,12 @@ makeResolvSeed conf = ResolvSeed conf <$> findAddresses
 
 makeAddrInfo :: HostName -> Maybe PortNumber -> IO AddrInfo
 makeAddrInfo addr mport = do
-    let flgs = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_PASSIVE]
-        hints = defaultHints {
-            addrFlags = if isJust mport then AI_NUMERICSERV : flgs else flgs
+    let hints = defaultHints {
+            addrFlags = [AI_ADDRCONFIG, AI_NUMERICHOST, AI_NUMERICSERV, AI_PASSIVE]
           , addrSocketType = Datagram
           }
-        serv = maybe "domain" show mport
+        -- 53 is the standard port number for domain name servers as assigned by IANA
+        serv = maybe "53" show mport
     head <$> getAddrInfo (Just hints) (Just addr) (Just serv)
 
 ----------------------------------------------------------------
