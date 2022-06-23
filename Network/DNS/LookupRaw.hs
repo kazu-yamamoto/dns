@@ -253,7 +253,7 @@ lookupRawCtl :: Resolver      -- ^ Resolver obtained via 'withResolver'
              -> TYPE          -- ^ Query RRtype
              -> QueryControls -- ^ Query flag and EDNS overrides
              -> IO (Either DNSError DNSMessage)
-lookupRawCtl rslv dom typ ctls = resolve dom typ rslv ctls receive
+lookupRawCtl rslv dom typ ctls = resolve rslv dom typ ctls receive
 
 ----------------------------------------------------------------
 
