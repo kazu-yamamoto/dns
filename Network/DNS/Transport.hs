@@ -78,8 +78,8 @@ type UdpRslv = Int -- Retry
 -- This function merges the query flag overrides from the resolver
 -- configuration with any additional overrides from the caller.
 --
-resolve :: Domain -> TYPE -> Resolver -> Rslv0
-resolve dom typ rlv qctls rcv
+resolve :: Resolver -> Domain -> TYPE -> Rslv0
+resolve rlv dom typ qctls rcv
   | isIllegal dom = return $ Left IllegalDomain
   | typ == AXFR   = return $ Left InvalidAXFRLookup
   | onlyOne       = resolveOne        (head nss) (head gens) q tm retry ctls rcv
