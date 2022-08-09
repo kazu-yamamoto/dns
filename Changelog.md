@@ -1,17 +1,26 @@
-# TBD
+# 4.0.2
 
 - Breaking change: GHC 7.x and earlier no longer supported.
   We now require support for PatternSynonyms, available since
   GHC 8.0.
+- Feature: relaxed lookup-raw interface
+  [#167](https://github.com/kazu-yamamoto/dns/pull/167)
+- Using "53" instead of "domain".
+  [#166](ttps://github.com/kazu-yamamoto/dns/pull/166)
+- UDP ReceiveFrom, sendTo with SockAddr
+  [#165](https://github.com/kazu-yamamoto/dns/pull/165)
 - Feature: Support for RP resource record type
+  [#161](https://github.com/kazu-yamamoto/dns/pull/161)
 - Feature: New `splitDomain` function splits a domain name
   at the first label break, unescaping the first label to
   a raw ByteString.
 - Feature: New `splitMailbox` function splits a domain name
   at the first label break, unescaping the first label to
   a raw ByteString.
+  [#155](https://github.com/kazu-yamamoto/dns/pull/155)
 - Bugfix: Encoding of large packets could produce invalid
   compression pointers.
+  [#156](https://github.com/kazu-yamamoto/dns/pull/156)
 - Bugfix: SRV record presentation form (RD_SRV show instance)
   was missing a space between the port and the target.
 
