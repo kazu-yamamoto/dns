@@ -111,31 +111,31 @@ data DNSHeader = DNSHeader {
 
 -- | Raw data format for the flags of DNS Query and Response.
 data DNSFlags = DNSFlags {
-    qOrR         :: !QorR  -- ^ Query or response.
+    qOrR         :: !QorR   -- ^ Query or response.
   , opcode       :: !OPCODE -- ^ Kind of query.
-  , authAnswer   :: !Bool  -- ^ AA (Authoritative Answer) bit - this bit is valid in responses,
-                           -- and specifies that the responding name server is an
-                           -- authority for the domain name in question section.
-  , trunCation   :: !Bool  -- ^ TC (Truncated Response) bit - specifies that this message was truncated
-                           -- due to length greater than that permitted on the
-                           -- transmission channel.
-  , recDesired   :: !Bool  -- ^ RD (Recursion Desired) bit - this bit may be set in a query and
-                           -- is copied into the response.  If RD is set, it directs
-                           -- the name server to pursue the query recursively.
-                           -- Recursive query support is optional.
-  , recAvailable :: !Bool  -- ^ RA (Recursion Available) bit - this be is set or cleared in a
-                           -- response, and denotes whether recursive query support is
-                           -- available in the name server.
+  , authAnswer   :: !Bool   -- ^ AA (Authoritative Answer) bit - this bit is valid in responses,
+                            -- and specifies that the responding name server is an
+                            -- authority for the domain name in question section.
+  , trunCation   :: !Bool   -- ^ TC (Truncated Response) bit - specifies that this message was truncated
+                            -- due to length greater than that permitted on the
+                            -- transmission channel.
+  , recDesired   :: !Bool   -- ^ RD (Recursion Desired) bit - this bit may be set in a query and
+                            -- is copied into the response.  If RD is set, it directs
+                            -- the name server to pursue the query recursively.
+                            -- Recursive query support is optional.
+  , recAvailable :: !Bool   -- ^ RA (Recursion Available) bit - this be is set or cleared in a
+                            -- response, and denotes whether recursive query support is
+                            -- available in the name server.
 
-  , rcode        :: !RCODE -- ^ The full 12-bit extended RCODE when EDNS is in use.
-                           -- Should always be zero in well-formed requests.
-                           -- When decoding replies, the high eight bits from
-                           -- any EDNS response are combined with the 4-bit
-                           -- RCODE from the DNS header.  When encoding
-                           -- replies, if no EDNS OPT record is provided, RCODE
-                           -- values > 15 are mapped to 'FormatErr'.
-  , authenData   :: !Bool  -- ^ AD (Authenticated Data) bit - (RFC4035, Section 3.2.3).
-  , chkDisable   :: !Bool  -- ^ CD (Checking Disabled) bit - (RFC4035, Section 3.2.2).
+  , rcode        :: !RCODE  -- ^ The full 12-bit extended RCODE when EDNS is in use.
+                            -- Should always be zero in well-formed requests.
+                            -- When decoding replies, the high eight bits from
+                            -- any EDNS response are combined with the 4-bit
+                            -- RCODE from the DNS header.  When encoding
+                            -- replies, if no EDNS OPT record is provided, RCODE
+                            -- values > 15 are mapped to 'FormatErr'.
+  , authenData   :: !Bool   -- ^ AD (Authenticated Data) bit - (RFC4035, Section 3.2.3).
+  , chkDisable   :: !Bool   -- ^ CD (Checking Disabled) bit - (RFC4035, Section 3.2.2).
   } deriving (Eq, Show)
 
 
@@ -475,6 +475,8 @@ ednsSetOptions od = mempty { qctlEdns = mempty { extOd = od } }
 data QorR = QR_Query    -- ^ Query.
           | QR_Response -- ^ Response.
           deriving (Eq, Show, Enum, Bounded)
+
+----------------------------------------------------------------
 
 -- | Kind of query.
 newtype OPCODE = OPCODE {
