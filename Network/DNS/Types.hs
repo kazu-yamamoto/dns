@@ -129,6 +129,6 @@ module Network.DNS.Types (
   , DNSError (..)
   -- * Other types
   , Mailbox
-    ) where
+  ) where
 
 import Network.DNS.Types.Internal
