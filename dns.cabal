@@ -35,6 +35,11 @@ Library dns-internal
                         Network.DNS.StateBinary
                         Network.DNS.Memo
                         Network.DNS.Base32Hex
+  Other-Modules:        Network.DNS.Types.Base
+                        Network.DNS.Types.EDNS
+                        Network.DNS.Types.Message
+                        Network.DNS.Types.RData
+                        Network.DNS.Types.SIG
   Build-Depends:        base
                       , array
                       , async

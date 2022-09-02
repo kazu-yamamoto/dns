@@ -44,7 +44,7 @@ module Network.DNS.Types (
   , toTYPE
   -- ** Resource Data
   , RData (..)
-  , RD_RRSIG(..)
+  , RDREP_RRSIG(..)
   , dnsTime
   -- * DNS Message
   , DNSMessage (..)
