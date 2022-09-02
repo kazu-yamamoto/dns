@@ -68,7 +68,7 @@ getResponse = do
 getDNSFlags :: SGet DNSFlags
 getDNSFlags = do
     flgs <- get16
-    oc <- getOpcode flgs
+    let oc = getOpcode flgs
     return $ DNSFlags (getQorR flgs)
                       oc
                       (getAuthAnswer flgs)
@@ -80,12 +80,7 @@ getDNSFlags = do
                       (getChkDisable flgs)
   where
     getQorR w = if testBit w 15 then QR_Response else QR_Query
-    getOpcode w =
-        case shiftR w 11 .&. 0x0f of
-            n | Just opc <- toOPCODE n
-              -> pure opc
-              | otherwise
-              -> failSGet $ "Unsupported header opcode: " ++ show n
+    getOpcode w = toOPCODE (shiftR w 11 .&. 0x0f)
     getAuthAnswer w = testBit w 10
     getTrunCation w = testBit w 9
     getRecDesired w = testBit w 8

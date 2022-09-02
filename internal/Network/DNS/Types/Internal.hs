@@ -708,35 +708,32 @@ data QorR = QR_Query    -- ^ Query.
           deriving (Eq, Show, Enum, Bounded)
 
 -- | Kind of query.
-data OPCODE
-  = OP_STD -- ^ A standard query.
-  | OP_INV -- ^ An inverse query (inverse queries are deprecated).
-  | OP_SSR -- ^ A server status request.
-  | OP_NOTIFY -- ^ A zone change notification (RFC1996)
-  | OP_UPDATE -- ^ An update request (RFC2136)
-  deriving (Eq, Show, Enum, Bounded)
+newtype OPCODE = OPCODE {
+    -- | Convert an 'OPCODE' to its numeric value.
+    fromOPCODE :: Word16
+  } deriving (Eq, Show)
+
+-- | A standard query.
+pattern OP_STD    :: OPCODE
+pattern OP_STD     = OPCODE 0
+-- | An inverse query (inverse queries are deprecated).
+pattern OP_INV    :: OPCODE
+pattern OP_INV     = OPCODE 1
+-- | A server status request.
+pattern OP_SSR    :: OPCODE
+pattern OP_SSR     = OPCODE 2
+-- OPCODE 3 is not assigned
+-- | A zone change notification (RFC1996)
+pattern OP_NOTIFY :: OPCODE
+pattern OP_NOTIFY  = OPCODE 4
+-- | An update request (RFC2136)
+pattern OP_UPDATE :: OPCODE
+pattern OP_UPDATE = OPCODE 5
 
 -- | Convert a 16-bit DNS OPCODE number to its internal representation
 --
-toOPCODE :: Word16 -> Maybe OPCODE
-toOPCODE i = case i of
-  0 -> Just OP_STD
-  1 -> Just OP_INV
-  2 -> Just OP_SSR
-  -- OPCODE 3 is unassigned
-  4 -> Just OP_NOTIFY
-  5 -> Just OP_UPDATE
-  _ -> Nothing
-
--- | Convert the internal representation of a DNS OPCODE to its 16-bit numeric
--- value.
---
-fromOPCODE :: OPCODE -> Word16
-fromOPCODE OP_STD    = 0
-fromOPCODE OP_INV    = 1
-fromOPCODE OP_SSR    = 2
-fromOPCODE OP_NOTIFY = 4
-fromOPCODE OP_UPDATE = 5
+toOPCODE :: Word16 -> OPCODE
+toOPCODE = OPCODE
 
 ----------------------------------------------------------------
 

@@ -76,7 +76,13 @@ module Network.DNS.Types (
   , QorR (..)
   , defaultDNSFlags
   -- *** OPCODE and RCODE
-  , OPCODE (..)
+  , OPCODE (
+    OP_STD
+  , OP_INV
+  , OP_SSR
+  , OP_NOTIFY
+  , OP_UPDATE
+  )
   , fromOPCODE
   , toOPCODE
   , RCODE (
