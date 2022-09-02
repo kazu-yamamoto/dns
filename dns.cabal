@@ -38,6 +38,7 @@ Library dns-internal
   Other-Modules:        Network.DNS.Types.Base
                         Network.DNS.Types.EDNS
                         Network.DNS.Types.Message
+                        Network.DNS.Types.Op
                         Network.DNS.Types.RData
                         Network.DNS.Types.SIG
   Build-Depends:        base
