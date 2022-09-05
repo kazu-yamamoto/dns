@@ -1,7 +1,5 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Network.DNS.Types.Message where
 
@@ -309,7 +307,7 @@ instance Show RCODE where
     show BadAlg    = "BadAlg"
     show BadTrunc  = "BadTrunc"
     show BadCookie = "BadCookie"
-    show x         = "RCODE " ++ (show $ fromRCODE x)
+    show x         = "RCODE " ++ show (fromRCODE x)
 
 -- | Convert a numeric value to a corresponding 'RCODE'.  The behaviour is
 -- undefined for values outside the range @[0 .. 0xFFF]@ since the EDNS

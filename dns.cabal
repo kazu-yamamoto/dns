@@ -40,7 +40,7 @@ Library dns-internal
                         Network.DNS.Types.Message
                         Network.DNS.Types.Op
                         Network.DNS.Types.RData
-                        Network.DNS.Types.SIG
+                        Network.DNS.Types.Sec
   Build-Depends:        base
                       , array
                       , async

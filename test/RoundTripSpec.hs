@@ -104,22 +104,22 @@ genResourceRecord = frequency
 mkRData :: Domain -> TYPE -> Gen RData
 mkRData dom typ =
     case typ of
-        A -> RD_A <$> genIPv4
-        AAAA -> RD_AAAA <$> genIPv6
-        NS -> pure $ RD_NS dom
-        TXT -> RD_TXT <$> genTextString
-        MX -> RD_MX <$> genWord16 <*> genDomain
-        CNAME -> pure $ RD_CNAME dom
-        SOA -> RD_SOA dom <$> genMailbox <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32
-        PTR -> RD_PTR <$> genDomain
-        SRV -> RD_SRV <$> genWord16 <*> genWord16 <*> genWord16 <*> genDomain
-        DNAME -> RD_DNAME <$> genDomain
-        DS -> RD_DS <$> genWord16 <*> genWord8 <*> genWord8 <*> genByteString
-        NSEC -> RD_NSEC <$> genDomain <*> genNsecTypes
-        NSEC3 -> genNSEC3
-        TLSA -> RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString
+        A     -> toRData <$> (RD_A <$> genIPv4)
+        AAAA  -> toRData <$> (RD_AAAA <$> genIPv6)
+        NS    -> toRData <$> pure (RD_NS dom)
+        TXT   -> toRData <$> (RD_TXT <$> genTextString)
+        MX    -> toRData <$> (RD_MX <$> genWord16 <*> genDomain)
+        CNAME -> toRData <$> pure (RD_CNAME dom)
+        SOA   -> toRData <$> (RD_SOA dom <$> genMailbox <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32)
+        PTR   -> toRData <$> (RD_PTR <$> genDomain)
+        SRV   -> toRData <$> (RD_SRV <$> genWord16 <*> genWord16 <*> genWord16 <*> genDomain)
+        DNAME -> toRData <$> (RD_DNAME <$> genDomain)
+        DS    -> toRData <$> (RD_DS <$> genWord16 <*> genWord8 <*> genWord8 <*> genByteString)
+        NSEC  -> toRData <$> (RD_NSEC <$> genDomain <*> genNsecTypes)
+        NSEC3 -> toRData <$> genNSEC3
+        TLSA  -> toRData <$> (RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString)
 
-        _ -> pure . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
+        _ -> pure . toRData . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
   where
     genNSEC3 = do
         (alg, hlen)  <- elements [(1,32),(2,64)]

@@ -43,8 +43,33 @@ module Network.DNS.Types (
   , fromTYPE
   , toTYPE
   -- ** Resource Data
-  , RData (..)
-  , RDREP_RRSIG(..)
+  , RData
+  , ResourceData
+  , RD_A(..)
+  , RD_NS(..)
+  , RD_CNAME(..)
+  , RD_SOA(..)
+  , RD_NULL(..)
+  , RD_PTR(..)
+  , RD_MX(..)
+  , RD_TXT(..)
+  , RD_RP(..)
+  , RD_AAAA(..)
+  , RD_SRV(..)
+  , RD_DNAME(..)
+  , RD_OPT(..)
+  , RD_DS(..)
+  , RD_RRSIG(..)
+  , RD_NSEC(..)
+  , RD_DNSKEY(..)
+  , RD_NSEC3(..)
+  , RD_NSEC3PARAM(..)
+  , RD_TLSA(..)
+  , RD_CDS(..)
+  , RD_CDNSKEY(..)
+  , RD_Unknown(..)
+  , toRData
+  , fromRData
   , dnsTime
   -- * DNS Message
   , DNSMessage (..)

@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 module Network.DNS.Memo where
 
 import qualified Control.Reaper as R
@@ -42,7 +40,7 @@ insertCache (dom,typ) tim ent0 reaper = R.reaperAdd reaper (key,tim,ent)
     key = (B.copy dom,typ)
     ent = case ent0 of
       l@(Left _)  -> l
-      (Right rds) -> Right $ map copy rds
+      (Right rds) -> Right $ map (\(RData x) -> RData $ copyResourceData x) rds
 
 -- Theoretically speaking, atMostView itself is good enough for pruning.
 -- But auto-update assumes a list based db which does not provide atMost
@@ -54,35 +52,6 @@ prune oldpsq = do
     return $ \newpsq -> foldl' ins pruned $ PSQ.toList newpsq
   where
     ins psq (k,p,v) = PSQ.insert k p v psq
-
-copy :: RData -> RData
-copy r@(RD_A _)           = r
-copy (RD_NS dom)          = RD_NS $ B.copy dom
-copy (RD_CNAME dom)       = RD_CNAME $ B.copy dom
-copy (RD_SOA mn mr a b c d e) = RD_SOA (B.copy mn) (B.copy mr) a b c d e
-copy (RD_PTR dom)         = RD_PTR $ B.copy dom
-copy (RD_NULL bytes)      = RD_NULL $ B.copy bytes
-copy (RD_MX prf dom)      = RD_MX prf $ B.copy dom
-copy (RD_TXT txt)         = RD_TXT $ B.copy txt
-copy (RD_RP mbox dname)   = RD_RP (B.copy mbox) (B.copy dname)
-copy r@(RD_AAAA _)        = r
-copy (RD_SRV a b c dom)   = RD_SRV a b c $ B.copy dom
-copy (RD_DNAME dom)       = RD_DNAME $ B.copy dom
-copy (RD_OPT od)          = RD_OPT $ map copyOData od
-copy (RD_DS t a dt dv)    = RD_DS t a dt $ B.copy dv
-copy (RD_CDS t a dt dv)   = RD_CDS t a dt $ B.copy dv
-copy (RD_NSEC dom ts)     = RD_NSEC (B.copy dom) ts
-copy (RD_DNSKEY f p a k)  = RD_DNSKEY f p a $ B.copy k
-copy (RD_CDNSKEY f p a k) = RD_CDNSKEY f p a $ B.copy k
-copy (RD_TLSA a b c dgst) = RD_TLSA a b c $ B.copy dgst
-copy (RD_NSEC3 a b c s h t) = RD_NSEC3 a b c (B.copy s) (B.copy h) t
-copy (RD_NSEC3PARAM a b c salt) = RD_NSEC3PARAM a b c $ B.copy salt
-copy (RD_RRSIG sig)       = RD_RRSIG $ copysig sig
-  where
-    copysig s@RDREP_RRSIG{..} =
-        s { rrsigZone = B.copy rrsigZone
-          , rrsigValue = B.copy rrsigValue }
-copy (UnknownRData is)    = UnknownRData $ B.copy is
 
 copyOData :: OData -> OData
 copyOData (OD_ECSgeneric family srcBits scpBits bs) =

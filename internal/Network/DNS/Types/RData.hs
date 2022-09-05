@@ -1,123 +1,493 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Network.DNS.Types.RData where
 
+import qualified Control.Exception as E
+import Control.Monad.State (gets)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
 import Data.Char (intToDigit)
-import Data.IP (IPv4, IPv6)
+import Data.IP (IPv4, IPv6, fromIPv4, toIPv4, fromIPv6b, toIPv6b)
 
 import Network.DNS.Imports
+import Network.DNS.StateBinary
 import Network.DNS.Types.Base
 import Network.DNS.Types.EDNS
-import Network.DNS.Types.SIG
 
--- | Raw data format for each type.
-data RData = RD_A IPv4           -- ^ IPv4 address
-           | RD_NS Domain        -- ^ An authoritative name serve
-           | RD_CNAME Domain     -- ^ The canonical name for an alias
-           | RD_SOA Domain Mailbox Word32 Word32 Word32 Word32 Word32
-                                 -- ^ Marks the start of a zone of authority
-           | RD_NULL ByteString  -- ^ NULL RR (EXPERIMENTAL, RFC1035).
-           | RD_PTR Domain       -- ^ A domain name pointer
-           | RD_MX Word16 Domain -- ^ Mail exchange
-           | RD_TXT ByteString   -- ^ Text strings
-           | RD_RP Mailbox Domain -- ^ Responsible Person (RFC1183)
-           | RD_AAAA IPv6        -- ^ IPv6 Address
-           | RD_SRV Word16 Word16 Word16 Domain
-                                 -- ^ Server Selection (RFC2782)
-           | RD_DNAME Domain     -- ^ DNAME (RFC6672)
-           | RD_OPT [OData]      -- ^ OPT (RFC6891)
-           | RD_DS Word16 Word8 Word8 ByteString -- ^ Delegation Signer (RFC4034)
-           | RD_RRSIG RDREP_RRSIG  -- ^ DNSSEC signature
-           | RD_NSEC Domain [TYPE] -- ^ DNSSEC denial of existence NSEC record
-           | RD_DNSKEY Word16 Word8 Word8 ByteString
-                                 -- ^ DNSKEY (RFC4034)
-           | RD_NSEC3 Word8 Word8 Word16 ByteString ByteString [TYPE]
-                                 -- ^ DNSSEC hashed denial of existence (RFC5155)
-           | RD_NSEC3PARAM Word8 Word8 Word16 ByteString
-                                 -- ^ NSEC3 zone parameters (RFC5155)
-           | RD_TLSA Word8 Word8 Word8 ByteString
-                                 -- ^ TLSA (RFC6698)
-           | RD_CDS Word16 Word8 Word8 ByteString
-                                 -- ^ Child DS (RFC7344)
-           | RD_CDNSKEY Word16 Word8 Word8 ByteString
-                                 -- ^ Child DNSKEY (RFC7344)
-           --RD_CSYNC
-           | UnknownRData ByteString   -- ^ Unknown resource data
-    deriving (Eq, Ord)
+---------------------------------------------------------------
+
+class (Typeable a, Eq a, Show a) => ResourceData a where
+    encodeResourceData :: a -> SPut
+    decodeResourceData :: proxy a -> Int -> SGet a
+    copyResourceData :: a -> a
+    copyResourceData x = x
+
+---------------------------------------------------------------
+
+data RData = forall a . (Typeable a, Eq a, Show a, ResourceData a) => RData a
+
+fromRData :: Typeable a => RData -> Maybe a
+fromRData (RData x) = cast x
+
+toRData :: (Typeable a, ResourceData a) => a -> RData
+toRData = RData
 
 instance Show RData where
-  show rd = case rd of
-      RD_A                  address -> show address
-      RD_NS                 nsdname -> showDomain nsdname
-      RD_CNAME                cname -> showDomain cname
-      RD_SOA          a b c d e f g -> showSOA a b c d e f g
-      RD_NULL                 bytes -> showOpaque bytes
-      RD_PTR               ptrdname -> showDomain ptrdname
-      RD_MX               pref exch -> showMX pref exch
-      RD_TXT             textstring -> showTXT textstring
-      RD_RP              mbox dname -> showRP mbox dname
-      RD_AAAA               address -> show address
-      RD_SRV        pri wei prt tgt -> showSRV pri wei prt tgt
-      RD_DNAME               target -> showDomain target
-      RD_OPT                options -> show options
-      RD_DS          tag alg dalg d -> showDS tag alg dalg d
-      RD_RRSIG                 rrsig -> show rrsig
-      RD_NSEC            next types -> showNSEC next types
-      RD_DNSKEY             f p a k -> showDNSKEY f p a k
-      RD_NSEC3      a f i s h types -> showNSEC3 a f i s h types
-      RD_NSEC3PARAM         a f i s -> showNSEC3PARAM a f i s
-      RD_TLSA               u s m d -> showTLSA u s m d
-      RD_CDS         tag alg dalg d -> showDS tag alg dalg d
-      RD_CDNSKEY            f p a k -> showDNSKEY f p a k
-      UnknownRData            bytes -> showOpaque bytes
-    where
-      showSalt ""    = "-"
-      showSalt salt  = _b16encode salt
-      showDomain = BS.unpack
-      showSOA mname rname serial refresh retry expire minttl =
-          showDomain mname ++ " " ++ showDomain rname ++ " " ++
-          show serial ++ " " ++ show refresh ++ " " ++
-          show retry ++ " " ++ show expire ++ " " ++ show minttl
-      showMX preference exchange =
-          show preference ++ " " ++ showDomain exchange
-      showTXT bs = '"' : B.foldr dnsesc ['"'] bs
+    show (RData x) = show x
+
+instance Eq RData where
+    x@(RData xi) == y@(RData yi) = typeOf x == typeOf y && Just xi == cast yi
+
+---------------------------------------------------------------
+
+-- | IPv4 Address (RFC1035)
+newtype RD_A = RD_A IPv4 deriving Eq
+
+instance ResourceData RD_A where
+    encodeResourceData = \(RD_A ipv4) -> mconcat $ map putInt8 (fromIPv4 ipv4)
+    decodeResourceData = \_ _ -> RD_A . toIPv4 <$> getNBytes 4
+
+instance Show RD_A where
+    show (RD_A ipv4) = show ipv4
+
+----------------------------------------------------------------
+
+-- | An authoritative name serve (RFC1035)
+newtype RD_NS = RD_NS Domain deriving (Eq)
+
+instance ResourceData RD_NS where
+    encodeResourceData = \(RD_NS d) -> putDomain d
+    decodeResourceData = \_ _ -> RD_NS <$> getDomain
+
+instance Show RD_NS where
+    show (RD_NS d) = showDomain d
+
+----------------------------------------------------------------
+
+-- | The canonical name for an alias (RFC1035)
+newtype RD_CNAME = RD_CNAME Domain deriving (Eq)
+
+instance ResourceData RD_CNAME where
+    encodeResourceData = \(RD_CNAME d) -> putDomain d
+    decodeResourceData = \_ _ -> RD_CNAME <$> getDomain
+
+instance Show RD_CNAME where
+    show (RD_CNAME d) = showDomain d
+
+----------------------------------------------------------------
+
+-- | Marks the start of a zone of authority (RFC1035)
+data RD_SOA = RD_SOA {
+    soaMname   :: Domain
+  , soaRname   :: Mailbox
+  , soaSerial  :: Word32
+  , soaRefresh :: Word32
+  , soaRetry   :: Word32
+  , soaExpire  :: Word32
+  , soaMinimum :: Word32
+  } deriving (Eq)
+
+instance ResourceData RD_SOA where
+    encodeResourceData = \RD_SOA{..} ->
+      mconcat [ putDomain soaMname
+              , putMailbox soaRname
+              , put32 soaSerial
+              , put32 soaRefresh
+              , put32 soaRetry
+              , put32 soaExpire
+              , put32 soaMinimum
+              ]
+    decodeResourceData = \_ _ -> RD_SOA  <$> getDomain
+                                         <*> getMailbox
+                                         <*> get32
+                                         <*> get32
+                                         <*> get32
+                                         <*> get32
+                                         <*> get32
+
+instance Show RD_SOA where
+    show RD_SOA{..} = showDomain soaMname ++ " "
+                   ++ showDomain soaRname ++ " "
+                   ++ show soaSerial      ++ " "
+                   ++ show soaRefresh     ++ " "
+                   ++ show soaRetry       ++ " "
+                   ++ show soaExpire      ++ " "
+                   ++ show soaMinimum
+
+----------------------------------------------------------------
+
+-- | NULL RR (EXPERIMENTAL, RFC1035).
+newtype RD_NULL = RD_NULL ByteString deriving (Eq)
+
+instance ResourceData RD_NULL where
+    encodeResourceData = \(RD_NULL bytes) -> putByteString bytes
+    decodeResourceData = \_ len -> RD_NULL <$> getNByteString len
+
+instance Show RD_NULL where
+    show (RD_NULL bytes) = showOpaque bytes
+
+----------------------------------------------------------------
+
+-- | A domain name pointer (RFC1035)
+newtype RD_PTR = RD_PTR Domain deriving (Eq)
+
+instance ResourceData RD_PTR where
+    encodeResourceData = \(RD_PTR d) -> putDomain d
+    decodeResourceData = \_ _ -> RD_PTR <$> getDomain
+
+instance Show RD_PTR where
+    show (RD_PTR d) = showDomain d
+
+----------------------------------------------------------------
+
+-- | Mail exchange (RFC1035)
+data RD_MX = RD_MX {
+    mxPreference :: Word16
+  , mxExchange   :: Domain
+  } deriving (Eq)
+
+instance ResourceData RD_MX where
+    encodeResourceData = \RD_MX{..} ->
+      mconcat [ put16 mxPreference
+              , putDomain mxExchange
+              ]
+    decodeResourceData = \_ _ -> RD_MX <$> get16 <*> getDomain
+
+instance Show RD_MX where
+    show RD_MX{..} = show mxPreference ++ " " ++ showDomain mxExchange
+
+----------------------------------------------------------------
+
+-- | Text strings (RFC1035)
+newtype RD_TXT = RD_TXT ByteString deriving (Eq)
+
+instance ResourceData RD_TXT where
+    encodeResourceData = \(RD_TXT txt0) -> putTXT txt0
+      where
+        putTXT txt = let (!h, !t) = BS.splitAt 255 txt
+                     in putByteStringWithLength h <> if BS.null t
+                                                     then mempty
+                                                     else putTXT t
+    decodeResourceData = \_ len ->
+      RD_TXT . B.concat <$> sGetMany "TXT RR string" len getstring
         where
-          c2w = fromIntegral . fromEnum
-          w2c = toEnum . fromIntegral
-          doubleQuote = c2w '"'
-          backSlash   = c2w '\\'
-          dnsesc c s
-              | c == doubleQuote   = '\\' : w2c c : s
-              | c == backSlash     = '\\' : w2c c : s
-              | c >= 32 && c < 127 =        w2c c : s
-              | otherwise          = '\\' : ddd c   s
-          ddd c s =
-              let (q100, r100) = divMod (fromIntegral c) 100
-                  (q10, r10) = divMod r100 10
-               in intToDigit q100 : intToDigit q10 : intToDigit r10 : s
-      showRP mbox dname = showDomain mbox ++ " " ++ showDomain dname
-      showSRV priority weight port target =
-          show priority ++ " " ++ show weight ++ " " ++
-          show port ++ " " ++ BS.unpack target
-      showDS keytag alg digestType digest =
-          show keytag ++ " " ++ show alg ++ " " ++
-          show digestType ++ " " ++ _b16encode digest
-      showNSEC next types =
-          unwords $ showDomain next : map show types
-      showDNSKEY flags protocol alg key =
-          show flags ++ " " ++ show protocol ++ " " ++
-          show alg ++ " " ++ _b64encode key
-      -- | <https://tools.ietf.org/html/rfc5155#section-3.2>
-      showNSEC3 hashalg flags iterations salt nexthash types =
-          unwords $ show hashalg : show flags : show iterations :
-                    showSalt salt : _b32encode nexthash : map show types
-      showNSEC3PARAM hashAlg flags iterations salt =
-          show hashAlg ++ " " ++ show flags ++ " " ++
-          show iterations ++ " " ++ showSalt salt
-      showTLSA usage selector mtype digest =
-          show usage ++ " " ++ show selector ++ " " ++
-          show mtype ++ " " ++ _b16encode digest
-      -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
-      showOpaque bs = unwords ["\\#", show (BS.length bs), _b16encode bs]
+          getstring = getInt8 >>= getNByteString
+
+instance Show RD_TXT where
+    show (RD_TXT bs) = '"' : B.foldr dnsesc ['"'] bs
+      where
+        c2w = fromIntegral . fromEnum
+        w2c = toEnum . fromIntegral
+        doubleQuote = c2w '"'
+        backSlash   = c2w '\\'
+        dnsesc c s
+          | c == doubleQuote   = '\\' : w2c c : s
+          | c == backSlash     = '\\' : w2c c : s
+          | c >= 32 && c < 127 =        w2c c : s
+          | otherwise          = '\\' : ddd c   s
+        ddd c s =
+            let (q100, r100) = divMod (fromIntegral c) 100
+                (q10, r10) = divMod r100 10
+             in intToDigit q100 : intToDigit q10 : intToDigit r10 : s
+
+----------------------------------------------------------------
+
+-- | Responsible Person (RFC1183)
+data RD_RP = RD_RP Mailbox Domain deriving (Eq)
+
+instance ResourceData RD_RP where
+    encodeResourceData = \(RD_RP mbox d) -> putMailbox mbox <> putDomain d
+    decodeResourceData = \_ _ -> RD_RP <$> getMailbox <*> getDomain
+
+instance Show RD_RP where
+    show (RD_RP mbox d) =
+        showDomain mbox ++ " " ++ showDomain d
+
+----------------------------------------------------------------
+
+-- | IPv6 Address (RFC3596)
+newtype RD_AAAA = RD_AAAA IPv6 deriving (Eq)
+
+instance ResourceData RD_AAAA where
+    encodeResourceData = \(RD_AAAA ipv6) -> mconcat $ map putInt8 (fromIPv6b ipv6)
+    decodeResourceData = \_ _ -> RD_AAAA . toIPv6b <$> getNBytes 16
+
+instance Show RD_AAAA where
+    show (RD_AAAA ipv6) = show ipv6
+
+----------------------------------------------------------------
+
+-- | Server Selection (RFC2782)
+data RD_SRV = RD_SRV {
+    srvPriority :: Word16
+  , srvWeight   :: Word16
+  , srvPort     :: Word16
+  , srvTarget   :: Domain
+  } deriving (Eq)
+
+instance ResourceData RD_SRV where
+    encodeResourceData = \RD_SRV{..} ->
+      mconcat [ put16 srvPriority
+              , put16 srvWeight
+              , put16 srvPort
+              , putDomain srvTarget
+              ]
+    decodeResourceData = \_ _ -> RD_SRV <$> get16
+                                        <*> get16
+                                        <*> get16
+                                        <*> getDomain
+
+instance Show RD_SRV where
+    show RD_SRV{..} = show srvPriority ++ " "
+                   ++ show srvWeight   ++ " "
+                   ++ show srvPort     ++ " "
+                   ++ BS.unpack srvTarget
+
+----------------------------------------------------------------
+
+-- | DNAME (RFC6672)
+newtype RD_DNAME = RD_DNAME Domain deriving (Eq)
+
+instance ResourceData RD_DNAME where
+    encodeResourceData = \(RD_DNAME d) -> putDomain d
+    decodeResourceData = \_ _ -> RD_DNAME <$> getDomain
+
+instance Show RD_DNAME where
+    show (RD_DNAME d) = showDomain d
+
+----------------------------------------------------------------
+
+-- | OPT (RFC6891)
+newtype RD_OPT = RD_OPT [OData] deriving (Eq)
+
+instance ResourceData RD_OPT where
+    encodeResourceData = \(RD_OPT options) -> mconcat $ fmap putOData options
+    decodeResourceData = \_ len ->
+      RD_OPT <$> sGetMany "EDNS option" len getoption
+        where
+          getoption = do
+              code <- toOptCode <$> get16
+              olen <- getInt16
+              getOData code olen
+
+instance Show RD_OPT where
+    show (RD_OPT options) = show options
+
+----------------------------------------------------------------
+
+-- | TLSA (RFC6698)
+data RD_TLSA = RD_TLSA {
+    tlsaUsage        :: Word8
+  , tlsaSelector     :: Word8
+  , tlsaMatchingType :: Word8
+  , tlsaAssocData    :: ByteString
+  } deriving (Eq)
+
+instance ResourceData RD_TLSA where
+    encodeResourceData = \RD_TLSA{..} ->
+      mconcat [ put8 tlsaUsage
+              , put8 tlsaSelector
+              , put8 tlsaMatchingType
+              , putByteString tlsaAssocData
+              ]
+    decodeResourceData = \_ len ->
+      RD_TLSA <$> get8
+              <*> get8
+              <*> get8
+              <*> getNByteString (len - 3)
+
+-- Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
+instance Show RD_TLSA where
+    show RD_TLSA{..} = show tlsaUsage        ++ " "
+                    ++ show tlsaSelector     ++ " "
+                    ++ show tlsaMatchingType ++ " "
+                    ++ _b16encode tlsaAssocData
+
+----------------------------------------------------------------
+
+-- | Unknown resource data
+newtype RD_Unknown = RD_Unknown ByteString deriving (Eq, Show)
+
+instance ResourceData RD_Unknown where
+    encodeResourceData = \(RD_Unknown bytes) -> putByteString bytes
+    decodeResourceData = \_ len -> RD_Unknown <$> getNByteString len
+
+----------------------------------------------------------------
+
+showSalt :: ByteString -> String
+showSalt ""    = "-"
+showSalt salt  = _b16encode salt
+
+showDomain :: ByteString -> String
+showDomain = BS.unpack
+
+showOpaque :: ByteString -> String
+showOpaque bs = unwords ["\\#", show (BS.length bs), _b16encode bs]
+
+----------------------------------------------------------------
+
+-- In the case of the TXT record, we need to put the string length
+-- fixme : What happens with the length > 256 ?
+putByteStringWithLength :: BS.ByteString -> SPut
+putByteStringWithLength bs = putInt8 (fromIntegral $ BS.length bs) -- put the length of the given string
+                          <> putByteString bs
+
+rootDomain :: Domain
+rootDomain = BS.pack "."
+
+putDomain :: Domain -> SPut
+putDomain = putDomain' '.'
+
+putMailbox :: Mailbox -> SPut
+putMailbox = putDomain' '@'
+
+putDomain' :: Char -> ByteString -> SPut
+putDomain' sep dom
+    | BS.null dom || dom == rootDomain = put8 0
+    | otherwise = do
+        mpos <- wsPop dom
+        cur <- gets wsPosition
+        case mpos of
+            Just pos -> putPointer pos
+            Nothing  -> do
+                        -- Pointers are limited to 14-bits!
+                        when (cur <= 0x3fff) $ wsPush dom cur
+                        mconcat [ putPartialDomain hd
+                                , putDomain' '.' tl
+                                ]
+  where
+    -- Try with the preferred separator if present, else fall back to '.'.
+    (hd, tl) = loop (c2w sep)
+      where
+        loop w = case parseLabel w dom of
+            Right p | w /= 0x2e && BS.null (snd p) -> loop 0x2e
+                    | otherwise -> p
+            Left e -> E.throw e
+
+    c2w = fromIntegral . fromEnum
+
+putPointer :: Int -> SPut
+putPointer pos = putInt16 (pos .|. 0xc000)
+
+putPartialDomain :: Domain -> SPut
+putPartialDomain = putByteStringWithLength
+
+----------------------------------------------------------------
+
+-- | Pointers MUST point back into the packet per RFC1035 Section 4.1.4.  This
+-- is further interpreted by the DNS community (from a discussion on the IETF
+-- DNSOP mailing list) to mean that they don't point back into the same domain.
+-- Therefore, when starting to parse a domain, the current offset is also a
+-- strict upper bound on the targets of any pointers that arise while processing
+-- the domain.  When following a pointer, the target again becomes a stict upper
+-- bound for any subsequent pointers.  This results in a simple loop-prevention
+-- algorithm, each sequence of valid pointer values is necessarily strictly
+-- decreasing!  The third argument to 'getDomain'' is a strict pointer upper
+-- bound, and is set here to the position at the start of parsing the domain
+-- or mailbox.
+--
+-- Note: the separator passed to 'getDomain'' is required to be either \'.\' or
+-- \'\@\', or else 'unparseLabel' needs to be modified to handle the new value.
+--
+
+getDomain :: SGet Domain
+getDomain = getPosition >>= getDomain' dot
+
+getMailbox :: SGet Mailbox
+getMailbox = getPosition >>= getDomain' atsign
+
+dot, atsign :: Word8
+dot    = fromIntegral $ fromEnum '.' -- 46
+atsign = fromIntegral $ fromEnum '@' -- 64
+
+-- $
+-- Pathological case: pointer embedded inside a label!  The pointer points
+-- behind the start of the domain and is then absorbed into the initial label!
+-- Though we don't IMHO have to support this, it is not manifestly illegal, and
+-- does exercise the code in an interesting way.  Ugly as this is, it also
+-- "works" the same in Perl's Net::DNS and reportedly in ISC's BIND.
+--
+-- >>> :{
+-- let input = "\6\3foo\192\0\3bar\0"
+--     parser = skipNBytes 1 >> getDomain' dot 1
+--     Right (output, _) = runSGet parser input
+--  in output == "foo.\\003foo\\192\\000.bar."
+-- :}
+-- True
+--
+-- The case below fails to point far enough back, and triggers the loop
+-- prevention code-path.
+--
+-- >>> :{
+-- let input = "\6\3foo\192\1\3bar\0"
+--     parser = skipNBytes 1 >> getDomain' dot 1
+--     Left (DecodeError err) = runSGet parser input
+--  in err
+-- :}
+-- "invalid name compression pointer"
+
+-- | Get a domain name, using sep1 as the separator between the 1st and 2nd
+-- label.  Subsequent labels (and always the trailing label) are terminated
+-- with a ".".
+--
+-- Note: the separator is required to be either \'.\' or \'\@\', or else
+-- 'unparseLabel' needs to be modified to handle the new value.
+--
+-- Domain name compression pointers must always refer to a position that
+-- precedes the start of the current domain name.  The starting offsets form a
+-- strictly decreasing sequence, which prevents pointer loops.
+--
+getDomain' :: Word8 -> Int -> SGet ByteString
+getDomain' sep1 ptrLimit = do
+    pos <- getPosition
+    c <- getInt8
+    let n = getValue c
+    getdomain pos c n
+  where
+    -- Reprocess the same ByteString starting at the pointer
+    -- target (offset).
+    getPtr pos offset = do
+        msg <- getInput
+        let parser = skipNBytes offset >> getDomain' sep1 offset
+        case runSGet parser msg of
+            Left (DecodeError err) -> failSGet err
+            Left err               -> fail $ show err
+            Right o                -> do
+                -- Cache only the presentation form decoding of domain names,
+                -- mailboxes (e.g. SOA rname) are less frequently reused, and
+                -- have a different presentation form, so must not share the
+                -- same cache.
+                when (sep1 == dot) $
+                    push pos (fst o)
+                return (fst o)
+
+    getdomain pos c n
+      | c == 0 = return "." -- Perhaps the root domain?
+      | isPointer c = do
+          d <- getInt8
+          let offset = n * 256 + d
+          when (offset >= ptrLimit) $
+              failSGet "invalid name compression pointer"
+          if sep1 /= dot
+              then getPtr pos offset
+              else pop offset >>= \case
+                  Nothing -> getPtr pos offset
+                  Just o  -> return o
+      -- As for now, extended labels have no use.
+      -- This may change some time in the future.
+      | isExtLabel c = return ""
+      | otherwise = do
+          hs <- unparseLabel sep1 <$> getNByteString n
+          ds <- getDomain' dot ptrLimit
+          let dom = case ds of -- avoid trailing ".."
+                  "." -> hs <> "."
+                  _   -> hs <> B.singleton sep1 <> ds
+          push pos dom
+          return dom
+    getValue c = c .&. 0x3f
+    isPointer c = testBit c 7 && testBit c 6
+    isExtLabel c = not (testBit c 7) && testBit c 6

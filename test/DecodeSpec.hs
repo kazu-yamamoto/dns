@@ -44,7 +44,7 @@ test_mx = "f03681800001000100000001036d6577036f726700000f0001c00c000f000100000df
 -- as a pointer to the question domain.
 test_soa_in :: DNSMessage
 test_soa_in =
-    let soard = RD_SOA "ns1.example.com." "hostmaster.example.com." 0 0 0 0 0
+    let soard = toRData $ RD_SOA "ns1.example.com." "hostmaster.example.com." 0 0 0 0 0
         soarr = ResourceRecord "example.com." SOA 1 3600 soard
      in defaultResponse { question = [Question "hostmaster.example.com." A]
                         , authority = [soarr] }
@@ -52,7 +52,7 @@ test_soa_in =
 -- Expected decoded presentation form of the 'test_soa' message.
 test_soa_out :: DNSMessage
 test_soa_out =
-    let soard = RD_SOA "ns1.example.com." "hostmaster@example.com." 0 0 0 0 0
+    let soard = toRData $ RD_SOA "ns1.example.com." "hostmaster@example.com." 0 0 0 0 0
         soarr = ResourceRecord "example.com." SOA 1 3600 soard
      in defaultResponse { question = [Question "hostmaster.example.com." A]
                         , authority = [soarr] }

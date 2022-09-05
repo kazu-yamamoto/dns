@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE CPP #-}
+
 module Network.DNS.StateBinary (
     PState(..)
   , initialState
@@ -65,7 +65,7 @@ import qualified Data.Map as M
 import Data.Semigroup as Sem
 
 import Network.DNS.Imports
-import Network.DNS.Types.Internal
+import Network.DNS.Types.Base
 
 ----------------------------------------------------------------
 

@@ -106,8 +106,9 @@ lookupA rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError IPv4
-    unTag (RD_A x) = Right x
-    unTag _ = Left UnexpectedRDATA
+    unTag rd = case fromRData rd of
+      Just (RD_A x) -> Right x
+      _             -> Left UnexpectedRDATA
 
 
 -- | Look up all (IPv6) \'AAAA\' records for the given hostname.
@@ -127,8 +128,9 @@ lookupAAAA rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError IPv6
-    unTag (RD_AAAA x) = Right x
-    unTag _ = Left UnexpectedRDATA
+    unTag rd = case fromRData rd of
+      Just (RD_AAAA x) -> Right x
+      _                -> Left UnexpectedRDATA
 
 ----------------------------------------------------------------
 
@@ -170,8 +172,9 @@ lookupMX rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError (Domain,Int)
-    unTag (RD_MX pr dm) = Right (dm, fromIntegral pr)
-    unTag _ = Left UnexpectedRDATA
+    unTag rd = case fromRData rd of
+      Just (RD_MX pr dm) -> Right (dm, fromIntegral pr)
+      _                  -> Left UnexpectedRDATA
 
 -- | Look up all \'MX\' records for the given hostname, and then
 --   resolve their hostnames to IPv4 addresses by calling
@@ -239,8 +242,9 @@ lookupNSImpl lookup_function rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError Domain
-    unTag (RD_NS dm) = Right dm
-    unTag _ = Left UnexpectedRDATA
+    unTag rd = case fromRData rd of
+      Just (RD_NS dm) -> Right dm
+      _               -> Left UnexpectedRDATA
 
 -- | Look up all \'NS\' records for the given hostname. The results
 --   are taken from the ANSWER section of the response (as opposed to
@@ -310,8 +314,9 @@ lookupTXT rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError ByteString
-    unTag (RD_TXT x) = Right x
-    unTag _ = Left UnexpectedRDATA
+    unTag rd = case fromRData rd of
+      Just (RD_TXT x) -> Right x
+      _               -> Left UnexpectedRDATA
 
 ----------------------------------------------------------------
 
@@ -340,8 +345,9 @@ lookupSOA rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError (Domain,Mailbox,Word32,Word32,Word32,Word32,Word32)
-    unTag (RD_SOA mn mr serial refresh retry expire mini) = Right (mn, mr, serial, refresh, retry, expire, mini)
-    unTag _ = Left UnexpectedRDATA
+    unTag rd = case fromRData rd of
+      Just (RD_SOA mn mr serial refresh retry expire mini) -> Right (mn, mr, serial, refresh, retry, expire, mini)
+      _             -> Left UnexpectedRDATA
 
 ----------------------------------------------------------------
 
@@ -367,9 +373,9 @@ lookupPTR rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError Domain
-    unTag (RD_PTR dm) = Right dm
-    unTag _ = Left UnexpectedRDATA
-
+    unTag rd = case fromRData rd of
+      Just (RD_PTR dm) -> Right dm
+      _                -> Left UnexpectedRDATA
 
 -- | Convenient wrapper around 'lookupPTR' to perform a reverse lookup
 --   on a single IP address.
@@ -432,5 +438,6 @@ lookupSRV rlv dom = do
     Right rds -> return $ mapM unTag rds
   where
     unTag :: RData -> Either DNSError (Word16, Word16, Word16, Domain)
-    unTag (RD_SRV pri wei prt dm) = Right (pri,wei,prt,dm)
-    unTag _ = Left UnexpectedRDATA
+    unTag rd = case fromRData rd of
+      Just (RD_SRV pri wei prt dm) -> Right (pri,wei,prt,dm)
+      _                            -> Left UnexpectedRDATA

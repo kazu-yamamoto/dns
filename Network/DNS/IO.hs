@@ -185,7 +185,7 @@ responseA :: Identifier -> Question -> [IPv4] -> DNSMessage
 responseA idt q ips = makeResponse idt q as
   where
     dom = qname q
-    as  = ResourceRecord dom A classIN 300 . RD_A <$> ips
+    as  = ResourceRecord dom A classIN 300 . toRData . RD_A <$> ips
 
 -- | Compose a response with a single IPv6 RRset.  If the query
 -- had an EDNS pseudo-header, a suitable EDNS pseudo-header must
@@ -198,4 +198,4 @@ responseAAAA :: Identifier -> Question -> [IPv6] -> DNSMessage
 responseAAAA idt q ips = makeResponse idt q as
   where
     dom = qname q
-    as  = ResourceRecord dom AAAA classIN 300 . RD_AAAA <$> ips
+    as  = ResourceRecord dom AAAA classIN 300 . toRData . RD_AAAA <$> ips

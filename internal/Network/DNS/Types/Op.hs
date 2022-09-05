@@ -1,8 +1,5 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Network.DNS.Types.Op (
     QueryControls(..)
@@ -131,7 +128,7 @@ data ODataOp = ODataAdd [OData] -- ^ Add the specified options to the list.
 --
 _odataDedup :: ODataOp -> [OData]
 _odataDedup op =
-    nubBy ((==) `on` _odataToOptCode) $
+    nubBy ((==) `on` odataToOptCode) $
         case op of
             ODataAdd os -> os
             ODataSet os -> os
@@ -206,7 +203,7 @@ instance Show EdnsControls where
             , _showWord "edns.version" vn
             , _showWord "edns.udpsize" sz
             , _showFlag "edns.dobit"   d0
-            , _showOdOp "edns.options" $ map (show. _odataToOptCode)
+            , _showOdOp "edns.options" $ map (show. odataToOptCode)
                                        $ _odataDedup od ]
       where
         _showWord :: Show a => String -> Maybe a -> String

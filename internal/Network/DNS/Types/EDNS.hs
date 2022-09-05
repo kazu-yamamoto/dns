@@ -1,11 +1,32 @@
 {-# LANGUAGE PatternSynonyms #-}
 
-module Network.DNS.Types.EDNS where
+module Network.DNS.Types.EDNS (
+    EDNS(..)
+  , defaultEDNS
+  , maxUdpSize
+  , minUdpSize
+  , OptCode (
+    NSID
+  , DAU
+  , DHU
+  , N3U
+  , ClientSubnet
+  )
+  , fromOptCode
+  , toOptCode
+  , odataToOptCode
+  , OData(..)
+  , putOData
+  , getOData
+  ) where
 
-import qualified Data.ByteString.Char8 as BS
-import Data.IP (IP(..))
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as S8
+import Data.IP (IP(..), fromIPv4, toIPv4, fromIPv6b, toIPv6b, makeAddrRange)
+import qualified Data.IP (addr)
 
 import Network.DNS.Imports
+import Network.DNS.StateBinary
 import Network.DNS.Types.Base
 
 ----------------------------------------------------------------
@@ -81,15 +102,15 @@ newtype OptCode = OptCode {
 
 -- | NSID (RFC5001, section 2.3)
 pattern NSID :: OptCode
-pattern NSID = OptCode 3
+pattern NSID  = OptCode 3
 
 -- | DNSSEC algorithm support (RFC6974, section 3)
-pattern DAU :: OptCode
-pattern DAU = OptCode 5
-pattern DHU :: OptCode
-pattern DHU = OptCode 6
-pattern N3U :: OptCode
-pattern N3U = OptCode 7
+pattern DAU  :: OptCode
+pattern DAU   = OptCode 5
+pattern DHU  :: OptCode
+pattern DHU   = OptCode 6
+pattern N3U  :: OptCode
+pattern N3U   = OptCode 7
 
 -- | Client subnet (RFC7871)
 pattern ClientSubnet :: OptCode
@@ -101,7 +122,7 @@ instance Show OptCode where
     show DHU          = "DHU"
     show N3U          = "N3U"
     show ClientSubnet = "ClientSubnet"
-    show x            = "OptCode" ++ (show $ fromOptCode x)
+    show x            = "OptCode" ++ show (fromOptCode x)
 
 -- | From number to option code.
 toOptCode :: Word16 -> OptCode
@@ -142,14 +163,14 @@ data OData =
 
 -- | Recover the (often implicit) 'OptCode' from a value of the 'OData' sum
 -- type.
-_odataToOptCode :: OData -> OptCode
-_odataToOptCode OD_NSID {}            = NSID
-_odataToOptCode OD_DAU {}             = DAU
-_odataToOptCode OD_DHU {}             = DHU
-_odataToOptCode OD_N3U {}             = N3U
-_odataToOptCode OD_ClientSubnet {}    = ClientSubnet
-_odataToOptCode OD_ECSgeneric {}      = ClientSubnet
-_odataToOptCode (UnknownOData code _) = toOptCode code
+odataToOptCode :: OData -> OptCode
+odataToOptCode OD_NSID {}            = NSID
+odataToOptCode OD_DAU {}             = DAU
+odataToOptCode OD_DHU {}             = DHU
+odataToOptCode OD_N3U {}             = N3U
+odataToOptCode OD_ClientSubnet {}    = ClientSubnet
+odataToOptCode OD_ECSgeneric {}      = ClientSubnet
+odataToOptCode (UnknownOData code _) = toOptCode code
 
 instance Show OData where
     show (OD_NSID nsid) = _showNSID nsid
@@ -168,9 +189,124 @@ _showAlgList nm ws = nm ++ " " ++ intercalate "," (map show ws)
 _showNSID :: ByteString -> String
 _showNSID nsid = "NSID" ++ " " ++ _b16encode nsid ++ ";" ++ printable nsid
   where
-    printable = BS.unpack. BS.map (\c -> if c < ' ' || c > '~' then '?' else c)
+    printable = S8.unpack. S8.map (\c -> if c < ' ' || c > '~' then '?' else c)
 
 _showECS :: Word16 -> Word8 -> Word8 -> String -> String
 _showECS family srcBits scpBits address =
     show family ++ " " ++ show srcBits
                 ++ " " ++ show scpBits ++ " " ++ address
+
+----------------------------------------------------------------
+
+putOData :: OData -> SPut
+putOData (OD_NSID nsid) = putODBytes (fromOptCode NSID) nsid
+putOData (OD_DAU as) = putODWords (fromOptCode DAU) as
+putOData (OD_DHU hs) = putODWords (fromOptCode DHU) hs
+putOData (OD_N3U hs) = putODWords (fromOptCode N3U) hs
+putOData (OD_ClientSubnet srcBits scpBits ip) =
+    -- https://tools.ietf.org/html/rfc7871#section-6
+    --
+    -- o  ADDRESS, variable number of octets, contains either an IPv4 or
+    --    IPv6 address, depending on FAMILY, which MUST be truncated to the
+    --    number of bits indicated by the SOURCE PREFIX-LENGTH field,
+    --    padding with 0 bits to pad to the end of the last octet needed.
+    --
+    -- o  A server receiving an ECS option that uses either too few or too
+    --    many ADDRESS octets, or that has non-zero ADDRESS bits set beyond
+    --    SOURCE PREFIX-LENGTH, SHOULD return FORMERR to reject the packet,
+    --    as a signal to the software developer making the request to fix
+    --    their implementation.
+    --
+    let octets = fromIntegral $ (srcBits + 7) `div` 8
+        prefix addr = Data.IP.addr $ makeAddrRange addr $ fromIntegral srcBits
+        (family, raw) = case ip of
+                        IPv4 ip4 -> (1, take octets $ fromIPv4  $ prefix ip4)
+                        IPv6 ip6 -> (2, take octets $ fromIPv6b $ prefix ip6)
+        dataLen = 2 + 2 + octets
+     in mconcat [ put16 $ fromOptCode ClientSubnet
+                , putInt16 dataLen
+                , put16 family
+                , put8 srcBits
+                , put8 scpBits
+                , mconcat $ fmap putInt8 raw
+                ]
+putOData (OD_ECSgeneric family srcBits scpBits addr) =
+    mconcat [ put16 $ fromOptCode ClientSubnet
+            , putInt16 $ 4 + S8.length addr
+            , put16 family
+            , put8 srcBits
+            , put8 scpBits
+            , putByteString addr
+            ]
+putOData (UnknownOData code bs) = putODBytes code bs
+
+-- | Encode EDNS OPTION consisting of a list of octets.
+putODWords :: Word16 -> [Word8] -> SPut
+putODWords code ws =
+     mconcat [ put16 code
+             , putInt16 $ length ws
+             , mconcat $ map put8 ws
+             ]
+
+-- | Encode an EDNS OPTION byte string.
+putODBytes :: Word16 -> ByteString -> SPut
+putODBytes code bs =
+    mconcat [ put16 code
+            , putInt16 $ S8.length bs
+            , putByteString bs
+            ]
+
+----------------------------------------------------------------
+
+getOData :: OptCode -> Int -> SGet OData
+getOData NSID len = OD_NSID <$> getNByteString len
+getOData DAU  len = OD_DAU  <$> getNoctets len
+getOData DHU  len = OD_DHU  <$> getNoctets len
+getOData N3U  len = OD_N3U  <$> getNoctets len
+getOData ClientSubnet len = do
+        family  <- get16
+        srcBits <- get8
+        scpBits <- get8
+        addrbs  <- getNByteString (len - 4) -- 4 = 2 + 1 + 1
+        --
+        -- https://tools.ietf.org/html/rfc7871#section-6
+        --
+        -- o  ADDRESS, variable number of octets, contains either an IPv4 or
+        --    IPv6 address, depending on FAMILY, which MUST be truncated to the
+        --    number of bits indicated by the SOURCE PREFIX-LENGTH field,
+        --    padding with 0 bits to pad to the end of the last octet needed.
+        --
+        -- o  A server receiving an ECS option that uses either too few or too
+        --    many ADDRESS octets, or that has non-zero ADDRESS bits set beyond
+        --    SOURCE PREFIX-LENGTH, SHOULD return FORMERR to reject the packet,
+        --    as a signal to the software developer making the request to fix
+        --    their implementation.
+        --
+        -- In order to avoid needless decoding errors, when the ECS encoding
+        -- requirements are violated, we construct an OD_ECSgeneric OData,
+        -- instread of an IP-specific OD_ClientSubnet OData, which will only
+        -- be used for valid inputs.  When the family is neither IPv4(1) nor
+        -- IPv6(2), or the address prefix is not correctly encoded (too long
+        -- or too short), the OD_ECSgeneric data contains the verbatim input
+        -- from the peer.
+        --
+        case S8.length addrbs == (fromIntegral srcBits + 7) `div` 8 of
+            True | Just ip <- bstoip family addrbs srcBits scpBits
+                -> pure $ OD_ClientSubnet srcBits scpBits ip
+            _   -> pure $ OD_ECSgeneric family srcBits scpBits addrbs
+  where
+    prefix addr bits = Data.IP.addr $ makeAddrRange addr $ fromIntegral bits
+    zeropad = (++ repeat 0). map fromIntegral. BS.unpack
+    checkBits fromBytes toIP srcBits scpBits bytes =
+        let addr       = fromBytes bytes
+            maskedAddr = prefix addr srcBits
+            maxBits    = fromIntegral $ 8 * length bytes
+         in if addr == maskedAddr && scpBits <= maxBits
+            then Just $ toIP addr
+            else Nothing
+    bstoip :: Word16 -> BS.ByteString -> Word8 -> Word8 -> Maybe IP
+    bstoip family bs srcBits scpBits = case family of
+        1 -> checkBits toIPv4  IPv4 srcBits scpBits $ take 4  $ zeropad bs
+        2 -> checkBits toIPv6b IPv6 srcBits scpBits $ take 16 $ zeropad bs
+        _ -> Nothing
+getOData opc len = UnknownOData (fromOptCode opc) <$> getNByteString len
