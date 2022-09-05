@@ -163,7 +163,7 @@ data QorR = QR_Query    -- ^ Query.
 newtype OPCODE = OPCODE {
     -- | Convert an 'OPCODE' to its numeric value.
     fromOPCODE :: Word16
-  } deriving (Eq, Show)
+  } deriving (Eq)
 
 -- | A standard query.
 pattern OP_STD    :: OPCODE
@@ -186,6 +186,14 @@ pattern OP_UPDATE = OPCODE 5
 --
 toOPCODE :: Word16 -> OPCODE
 toOPCODE = OPCODE
+
+instance Show OPCODE where
+    show OP_STD     = "OP_STD"
+    show OP_INV     = "OP_INV"
+    show OP_SSR     = "OP_SSR"
+    show OP_NOTIFY  = "OP_NOTIFY"
+    show OP_UPDATE  = "OP_UPDATE"
+    show (OPCODE n) = "Unknown OPCODE " ++ show n
 
 ----------------------------------------------------------------
 
