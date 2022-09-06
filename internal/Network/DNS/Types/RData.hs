@@ -23,8 +23,7 @@ import Network.DNS.Types.EDNS
 class (Typeable a, Eq a, Show a) => ResourceData a where
     encodeResourceData :: a -> SPut
     decodeResourceData :: proxy a -> Int -> SGet a
-    copyResourceData :: a -> a
-    copyResourceData x = x
+    copyResourceData   :: a -> a
 
 ---------------------------------------------------------------
 
@@ -50,6 +49,7 @@ newtype RD_A = RD_A IPv4 deriving Eq
 instance ResourceData RD_A where
     encodeResourceData = \(RD_A ipv4) -> mconcat $ map putInt8 (fromIPv4 ipv4)
     decodeResourceData = \_ _ -> RD_A . toIPv4 <$> getNBytes 4
+    copyResourceData x = x
 
 instance Show RD_A where
     show (RD_A ipv4) = show ipv4
@@ -62,6 +62,7 @@ newtype RD_NS = RD_NS Domain deriving (Eq)
 instance ResourceData RD_NS where
     encodeResourceData = \(RD_NS d) -> putDomain d
     decodeResourceData = \_ _ -> RD_NS <$> getDomain
+    copyResourceData (RD_NS dom) = RD_NS $ B.copy dom
 
 instance Show RD_NS where
     show (RD_NS d) = showDomain d
@@ -74,6 +75,7 @@ newtype RD_CNAME = RD_CNAME Domain deriving (Eq)
 instance ResourceData RD_CNAME where
     encodeResourceData = \(RD_CNAME d) -> putDomain d
     decodeResourceData = \_ _ -> RD_CNAME <$> getDomain
+    copyResourceData (RD_CNAME dom) = RD_CNAME $ B.copy dom
 
 instance Show RD_CNAME where
     show (RD_CNAME d) = showDomain d
@@ -108,6 +110,10 @@ instance ResourceData RD_SOA where
                                          <*> get32
                                          <*> get32
                                          <*> get32
+    copyResourceData r@RD_SOA{..} =
+        r { soaMname = B.copy soaMname
+          , soaRname = B.copy soaRname
+          }
 
 instance Show RD_SOA where
     show RD_SOA{..} = showDomain soaMname ++ " "
@@ -126,6 +132,7 @@ newtype RD_NULL = RD_NULL ByteString deriving (Eq)
 instance ResourceData RD_NULL where
     encodeResourceData = \(RD_NULL bytes) -> putByteString bytes
     decodeResourceData = \_ len -> RD_NULL <$> getNByteString len
+    copyResourceData (RD_NULL bytes) = RD_NULL $ B.copy bytes
 
 instance Show RD_NULL where
     show (RD_NULL bytes) = showOpaque bytes
@@ -138,6 +145,7 @@ newtype RD_PTR = RD_PTR Domain deriving (Eq)
 instance ResourceData RD_PTR where
     encodeResourceData = \(RD_PTR d) -> putDomain d
     decodeResourceData = \_ _ -> RD_PTR <$> getDomain
+    copyResourceData (RD_PTR dom) = RD_PTR $ B.copy dom
 
 instance Show RD_PTR where
     show (RD_PTR d) = showDomain d
@@ -156,6 +164,7 @@ instance ResourceData RD_MX where
               , putDomain mxExchange
               ]
     decodeResourceData = \_ _ -> RD_MX <$> get16 <*> getDomain
+    copyResourceData (RD_MX prf dom) = RD_MX prf $ B.copy dom
 
 instance Show RD_MX where
     show RD_MX{..} = show mxPreference ++ " " ++ showDomain mxExchange
@@ -176,6 +185,7 @@ instance ResourceData RD_TXT where
       RD_TXT . B.concat <$> sGetMany "TXT RR string" len getstring
         where
           getstring = getInt8 >>= getNByteString
+    copyResourceData (RD_TXT txt) = RD_TXT $ B.copy txt
 
 instance Show RD_TXT where
     show (RD_TXT bs) = '"' : B.foldr dnsesc ['"'] bs
@@ -202,6 +212,7 @@ data RD_RP = RD_RP Mailbox Domain deriving (Eq)
 instance ResourceData RD_RP where
     encodeResourceData = \(RD_RP mbox d) -> putMailbox mbox <> putDomain d
     decodeResourceData = \_ _ -> RD_RP <$> getMailbox <*> getDomain
+    copyResourceData (RD_RP mbox dname) = RD_RP (B.copy mbox) (B.copy dname)
 
 instance Show RD_RP where
     show (RD_RP mbox d) =
@@ -215,6 +226,7 @@ newtype RD_AAAA = RD_AAAA IPv6 deriving (Eq)
 instance ResourceData RD_AAAA where
     encodeResourceData = \(RD_AAAA ipv6) -> mconcat $ map putInt8 (fromIPv6b ipv6)
     decodeResourceData = \_ _ -> RD_AAAA . toIPv6b <$> getNBytes 16
+    copyResourceData x = x
 
 instance Show RD_AAAA where
     show (RD_AAAA ipv6) = show ipv6
@@ -240,6 +252,7 @@ instance ResourceData RD_SRV where
                                         <*> get16
                                         <*> get16
                                         <*> getDomain
+    copyResourceData r@RD_SRV{..} = r { srvTarget = B.copy srvTarget }
 
 instance Show RD_SRV where
     show RD_SRV{..} = show srvPriority ++ " "
@@ -255,6 +268,7 @@ newtype RD_DNAME = RD_DNAME Domain deriving (Eq)
 instance ResourceData RD_DNAME where
     encodeResourceData = \(RD_DNAME d) -> putDomain d
     decodeResourceData = \_ _ -> RD_DNAME <$> getDomain
+    copyResourceData (RD_DNAME dom) = RD_DNAME $ B.copy dom
 
 instance Show RD_DNAME where
     show (RD_DNAME d) = showDomain d
@@ -273,6 +287,7 @@ instance ResourceData RD_OPT where
               code <- toOptCode <$> get16
               olen <- getInt16
               getOData code olen
+    copyResourceData (RD_OPT od) = RD_OPT $ map copyOData od
 
 instance Show RD_OPT where
     show (RD_OPT options) = show options
@@ -299,6 +314,7 @@ instance ResourceData RD_TLSA where
               <*> get8
               <*> get8
               <*> getNByteString (len - 3)
+    copyResourceData (RD_TLSA a b c dgst) = RD_TLSA a b c $ B.copy dgst
 
 -- Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
 instance Show RD_TLSA where
@@ -315,6 +331,7 @@ newtype RD_Unknown = RD_Unknown ByteString deriving (Eq, Show)
 instance ResourceData RD_Unknown where
     encodeResourceData = \(RD_Unknown bytes) -> putByteString bytes
     decodeResourceData = \_ len -> RD_Unknown <$> getNByteString len
+    copyResourceData (RD_Unknown x)  = RD_Unknown $ B.copy x
 
 ----------------------------------------------------------------
 

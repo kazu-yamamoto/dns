@@ -96,6 +96,9 @@ instance ResourceData RD_RRSIG where
             tnow <- getAtTime
             tdns <- get32
             return $ dnsTime tdns tnow
+    copyResourceData r@RD_RRSIG{..} =
+        r { rrsigZone = BS.copy rrsigZone
+          , rrsigValue = BS.copy rrsigValue }
 
 instance Show RD_RRSIG where
     show RD_RRSIG{..} =
@@ -138,6 +141,7 @@ instance ResourceData RD_DS where
               <*> get8
               <*> get8
               <*> getNByteString (lim - 4)
+    copyResourceData r@RD_DS{..} = r { dsDigest = BS.copy dsDigest }
 
 instance Show RD_DS where
     show RD_DS{..} = show dsKeyTag     ++ " "
@@ -161,6 +165,8 @@ instance ResourceData RD_NSEC where
         dom <- getDomain
         pos <- getPosition
         RD_NSEC dom <$> getNsecTypes (end - pos)
+    copyResourceData r@RD_NSEC{..} =
+        r { nsecNextDomain = BS.copy nsecNextDomain }
 
 instance Show RD_NSEC where
     show RD_NSEC{..} =
@@ -188,6 +194,8 @@ instance ResourceData RD_DNSKEY where
                   <*> get8
                   <*> get8
                   <*> getNByteString (len - 4)
+    copyResourceData r@RD_DNSKEY{..} =
+        r { dnskeyPublicKey = BS.copy dnskeyPublicKey }
 
 -- <https://tools.ietf.org/html/rfc5155#section-3.2>
 instance Show RD_DNSKEY where
@@ -226,6 +234,10 @@ instance ResourceData RD_NSEC3 where
         hash <- getInt8ByteString
         tpos <- getPosition
         RD_NSEC3 halg flgs iter salt hash <$> getNsecTypes (dend - tpos)
+    copyResourceData r@RD_NSEC3{..} =
+        r { nsec3Salt = BS.copy nsec3Salt
+          , nsec3NextHashedOwnerName = BS.copy nsec3NextHashedOwnerName
+          }
 
 instance Show RD_NSEC3 where
     show RD_NSEC3{..} = unwords $ show nsec3HashAlgorithm
@@ -257,6 +269,8 @@ instance ResourceData RD_NSEC3PARAM where
                       <*> get8
                       <*> get16
                       <*> getInt8ByteString
+    copyResourceData r@RD_NSEC3PARAM{..} =
+        r { nsec3paramSalt = BS.copy nsec3paramSalt }
 
 instance Show RD_NSEC3PARAM where
     show RD_NSEC3PARAM{..} = show nsec3paramHashAlgorithm ++ " "
@@ -272,6 +286,7 @@ newtype RD_CDS = RD_CDS RD_DS deriving (Eq)
 instance ResourceData RD_CDS where
     encodeResourceData = \(RD_CDS ds) -> encodeResourceData ds
     decodeResourceData = \_ len -> RD_CDS <$> decodeResourceData (Proxy :: Proxy RD_DS) len
+    copyResourceData = \(RD_CDS ds) -> RD_CDS $ copyResourceData ds
 
 instance Show RD_CDS where
     show (RD_CDS ds) = show ds
@@ -284,6 +299,7 @@ newtype RD_CDNSKEY = RD_CDNSKEY RD_DNSKEY deriving (Eq)
 instance ResourceData RD_CDNSKEY where
     encodeResourceData = \(RD_CDNSKEY dnskey) -> encodeResourceData dnskey
     decodeResourceData = \_ len -> RD_CDNSKEY <$> decodeResourceData (Proxy :: Proxy RD_DNSKEY) len
+    copyResourceData = \(RD_CDNSKEY dnskey) -> RD_CDNSKEY $ copyResourceData dnskey
 
 instance Show RD_CDNSKEY where
     show (RD_CDNSKEY dnskey) = show dnskey

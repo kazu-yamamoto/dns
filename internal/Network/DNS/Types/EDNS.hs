@@ -18,6 +18,7 @@ module Network.DNS.Types.EDNS (
   , OData(..)
   , putOData
   , getOData
+  , copyOData
   ) where
 
 import qualified Data.ByteString as BS
@@ -310,3 +311,18 @@ getOData ClientSubnet len = do
         2 -> checkBits toIPv6b IPv6 srcBits scpBits $ take 16 $ zeropad bs
         _ -> Nothing
 getOData opc len = UnknownOData (fromOptCode opc) <$> getNByteString len
+
+copyOData :: OData -> OData
+copyOData (OD_ECSgeneric family srcBits scpBits bs) =
+    OD_ECSgeneric family srcBits scpBits $ BS.copy bs
+copyOData (OD_NSID nsid) = OD_NSID $ BS.copy nsid
+copyOData (UnknownOData c b)        = UnknownOData c $ BS.copy b
+
+-- No copying required for the rest, but avoiding a wildcard pattern match
+-- so that if more option types are added in the future, the compiler will
+-- complain about a partial function.
+--
+copyOData o@OD_ClientSubnet {} = o
+copyOData o@OD_DAU {} = o
+copyOData o@OD_DHU {} = o
+copyOData o@OD_N3U {} = o
