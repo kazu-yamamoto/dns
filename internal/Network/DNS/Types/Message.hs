@@ -193,7 +193,7 @@ instance Show OPCODE where
     show OP_SSR     = "OP_SSR"
     show OP_NOTIFY  = "OP_NOTIFY"
     show OP_UPDATE  = "OP_UPDATE"
-    show (OPCODE n) = "Unknown OPCODE " ++ show n
+    show (OPCODE n) = "OPCODE " ++ show n
 
 ----------------------------------------------------------------
 
@@ -315,7 +315,7 @@ instance Show RCODE where
     show BadAlg    = "BadAlg"
     show BadTrunc  = "BadTrunc"
     show BadCookie = "BadCookie"
-    show x         = "RCODE " ++ show (fromRCODE x)
+    show (RCODE n) = "RCODE " ++ show n
 
 -- | Convert a numeric value to a corresponding 'RCODE'.  The behaviour is
 -- undefined for values outside the range @[0 .. 0xFFF]@ since the EDNS

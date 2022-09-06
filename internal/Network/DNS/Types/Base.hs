@@ -218,7 +218,7 @@ instance Show TYPE where
     show AXFR       = "AXFR"
     show ANY        = "ANY"
     show CAA        = "CAA"
-    show x          = "TYPE" ++ show (fromTYPE x)
+    show (TYPE n)   = "TYPE " ++ show n
 
 ----------------------------------------------------------------
 

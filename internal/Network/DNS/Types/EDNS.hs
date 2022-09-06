@@ -123,7 +123,7 @@ instance Show OptCode where
     show DHU          = "DHU"
     show N3U          = "N3U"
     show ClientSubnet = "ClientSubnet"
-    show x            = "OptCode" ++ show (fromOptCode x)
+    show (OptCode n)  = "OptCode " ++ show n
 
 -- | From number to option code.
 toOptCode :: Word16 -> OptCode
