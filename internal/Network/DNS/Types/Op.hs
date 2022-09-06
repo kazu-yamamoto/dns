@@ -26,6 +26,9 @@ import Network.DNS.Imports
 import Network.DNS.Types.EDNS
 import Network.DNS.Types.Message
 
+-- $setup
+-- >>> import Data.IP
+
 ----------------------------------------------------------------
 
 -- | Boolean flag operations. These form a 'Monoid'.  When combined via
