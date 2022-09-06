@@ -6,6 +6,7 @@ import Network.Socket
 import Test.Hspec
 
 import Network.DNS.IO as DNS
+import Network.DNS.Imports -- for GHC 8.0 and 8.2
 import Network.DNS.Types as DNS
 
 spec :: Spec
