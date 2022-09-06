@@ -105,7 +105,7 @@ newtype OptCode = OptCode {
 pattern NSID :: OptCode
 pattern NSID  = OptCode 3
 
--- | DNSSEC algorithm support (RFC6974, section 3)
+-- | DNSSEC algorithm support (RFC6975, section 3)
 pattern DAU  :: OptCode
 pattern DAU   = OptCode 5
 pattern DHU  :: OptCode
