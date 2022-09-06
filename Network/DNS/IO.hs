@@ -24,12 +24,12 @@ import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 import Data.IP (IPv4, IPv6)
-import Time.System (timeCurrent)
-import Time.Types (Elapsed(..), Seconds(..))
 import Network.Socket (Socket, SockAddr)
 import Network.Socket.ByteString (recv, recvFrom)
 import qualified Network.Socket.ByteString as Socket
 import System.IO.Error
+import Time.System (timeCurrent)
+import Time.Types (Elapsed(..), Seconds(..))
 
 import Network.DNS.Decode (decodeAt)
 import Network.DNS.Encode (encode)
@@ -81,7 +81,7 @@ receiveVC sock = do
         Right msg -> return msg
   where
     toLen bs = case B.unpack bs of
-        [hi, lo] -> 256 * (fromIntegral hi) + (fromIntegral lo)
+        [hi, lo] -> 256 * fromIntegral hi + fromIntegral lo
         _        -> 0              -- never reached
 
 recvDNS :: Socket -> Int -> IO ByteString
@@ -127,7 +127,7 @@ send = (void .). Socket.send
 -- message needs to be prepended with an explicit length.
 --
 sendTo :: Socket -> ByteString -> SockAddr -> IO ()
-sendTo sock str addr = Socket.sendTo sock str addr >> return ()
+sendTo sock str addr = void $ Socket.sendTo sock str addr
 {-# INLINE sendTo #-}
 
 -- | Send a single encoded 'DNSMessage' over TCP.  An explicit length is
