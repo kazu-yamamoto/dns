@@ -43,8 +43,7 @@ module Network.DNS.Types (
   , fromTYPE
   , toTYPE
   -- ** Resource Data
-  , RData
-  , ResourceData
+  , ResourceData(..)
   , RD_A(..)
   , RD_NS(..)
   , RD_CNAME(..)
@@ -68,9 +67,12 @@ module Network.DNS.Types (
   , RD_CDS(..)
   , RD_CDNSKEY(..)
   , RD_Unknown(..)
+  -- *** RData
+  , RData(..)
   , toRData
   , fromRData
-  , dnsTime
+  , SGet
+  , SPut
   -- * DNS Message
   , DNSMessage (..)
   -- ** Query
@@ -160,6 +162,9 @@ module Network.DNS.Types (
   , DNSError (..)
   -- * Other types
   , Mailbox
+  -- * Other functions
+  , dnsTime
   ) where
 
 import Network.DNS.Types.Internal
+import Network.DNS.StateBinary
