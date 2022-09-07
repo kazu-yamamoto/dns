@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.DNS.Decode.Parsers (
@@ -9,6 +10,8 @@ module Network.DNS.Decode.Parsers (
   , getDomain
   , getMailbox
   ) where
+
+import qualified Data.IntMap as M
 
 import Network.DNS.Imports
 import Network.DNS.StateBinary
@@ -122,6 +125,45 @@ getResourceRecord = do
     dat <- fitSGet len $ switch typ len
     return $ ResourceRecord dom typ cls ttl dat
 
+type Dict = M.IntMap Decode
+
+data Decode = forall a . (ResourceData a) => Decode (Proxy a)
+
+toKey :: TYPE -> M.Key
+toKey = fromIntegral . fromTYPE
+
+decodeDict :: Dict
+decodeDict =
+    M.insert (toKey A) (Decode (Proxy :: Proxy RD_A)) $
+    M.insert (toKey NS) (Decode (Proxy :: Proxy RD_NS)) $
+    M.insert (toKey CNAME) (Decode (Proxy :: Proxy RD_CNAME)) $
+    M.insert (toKey SOA) (Decode (Proxy :: Proxy RD_SOA)) $
+    M.insert (toKey NULL) (Decode (Proxy :: Proxy RD_NULL)) $
+    M.insert (toKey PTR) (Decode (Proxy :: Proxy RD_PTR)) $
+    M.insert (toKey MX) (Decode (Proxy :: Proxy RD_MX)) $
+    M.insert (toKey TXT) (Decode (Proxy :: Proxy RD_TXT)) $
+    M.insert (toKey RP) (Decode (Proxy :: Proxy RD_RP)) $
+    M.insert (toKey AAAA) (Decode (Proxy :: Proxy RD_AAAA)) $
+    M.insert (toKey SRV) (Decode (Proxy :: Proxy RD_SRV)) $
+    M.insert (toKey DNAME) (Decode (Proxy :: Proxy RD_DNAME)) $
+    M.insert (toKey OPT) (Decode (Proxy :: Proxy RD_OPT)) $
+    M.insert (toKey DS) (Decode (Proxy :: Proxy RD_DS)) $
+    M.insert (toKey RRSIG) (Decode (Proxy :: Proxy RD_RRSIG)) $
+    M.insert (toKey NSEC) (Decode (Proxy :: Proxy RD_NSEC)) $
+    M.insert (toKey DNSKEY) (Decode (Proxy :: Proxy RD_DNSKEY)) $
+    M.insert (toKey NSEC3) (Decode (Proxy :: Proxy RD_NSEC3)) $
+    M.insert (toKey NSEC3PARAM) (Decode (Proxy :: Proxy RD_NSEC3PARAM)) $
+    M.insert (toKey TLSA) (Decode (Proxy :: Proxy RD_TLSA)) $
+    M.insert (toKey CDS) (Decode (Proxy :: Proxy RD_CDS)) $
+    M.insert (toKey CDNSKEY) (Decode (Proxy :: Proxy RD_CDNSKEY)) $
+    M.empty
+
+switch :: TYPE -> Int -> SGet RData
+switch typ len = case M.lookup (toKey typ) decodeDict of
+  Just (Decode proxy) -> RData <$> decodeResourceData proxy len
+  Nothing -> RData <$> decodeResourceData (Proxy :: Proxy RD_Unknown) len
+
+{-
 -- fixme
 switch :: TYPE -> Int -> SGet RData
 switch A     l = toRData <$> decodeResourceData (Proxy :: Proxy RD_A)     l
@@ -147,3 +189,4 @@ switch TLSA  l = toRData <$> decodeResourceData (Proxy :: Proxy RD_TLSA)  l
 switch CDS   l = toRData <$> decodeResourceData (Proxy :: Proxy RD_CDS)   l
 switch CDNSKEY l = toRData <$> decodeResourceData (Proxy :: Proxy RD_CDNSKEY) l
 switch _ _ = undefined
+-}
