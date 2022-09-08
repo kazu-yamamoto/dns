@@ -22,6 +22,7 @@ module Network.DNS.Types (
   , PTR
   , MX
   , TXT
+  , RP
   , AAAA
   , SRV
   , DNAME
@@ -74,6 +75,30 @@ module Network.DNS.Types (
   , rdataType
   , SGet
   , SPut
+  -- *** Smart constructors
+  , rd_a
+  , rd_ns
+  , rd_cname
+  , rd_soa
+  , rd_null
+  , rd_ptr
+  , rd_mx
+  , rd_txt
+  , rd_rp
+  , rd_aaaa
+  , rd_srv
+  , rd_dname
+  , rd_opt
+  , rd_ds
+  , rd_rrsig
+  , rd_nsec
+  , rd_dnskey
+  , rd_nsec3
+  , rd_nsec3param
+  , rd_tlsa
+  , rd_cds
+  , rd_cdnskey
+  , rd_unknown
   -- * DNS Message
   , DNSMessage (..)
   -- ** Query

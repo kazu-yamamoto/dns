@@ -104,20 +104,20 @@ genResourceRecord = frequency
 mkRData :: Domain -> TYPE -> Gen RData
 mkRData dom typ =
     case typ of
-        A     -> toRData <$> (RD_A <$> genIPv4)
-        AAAA  -> toRData <$> (RD_AAAA <$> genIPv6)
-        NS    -> toRData <$> pure (RD_NS dom)
-        TXT   -> toRData <$> (RD_TXT <$> genTextString)
-        MX    -> toRData <$> (RD_MX <$> genWord16 <*> genDomain)
-        CNAME -> toRData <$> pure (RD_CNAME dom)
-        SOA   -> toRData <$> (RD_SOA dom <$> genMailbox <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32)
-        PTR   -> toRData <$> (RD_PTR <$> genDomain)
-        SRV   -> toRData <$> (RD_SRV <$> genWord16 <*> genWord16 <*> genWord16 <*> genDomain)
-        DNAME -> toRData <$> (RD_DNAME <$> genDomain)
-        DS    -> toRData <$> (RD_DS <$> genWord16 <*> genWord8 <*> genWord8 <*> genByteString)
-        NSEC  -> toRData <$> (RD_NSEC <$> genDomain <*> genNsecTypes)
-        NSEC3 -> toRData <$> genNSEC3
-        TLSA  -> toRData <$> (RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString)
+        A     -> rd_a <$> genIPv4
+        AAAA  -> rd_aaaa <$> genIPv6
+        NS    -> pure $ rd_ns dom
+        TXT   -> rd_txt  <$> genTextString
+        MX    -> rd_mx   <$> genWord16 <*> genDomain
+        CNAME -> pure $ rd_cname dom
+        SOA   -> rd_soa dom <$> genMailbox <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32 <*> genWord32
+        PTR   -> rd_ptr  <$> genDomain
+        SRV   -> rd_srv  <$> genWord16 <*> genWord16 <*> genWord16 <*> genDomain
+        DNAME -> rd_dname <$> genDomain
+        DS    -> rd_ds   <$> genWord16 <*> genWord8 <*> genWord8 <*> genByteString
+        NSEC  -> rd_nsec <$> genDomain <*> genNsecTypes
+        NSEC3 -> genNSEC3
+        TLSA  -> rd_tlsa <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString
 
         _ -> pure . toRData . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
   where
@@ -127,7 +127,7 @@ mkRData dom typ =
         iter <- elements [0..100]
         salt <- elements ["", "AB"]
         hash <- B.pack <$> replicateM hlen genWord8
-        RD_NSEC3 alg flgs iter salt hash <$> genNsecTypes
+        rd_nsec3 alg flgs iter salt hash <$> genNsecTypes
     genTextString = do
         len <- elements [0, 1, 63, 255, 256, 511, 512, 1023, 1024]
         B.pack <$> replicateM len genWord8

@@ -12,6 +12,14 @@ module Network.DNS.Types.Sec (
   , RD_CDNSKEY(..)
   , getTYPE
   , dnsTime
+  , rd_rrsig
+  , rd_ds
+  , rd_nsec
+  , rd_dnskey
+  , rd_nsec3
+  , rd_nsec3param
+  , rd_cds
+  , rd_cdnskey
   ) where
 
 import qualified Data.ByteString.Char8 as BS
@@ -120,6 +128,9 @@ instance Show RD_RRSIG where
             fmt = [ H.Format_Year4, H.Format_Month2, H.Format_Day2
                   , H.Format_Hour,  H.Format_Minute, H.Format_Second ]
 
+rd_rrsig :: TYPE -> Word8 -> Word8 -> Word32 -> Int64 -> Int64 -> Word16 -> Domain -> ByteString -> RData
+rd_rrsig a b c d e f g h i = toRData $ RD_RRSIG a b c d e f g h i
+
 ----------------------------------------------------------------
 
 -- | Delegation Signer (RFC4034)
@@ -151,6 +162,9 @@ instance Show RD_DS where
                   ++ show dsDigestType ++ " "
                   ++ _b16encode dsDigest
 
+rd_ds :: Word16 -> Word8 -> Word8 -> ByteString -> RData
+rd_ds a b c d = toRData $ RD_DS a b c d
+
 ----------------------------------------------------------------
 
 -- | DNSSEC denial of existence NSEC record
@@ -174,6 +188,9 @@ instance ResourceData RD_NSEC where
 instance Show RD_NSEC where
     show RD_NSEC{..} =
         unwords $ showDomain nsecNextDomain : map show nsecTypes
+
+rd_nsec :: Domain -> [TYPE] -> RData
+rd_nsec a b = toRData $ RD_NSEC a b
 
 ----------------------------------------------------------------
 
@@ -207,6 +224,9 @@ instance Show RD_DNSKEY where
                       ++ show dnskeyProtocol  ++ " "
                       ++ show dnskeyAlgorithm ++ " "
                       ++ _b64encode dnskeyPublicKey
+
+rd_dnskey :: Word16 -> Word8 -> Word8 -> ByteString -> RData
+rd_dnskey a b c d = toRData $ RD_DNSKEY a b c d
 
 ----------------------------------------------------------------
 
@@ -252,6 +272,9 @@ instance Show RD_NSEC3 where
                                 : _b32encode nsec3NextHashedOwnerName
                                 : map show nsec3Types
 
+rd_nsec3 :: Word8 -> Word8 -> Word16 -> ByteString -> ByteString -> [TYPE] -> RData
+rd_nsec3 a b c d e f = toRData $ RD_NSEC3 a b c d e f
+
 ----------------------------------------------------------------
 
 -- | NSEC3 zone parameters (RFC5155)
@@ -284,6 +307,9 @@ instance Show RD_NSEC3PARAM where
                           ++ show nsec3paramIterations    ++ " "
                           ++ showSalt nsec3paramSalt
 
+rd_nsec3param :: Word8 -> Word8 -> Word16 -> ByteString -> RData
+rd_nsec3param a b c d = toRData $ RD_NSEC3PARAM a b c d
+
 ----------------------------------------------------------------
 
 -- | Child DS (RFC7344)
@@ -298,6 +324,9 @@ instance ResourceData RD_CDS where
 instance Show RD_CDS where
     show (RD_CDS ds) = show ds
 
+rd_cds :: Word16 -> Word8 -> Word8 -> ByteString -> RData
+rd_cds a b c d = toRData $ RD_CDS $ RD_DS a b c d
+
 ----------------------------------------------------------------
 
 -- | Child DNSKEY (RFC7344)
@@ -311,6 +340,9 @@ instance ResourceData RD_CDNSKEY where
 
 instance Show RD_CDNSKEY where
     show (RD_CDNSKEY dnskey) = show dnskey
+
+rd_cdnskey :: Word16 -> Word8 -> Word8 -> ByteString -> RData
+rd_cdnskey a b c d = toRData $ RD_CDNSKEY $ RD_DNSKEY a b c d
 
 ----------------------------------------------------------------
 

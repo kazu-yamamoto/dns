@@ -63,6 +63,9 @@ instance ResourceData RD_A where
 instance Show RD_A where
     show (RD_A ipv4) = show ipv4
 
+rd_a :: IPv4 -> RData
+rd_a ipv4 = toRData $ RD_A ipv4
+
 ----------------------------------------------------------------
 
 -- | An authoritative name serve (RFC1035)
@@ -77,6 +80,9 @@ instance ResourceData RD_NS where
 instance Show RD_NS where
     show (RD_NS d) = showDomain d
 
+rd_ns :: Domain -> RData
+rd_ns d = toRData $ RD_NS d
+
 ----------------------------------------------------------------
 
 -- | The canonical name for an alias (RFC1035)
@@ -90,6 +96,9 @@ instance ResourceData RD_CNAME where
 
 instance Show RD_CNAME where
     show (RD_CNAME d) = showDomain d
+
+rd_cname :: Domain -> RData
+rd_cname d = toRData $ RD_CNAME d
 
 ----------------------------------------------------------------
 
@@ -136,6 +145,9 @@ instance Show RD_SOA where
                    ++ show soaExpire      ++ " "
                    ++ show soaMinimum
 
+rd_soa :: Domain -> Mailbox -> Word32 -> Word32 -> Word32 -> Word32 -> Word32 -> RData
+rd_soa a b c d e f g = toRData $ RD_SOA a b c d e f g
+
 ----------------------------------------------------------------
 
 -- | NULL RR (EXPERIMENTAL, RFC1035).
@@ -150,6 +162,9 @@ instance ResourceData RD_NULL where
 instance Show RD_NULL where
     show (RD_NULL bytes) = showOpaque bytes
 
+rd_null :: ByteString -> RData
+rd_null x = toRData $ RD_NULL x
+
 ----------------------------------------------------------------
 
 -- | A domain name pointer (RFC1035)
@@ -163,6 +178,9 @@ instance ResourceData RD_PTR where
 
 instance Show RD_PTR where
     show (RD_PTR d) = showDomain d
+
+rd_ptr :: Domain -> RData
+rd_ptr d = toRData $ RD_PTR d
 
 ----------------------------------------------------------------
 
@@ -183,6 +201,9 @@ instance ResourceData RD_MX where
 
 instance Show RD_MX where
     show RD_MX{..} = show mxPreference ++ " " ++ showDomain mxExchange
+
+rd_mx :: Word16 -> Domain -> RData
+rd_mx a b = toRData $ RD_MX a b
 
 ----------------------------------------------------------------
 
@@ -220,6 +241,9 @@ instance Show RD_TXT where
                 (q10, r10) = divMod r100 10
              in intToDigit q100 : intToDigit q10 : intToDigit r10 : s
 
+rd_txt :: ByteString -> RData
+rd_txt x = toRData $ RD_TXT x
+
 ----------------------------------------------------------------
 
 -- | Responsible Person (RFC1183)
@@ -235,6 +259,9 @@ instance Show RD_RP where
     show (RD_RP mbox d) =
         showDomain mbox ++ " " ++ showDomain d
 
+rd_rp :: Mailbox -> Domain -> RData
+rd_rp a b = toRData $ RD_RP a b
+
 ----------------------------------------------------------------
 
 -- | IPv6 Address (RFC3596)
@@ -248,6 +275,9 @@ instance ResourceData RD_AAAA where
 
 instance Show RD_AAAA where
     show (RD_AAAA ipv6) = show ipv6
+
+rd_aaaa :: IPv6 -> RData
+rd_aaaa ipv6 = toRData $ RD_AAAA ipv6
 
 ----------------------------------------------------------------
 
@@ -279,6 +309,9 @@ instance Show RD_SRV where
                    ++ show srvPort     ++ " "
                    ++ BS.unpack srvTarget
 
+rd_srv :: Word16 -> Word16 -> Word16 -> Domain -> RData
+rd_srv a b c d = toRData $ RD_SRV a b c d
+
 ----------------------------------------------------------------
 
 -- | DNAME (RFC6672)
@@ -292,6 +325,9 @@ instance ResourceData RD_DNAME where
 
 instance Show RD_DNAME where
     show (RD_DNAME d) = showDomain d
+
+rd_dname :: Domain -> RData
+rd_dname d = toRData $ RD_DNAME d
 
 ----------------------------------------------------------------
 
@@ -312,6 +348,9 @@ instance ResourceData RD_OPT where
 
 instance Show RD_OPT where
     show (RD_OPT options) = show options
+
+rd_opt :: [OData] -> RData
+rd_opt x = toRData $ RD_OPT x
 
 ----------------------------------------------------------------
 
@@ -345,6 +384,9 @@ instance Show RD_TLSA where
                     ++ show tlsaMatchingType ++ " "
                     ++ _b16encode tlsaAssocData
 
+rd_tlsa :: Word8 -> Word8 -> Word8 -> ByteString -> RData
+rd_tlsa a b c d = toRData $ RD_TLSA a b c d
+
 ----------------------------------------------------------------
 
 -- | Unknown resource data
@@ -355,6 +397,9 @@ instance ResourceData RD_Unknown where
     encodeResourceData = \(RD_Unknown _ bytes) -> putByteString bytes
     decodeResourceData = undefined -- never used
     copyResourceData (RD_Unknown t x)  = RD_Unknown t $ B.copy x
+
+rd_unknown :: TYPE -> ByteString -> RData
+rd_unknown a b = toRData $ RD_Unknown a b
 
 ----------------------------------------------------------------
 
