@@ -71,6 +71,7 @@ module Network.DNS.Types (
   , RData(..)
   , toRData
   , fromRData
+  , rdataType
   , SGet
   , SPut
   -- * DNS Message

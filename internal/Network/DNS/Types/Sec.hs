@@ -61,6 +61,7 @@ data RD_RRSIG = RD_RRSIG {
   } deriving (Eq, Ord)
 
 instance ResourceData RD_RRSIG where
+    resourceDataType   = \_ -> RRSIG
     encodeResourceData = \RD_RRSIG{..} ->
       mconcat [ put16 $ fromTYPE rrsigType
               , put8    rrsigKeyAlg
@@ -130,6 +131,7 @@ data RD_DS = RD_DS {
   } deriving (Eq)
 
 instance ResourceData RD_DS where
+    resourceDataType   = \_ -> DS
     encodeResourceData = \RD_DS{..} ->
         mconcat [ put16 dsKeyTag
                 , put8 dsAlgorithm
@@ -158,6 +160,7 @@ data RD_NSEC = RD_NSEC {
   } deriving (Eq)
 
 instance ResourceData RD_NSEC where
+    resourceDataType   = \_ -> NSEC
     encodeResourceData = \RD_NSEC{..} ->
         putDomain nsecNextDomain <> putNsecTypes nsecTypes
     decodeResourceData = \_ len -> do
@@ -183,6 +186,7 @@ data RD_DNSKEY = RD_DNSKEY {
   } deriving (Eq)
 
 instance ResourceData RD_DNSKEY where
+    resourceDataType   = \_ -> DNSKEY
     encodeResourceData = \RD_DNSKEY{..} ->
         mconcat [ put16 dnskeyFlags
                 , put8  dnskeyProtocol
@@ -217,6 +221,7 @@ data RD_NSEC3 = RD_NSEC3 {
   } deriving (Eq)
 
 instance ResourceData RD_NSEC3 where
+    resourceDataType   = \_ -> NSEC3
     encodeResourceData = \RD_NSEC3{..} ->
         mconcat [ put8 nsec3HashAlgorithm
                 , put8 nsec3Flags
@@ -258,6 +263,7 @@ data RD_NSEC3PARAM = RD_NSEC3PARAM {
   } deriving (Eq)
 
 instance ResourceData RD_NSEC3PARAM where
+    resourceDataType   = \_ -> NSEC3PARAM
     encodeResourceData = \RD_NSEC3PARAM{..} ->
         mconcat [ put8  nsec3paramHashAlgorithm
                 , put8  nsec3paramFlags
@@ -284,6 +290,7 @@ instance Show RD_NSEC3PARAM where
 newtype RD_CDS = RD_CDS RD_DS deriving (Eq)
 
 instance ResourceData RD_CDS where
+    resourceDataType   = \_ -> CDS
     encodeResourceData = \(RD_CDS ds) -> encodeResourceData ds
     decodeResourceData = \_ len -> RD_CDS <$> decodeResourceData (Proxy :: Proxy RD_DS) len
     copyResourceData = \(RD_CDS ds) -> RD_CDS $ copyResourceData ds
@@ -297,6 +304,7 @@ instance Show RD_CDS where
 newtype RD_CDNSKEY = RD_CDNSKEY RD_DNSKEY deriving (Eq)
 
 instance ResourceData RD_CDNSKEY where
+    resourceDataType   = \_ -> CDNSKEY
     encodeResourceData = \(RD_CDNSKEY dnskey) -> encodeResourceData dnskey
     decodeResourceData = \_ len -> RD_CDNSKEY <$> decodeResourceData (Proxy :: Proxy RD_DNSKEY) len
     copyResourceData = \(RD_CDNSKEY dnskey) -> RD_CDNSKEY $ copyResourceData dnskey

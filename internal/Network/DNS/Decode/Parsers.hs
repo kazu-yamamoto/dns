@@ -146,4 +146,4 @@ switch NSEC3PARAM l = toRData <$> decodeResourceData (Proxy :: Proxy RD_NSEC3PAR
 switch TLSA  l = toRData <$> decodeResourceData (Proxy :: Proxy RD_TLSA)  l
 switch CDS   l = toRData <$> decodeResourceData (Proxy :: Proxy RD_CDS)   l
 switch CDNSKEY l = toRData <$> decodeResourceData (Proxy :: Proxy RD_CDNSKEY) l
-switch _ _ = undefined
+switch typ   l = toRData <$> RD_Unknown typ <$> getNByteString l
