@@ -28,11 +28,14 @@ class (Typeable a, Eq a, Show a) => ResourceData a where
 
 ---------------------------------------------------------------
 
+-- | A type to uniform 'ResourceData' 'a'.
 data RData = forall a . (Typeable a, Eq a, Show a, ResourceData a) => RData a
 
+-- | Extracting the original type.
 fromRData :: Typeable a => RData -> Maybe a
 fromRData (RData x) = cast x
 
+-- | Wrapping the original type with 'RData'.
 toRData :: (Typeable a, ResourceData a) => a -> RData
 toRData = RData
 
@@ -42,6 +45,7 @@ instance Show RData where
 instance Eq RData where
     x@(RData xi) == y@(RData yi) = typeOf x == typeOf y && Just xi == cast yi
 
+-- | Getting 'TYPE' of 'RData'.
 rdataType :: RData -> TYPE
 rdataType (RData x) = resourceDataType x
 
