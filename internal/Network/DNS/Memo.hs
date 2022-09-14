@@ -52,18 +52,3 @@ prune oldpsq = do
     return $ \newpsq -> foldl' ins pruned $ PSQ.toList newpsq
   where
     ins psq (k,p,v) = PSQ.insert k p v psq
-
-copyOData :: OData -> OData
-copyOData (OD_ECSgeneric family srcBits scpBits bs) =
-    OD_ECSgeneric family srcBits scpBits $ B.copy bs
-copyOData (OD_NSID nsid) = OD_NSID $ B.copy nsid
-copyOData (UnknownOData c b)        = UnknownOData c $ B.copy b
-
--- No copying required for the rest, but avoiding a wildcard pattern match
--- so that if more option types are added in the future, the compiler will
--- complain about a partial function.
---
-copyOData o@OD_ClientSubnet {} = o
-copyOData o@OD_DAU {} = o
-copyOData o@OD_DHU {} = o
-copyOData o@OD_N3U {} = o

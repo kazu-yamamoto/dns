@@ -336,14 +336,14 @@ newtype RD_OPT = RD_OPT [OData] deriving (Eq)
 
 instance ResourceData RD_OPT where
     resourceDataType   = \_ -> OPT
-    encodeResourceData = \(RD_OPT options) -> mconcat $ fmap putOData options
+    encodeResourceData = \(RD_OPT options) -> mconcat $ fmap encodeOData options
     decodeResourceData = \_ len ->
       RD_OPT <$> sGetMany "EDNS option" len getoption
         where
           getoption = do
               code <- toOptCode <$> get16
               olen <- getInt16
-              getOData code olen
+              decodeOData code olen
     copyResourceData (RD_OPT od) = RD_OPT $ map copyOData od
 
 instance Show RD_OPT where

@@ -172,7 +172,6 @@ module Network.DNS.Types (
   , maxUdpSize
   , minUdpSize
   -- *** EDNS options
-  , OData (..)
   , OptCode (
     ClientSubnet
   , DAU
@@ -182,6 +181,19 @@ module Network.DNS.Types (
   )
   , fromOptCode
   , toOptCode
+  , OData (..)
+  , OD_NSID(..)
+  , OD_DAU(..)
+  , OD_DHU(..)
+  , OD_N3U(..)
+  , OD_ClientSubnet(..)
+  , od_nsid
+  , od_dau
+  , od_dhu
+  , od_n3u
+  , od_clientSubnet
+  , od_ecsGeneric
+  , od_unknown
   -- ** DNS Body
   , Question (..)
   -- * DNS Error

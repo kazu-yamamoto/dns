@@ -213,7 +213,7 @@ genOData = oneof
   where
     -- | Choose from the range reserved for local use
     -- https://tools.ietf.org/html/rfc6891#section-9
-    genOD_Unknown = UnknownOData <$> elements [65001, 65534] <*> genByteString
+    genOD_Unknown = od_unknown <$> elements [65001, 65534] <*> genByteString
 
     -- | Only valid ECS prefixes round-trip, make sure the prefix is
     -- is consistent with the mask.
@@ -249,11 +249,11 @@ genOData = oneof
                 more  = less ++ [0xFF]
             if srcBits == bits1
             then if scpBits == bits2
-                 then pure $ OD_ClientSubnet bits1 scpBits $ toIP addr
-                 else pure $ OD_ECSgeneric fam bits1 scpBits $ B.pack bytes
+                 then pure $ od_clientSubnet bits1 scpBits $ toIP addr
+                 else pure $ od_ecsGeneric fam bits1 scpBits $ B.pack bytes
             else if srcBits < bits1
-                 then pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack more
-                 else pure $ OD_ECSgeneric fam srcBits scpBits $ B.pack less
+                 then pure $ od_ecsGeneric fam srcBits scpBits $ B.pack more
+                 else pure $ od_ecsGeneric fam srcBits scpBits $ B.pack less
 
 genExtRCODE :: Gen RCODE
 genExtRCODE = elements $ map toRCODE [0..4095]

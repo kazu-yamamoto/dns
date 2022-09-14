@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 module Network.DNS.Types.EDNS (
@@ -15,10 +16,25 @@ module Network.DNS.Types.EDNS (
   , fromOptCode
   , toOptCode
   , odataToOptCode
-  , OData(..)
-  , putOData
-  , getOData
+  , OptData(..)
+  , fromOData
+  , toOData
+  , encodeOData
+  , decodeOData
   , copyOData
+  , OData(..)
+  , OD_NSID(..)
+  , OD_DAU(..)
+  , OD_DHU(..)
+  , OD_N3U(..)
+  , OD_ClientSubnet(..)
+  , od_nsid
+  , od_dau
+  , od_dhu
+  , od_n3u
+  , od_clientSubnet
+  , od_ecsGeneric
+  , od_unknown
   ) where
 
 import qualified Data.ByteString as BS
@@ -129,82 +145,153 @@ instance Show OptCode where
 toOptCode :: Word16 -> OptCode
 toOptCode = OptCode
 
-----------------------------------------------------------------
+---------------------------------------------------------------
 
--- | RData formats for a few EDNS options, and an opaque catchall
-data OData =
-      -- | Name Server Identifier (RFC5001).  Bidirectional, empty from client.
-      -- (opaque octet-string).  May contain binary data, which MUST be empty
-      -- in queries.
-      OD_NSID ByteString
-      -- | DNSSEC Algorithm Understood (RFC6975).  Client to server.
-      -- (array of 8-bit numbers). Lists supported DNSKEY algorithms.
-    | OD_DAU [Word8]
-      -- | DS Hash Understood (RFC6975).  Client to server.
-      -- (array of 8-bit numbers). Lists supported DS hash algorithms.
-    | OD_DHU [Word8]
-      -- | NSEC3 Hash Understood (RFC6975).  Client to server.
-      -- (array of 8-bit numbers). Lists supported NSEC3 hash algorithms.
-    | OD_N3U [Word8]
-      -- | Client subnet (RFC7871).  Bidirectional.
-      -- (source bits, scope bits, address).
-      -- The address is masked and truncated when encoding queries.  The
-      -- address is zero-padded when decoding.  Invalid input encodings
-      -- result in an 'OD_ECSgeneric' value instead.
-      --
-    | OD_ClientSubnet Word8 Word8 IP
-      -- | Unsupported or malformed IP client subnet option.  Bidirectional.
-      -- (address family, source bits, scope bits, opaque address).
-    | OD_ECSgeneric Word16 Word8 Word8 ByteString
-      -- | Generic EDNS option.
-      -- (numeric 'OptCode', opaque content)
-    | UnknownOData Word16 ByteString
-    deriving (Eq,Ord)
+class (Typeable a, Eq a, Show a) => OptData a where
+    optDataCode   :: a -> OptCode
+    encodeOptData :: a -> SPut
+    decodeOptData :: proxy a -> Int -> SGet a
+    copyOptData   :: a -> a
 
+---------------------------------------------------------------
 
--- | Recover the (often implicit) 'OptCode' from a value of the 'OData' sum
--- type.
-odataToOptCode :: OData -> OptCode
-odataToOptCode OD_NSID {}            = NSID
-odataToOptCode OD_DAU {}             = DAU
-odataToOptCode OD_DHU {}             = DHU
-odataToOptCode OD_N3U {}             = N3U
-odataToOptCode OD_ClientSubnet {}    = ClientSubnet
-odataToOptCode OD_ECSgeneric {}      = ClientSubnet
-odataToOptCode (UnknownOData code _) = toOptCode code
+-- | A type to uniform 'OptData' 'a'.
+data OData = forall a . (Typeable a, Eq a, Show a, OptData a) => OData a
+
+-- | Extracting the original type.
+fromOData :: Typeable a => OData -> Maybe a
+fromOData (OData x) = cast x
+
+-- | Wrapping the original type with 'OData'.
+toOData :: (Typeable a, OptData a) => a -> OData
+toOData = OData
 
 instance Show OData where
+    show (OData x) = show x
+
+instance Eq OData where
+    x@(OData xi) == y@(OData yi) = typeOf x == typeOf y && Just xi == cast yi
+
+-- | Getting 'OptCode' of 'OData'.
+odataToOptCode :: OData -> OptCode
+odataToOptCode (OData x) = optDataCode x
+
+encodeOData :: OData -> SPut
+encodeOData (OData x) = encodeOptData x
+
+decodeOData :: OptCode -> Int -> SGet OData
+decodeOData NSID len = toOData <$> decodeOptData (Proxy :: Proxy OD_NSID) len
+decodeOData DAU  len = toOData <$> decodeOptData (Proxy :: Proxy OD_DAU)  len
+decodeOData DHU  len = toOData <$> decodeOptData (Proxy :: Proxy OD_DHU)  len
+decodeOData N3U  len = toOData <$> decodeOptData (Proxy :: Proxy OD_N3U) len
+decodeOData ClientSubnet len = toOData <$> decodeOptData (Proxy :: Proxy OD_ClientSubnet) len
+decodeOData code len = toOData <$> OD_Unknown (fromOptCode code) <$> getNByteString len
+
+copyOData :: OData -> OData
+copyOData (OData x) = OData $ copyOptData x
+
+---------------------------------------------------------------
+
+-- | Name Server Identifier (RFC5001).  Bidirectional, empty from client.
+-- (opaque octet-string).  May contain binary data, which MUST be empty
+-- in queries.
+newtype OD_NSID = OD_NSID ByteString deriving (Eq)
+
+instance Show OD_NSID where
     show (OD_NSID nsid) = _showNSID nsid
-    show (OD_DAU as)    = _showAlgList "DAU" as
+
+instance OptData OD_NSID where
+    optDataCode _ = NSID
+    encodeOptData (OD_NSID nsid) = putODBytes (fromOptCode NSID) nsid
+    decodeOptData _ len = OD_NSID <$> getNByteString len
+    copyOptData (OD_NSID nsid) = OD_NSID $ BS.copy nsid
+
+od_nsid :: ByteString -> OData
+od_nsid x = toOData $ OD_NSID x
+
+---------------------------------------------------------------
+
+-- | DNSSEC Algorithm Understood (RFC6975).  Client to server.
+-- (array of 8-bit numbers). Lists supported DNSKEY algorithms.
+newtype OD_DAU = OD_DAU [Word8] deriving (Eq)
+
+instance Show OD_DAU where
+    show (OD_DAU as) = _showAlgList "DAU" as
+
+instance OptData OD_DAU where
+    optDataCode _ = DAU
+    encodeOptData (OD_DAU as) = putODWords (fromOptCode DAU) as
+    decodeOptData _ len = OD_DAU <$> getNoctets len
+    copyOptData   = id
+
+od_dau :: [Word8] -> OData
+od_dau a = toOData $ OD_DAU a
+
+---------------------------------------------------------------
+
+-- | DS Hash Understood (RFC6975).  Client to server.
+-- (array of 8-bit numbers). Lists supported DS hash algorithms.
+newtype OD_DHU = OD_DHU [Word8] deriving (Eq)
+
+instance Show OD_DHU where
     show (OD_DHU hs)    = _showAlgList "DHU" hs
+
+instance OptData OD_DHU where
+    optDataCode _ = DHU
+    encodeOptData (OD_DHU hs) = putODWords (fromOptCode DHU) hs
+    decodeOptData _ len = OD_DHU <$> getNoctets len
+    copyOptData   = id
+
+od_dhu :: [Word8] -> OData
+od_dhu a = toOData $ OD_DHU a
+
+---------------------------------------------------------------
+
+-- | NSEC3 Hash Understood (RFC6975).  Client to server.
+-- (array of 8-bit numbers). Lists supported NSEC3 hash algorithms.
+newtype OD_N3U = OD_N3U [Word8] deriving (Eq)
+
+instance Show OD_N3U where
     show (OD_N3U hs)    = _showAlgList "N3U" hs
+
+instance OptData OD_N3U where
+    optDataCode _ = N3U
+    encodeOptData (OD_N3U hs) = putODWords (fromOptCode N3U) hs
+    decodeOptData _ len = OD_N3U <$> getNoctets len
+    copyOptData   = id
+
+od_n3u :: [Word8] -> OData
+od_n3u a = toOData $ OD_N3U a
+
+---------------------------------------------------------------
+
+-- | ECS(EDNS client subnet) (RFC7871).
+data OD_ClientSubnet =
+  -- | Valid client subnet.
+  --   Bidirectional. (source bits, scope bits, address).
+  --   The address is masked and truncated when encoding queries.
+  --   The address is zero-padded when decoding.
+    OD_ClientSubnet Word8 Word8 IP
+  -- | Unsupported or malformed IP client subnet option.  Bidirectional.
+  --   (address family, source bits, scope bits, opaque address).
+    | OD_ECSgeneric Word16 Word8 Word8 ByteString
+                     deriving (Eq)
+
+instance Show OD_ClientSubnet where
     show (OD_ClientSubnet b1 b2 ip@(IPv4 _)) = _showECS 1 b1 b2 $ show ip
     show (OD_ClientSubnet b1 b2 ip@(IPv6 _)) = _showECS 2 b1 b2 $ show ip
     show (OD_ECSgeneric fam b1 b2 a) = _showECS fam b1 b2 $ _b16encode a
-    show (UnknownOData code bs) =
-        "UnknownOData " ++ show code ++ " " ++ _b16encode bs
 
-_showAlgList :: String -> [Word8] -> String
-_showAlgList nm ws = nm ++ " " ++ intercalate "," (map show ws)
+instance OptData OD_ClientSubnet where
+    optDataCode _ = ClientSubnet
+    encodeOptData = encodeClientSubnet
+    decodeOptData _ len = decodeClientSubnet len
+    copyOptData (OD_ECSgeneric family srcBits scpBits bs) =
+        OD_ECSgeneric family srcBits scpBits $ BS.copy bs
+    copyOptData x = x
 
-_showNSID :: ByteString -> String
-_showNSID nsid = "NSID" ++ " " ++ _b16encode nsid ++ ";" ++ printable nsid
-  where
-    printable = S8.unpack. S8.map (\c -> if c < ' ' || c > '~' then '?' else c)
-
-_showECS :: Word16 -> Word8 -> Word8 -> String -> String
-_showECS family srcBits scpBits address =
-    show family ++ " " ++ show srcBits
-                ++ " " ++ show scpBits ++ " " ++ address
-
-----------------------------------------------------------------
-
-putOData :: OData -> SPut
-putOData (OD_NSID nsid) = putODBytes (fromOptCode NSID) nsid
-putOData (OD_DAU as) = putODWords (fromOptCode DAU) as
-putOData (OD_DHU hs) = putODWords (fromOptCode DHU) hs
-putOData (OD_N3U hs) = putODWords (fromOptCode N3U) hs
-putOData (OD_ClientSubnet srcBits scpBits ip) =
+encodeClientSubnet :: OD_ClientSubnet -> SPut
+encodeClientSubnet (OD_ClientSubnet srcBits scpBits ip) =
     -- https://tools.ietf.org/html/rfc7871#section-6
     --
     -- o  ADDRESS, variable number of octets, contains either an IPv4 or
@@ -231,7 +318,7 @@ putOData (OD_ClientSubnet srcBits scpBits ip) =
                 , put8 scpBits
                 , mconcat $ fmap putInt8 raw
                 ]
-putOData (OD_ECSgeneric family srcBits scpBits addr) =
+encodeClientSubnet (OD_ECSgeneric family srcBits scpBits addr) =
     mconcat [ put16 $ fromOptCode ClientSubnet
             , putInt16 $ 4 + S8.length addr
             , put16 family
@@ -239,32 +326,9 @@ putOData (OD_ECSgeneric family srcBits scpBits addr) =
             , put8 scpBits
             , putByteString addr
             ]
-putOData (UnknownOData code bs) = putODBytes code bs
 
--- | Encode EDNS OPTION consisting of a list of octets.
-putODWords :: Word16 -> [Word8] -> SPut
-putODWords code ws =
-     mconcat [ put16 code
-             , putInt16 $ length ws
-             , mconcat $ map put8 ws
-             ]
-
--- | Encode an EDNS OPTION byte string.
-putODBytes :: Word16 -> ByteString -> SPut
-putODBytes code bs =
-    mconcat [ put16 code
-            , putInt16 $ S8.length bs
-            , putByteString bs
-            ]
-
-----------------------------------------------------------------
-
-getOData :: OptCode -> Int -> SGet OData
-getOData NSID len = OD_NSID <$> getNByteString len
-getOData DAU  len = OD_DAU  <$> getNoctets len
-getOData DHU  len = OD_DHU  <$> getNoctets len
-getOData N3U  len = OD_N3U  <$> getNoctets len
-getOData ClientSubnet len = do
+decodeClientSubnet :: Int -> SGet OD_ClientSubnet
+decodeClientSubnet len = do
         family  <- get16
         srcBits <- get8
         scpBits <- get8
@@ -310,19 +374,61 @@ getOData ClientSubnet len = do
         1 -> checkBits toIPv4  IPv4 srcBits scpBits $ take 4  $ zeropad bs
         2 -> checkBits toIPv6b IPv6 srcBits scpBits $ take 16 $ zeropad bs
         _ -> Nothing
-getOData opc len = UnknownOData (fromOptCode opc) <$> getNByteString len
 
-copyOData :: OData -> OData
-copyOData (OD_ECSgeneric family srcBits scpBits bs) =
-    OD_ECSgeneric family srcBits scpBits $ BS.copy bs
-copyOData (OD_NSID nsid) = OD_NSID $ BS.copy nsid
-copyOData (UnknownOData c b)        = UnknownOData c $ BS.copy b
+od_clientSubnet :: Word8 -> Word8 -> IP -> OData
+od_clientSubnet a b c = toOData $ OD_ClientSubnet a b c
 
--- No copying required for the rest, but avoiding a wildcard pattern match
--- so that if more option types are added in the future, the compiler will
--- complain about a partial function.
---
-copyOData o@OD_ClientSubnet {} = o
-copyOData o@OD_DAU {} = o
-copyOData o@OD_DHU {} = o
-copyOData o@OD_N3U {} = o
+od_ecsGeneric :: Word16 -> Word8 -> Word8 -> ByteString -> OData
+od_ecsGeneric a b c d = toOData $ OD_ECSgeneric a b c d
+
+---------------------------------------------------------------
+
+-- | Generic EDNS option.
+-- (numeric 'OptCode', opaque content)
+data OD_Unknown = OD_Unknown Word16 ByteString deriving (Eq)
+
+instance Show OD_Unknown where
+    show (OD_Unknown code bs) =
+        "OD_Unknown " ++ show code ++ " " ++ _b16encode bs
+
+instance OptData OD_Unknown where
+    optDataCode (OD_Unknown n _) = toOptCode n
+    encodeOptData (OD_Unknown code bs) = putODBytes code bs
+    decodeOptData = undefined -- never used
+    copyOptData (OD_Unknown c b) = OD_Unknown c $ BS.copy b
+
+od_unknown :: Word16 -> ByteString -> OData
+od_unknown code bs = toOData $ OD_Unknown code bs
+
+---------------------------------------------------------------
+
+_showAlgList :: String -> [Word8] -> String
+_showAlgList nm ws = nm ++ " " ++ intercalate "," (map show ws)
+
+_showNSID :: ByteString -> String
+_showNSID nsid = "NSID" ++ " " ++ _b16encode nsid ++ ";" ++ printable nsid
+  where
+    printable = S8.unpack. S8.map (\c -> if c < ' ' || c > '~' then '?' else c)
+
+_showECS :: Word16 -> Word8 -> Word8 -> String -> String
+_showECS family srcBits scpBits address =
+    show family ++ " " ++ show srcBits
+                ++ " " ++ show scpBits ++ " " ++ address
+
+---------------------------------------------------------------
+
+-- | Encode EDNS OPTION consisting of a list of octets.
+putODWords :: Word16 -> [Word8] -> SPut
+putODWords code ws =
+     mconcat [ put16 code
+             , putInt16 $ length ws
+             , mconcat $ map put8 ws
+             ]
+
+-- | Encode an EDNS OPTION byte string.
+putODBytes :: Word16 -> ByteString -> SPut
+putODBytes code bs =
+    mconcat [ put16 code
+            , putInt16 $ S8.length bs
+            , putByteString bs
+            ]
