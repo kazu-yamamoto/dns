@@ -55,9 +55,9 @@ rdataType (RData x) = resourceDataType x
 newtype RD_A = RD_A IPv4 deriving Eq
 
 instance ResourceData RD_A where
-    resourceDataType   = \_ -> A
-    encodeResourceData = \(RD_A ipv4) -> mconcat $ map putInt8 (fromIPv4 ipv4)
-    decodeResourceData = \_ _ -> RD_A . toIPv4 <$> getNBytes 4
+    resourceDataType _ = A
+    encodeResourceData (RD_A ipv4) = mconcat $ map putInt8 (fromIPv4 ipv4)
+    decodeResourceData _ _ = RD_A . toIPv4 <$> getNBytes 4
     copyResourceData x = x
 
 instance Show RD_A where
@@ -72,9 +72,9 @@ rd_a ipv4 = toRData $ RD_A ipv4
 newtype RD_NS = RD_NS Domain deriving (Eq)
 
 instance ResourceData RD_NS where
-    resourceDataType   = \_ -> NS
-    encodeResourceData = \(RD_NS d) -> putDomain d
-    decodeResourceData = \_ _ -> RD_NS <$> getDomain
+    resourceDataType _ = NS
+    encodeResourceData (RD_NS d) = putDomain d
+    decodeResourceData _ _ = RD_NS <$> getDomain
     copyResourceData (RD_NS dom) = RD_NS $ B.copy dom
 
 instance Show RD_NS where
@@ -89,9 +89,9 @@ rd_ns d = toRData $ RD_NS d
 newtype RD_CNAME = RD_CNAME Domain deriving (Eq)
 
 instance ResourceData RD_CNAME where
-    resourceDataType   = \_ -> CNAME
-    encodeResourceData = \(RD_CNAME d) -> putDomain d
-    decodeResourceData = \_ _ -> RD_CNAME <$> getDomain
+    resourceDataType _ = CNAME
+    encodeResourceData (RD_CNAME d) = putDomain d
+    decodeResourceData _ _ = RD_CNAME <$> getDomain
     copyResourceData (RD_CNAME dom) = RD_CNAME $ B.copy dom
 
 instance Show RD_CNAME where
@@ -114,8 +114,8 @@ data RD_SOA = RD_SOA {
   } deriving (Eq)
 
 instance ResourceData RD_SOA where
-    resourceDataType   = \_ -> SOA
-    encodeResourceData = \RD_SOA{..} ->
+    resourceDataType _ = SOA
+    encodeResourceData RD_SOA{..} =
       mconcat [ putDomain soaMname
               , putMailbox soaRname
               , put32 soaSerial
@@ -124,13 +124,13 @@ instance ResourceData RD_SOA where
               , put32 soaExpire
               , put32 soaMinimum
               ]
-    decodeResourceData = \_ _ -> RD_SOA  <$> getDomain
-                                         <*> getMailbox
-                                         <*> get32
-                                         <*> get32
-                                         <*> get32
-                                         <*> get32
-                                         <*> get32
+    decodeResourceData _ _ = RD_SOA <$> getDomain
+                                    <*> getMailbox
+                                    <*> get32
+                                    <*> get32
+                                    <*> get32
+                                    <*> get32
+                                    <*> get32
     copyResourceData r@RD_SOA{..} =
         r { soaMname = B.copy soaMname
           , soaRname = B.copy soaRname
@@ -154,9 +154,9 @@ rd_soa a b c d e f g = toRData $ RD_SOA a b c d e f g
 newtype RD_NULL = RD_NULL ByteString deriving (Eq)
 
 instance ResourceData RD_NULL where
-    resourceDataType   = \_ -> NULL
-    encodeResourceData = \(RD_NULL bytes) -> putByteString bytes
-    decodeResourceData = \_ len -> RD_NULL <$> getNByteString len
+    resourceDataType _ = NULL
+    encodeResourceData (RD_NULL bytes) = putByteString bytes
+    decodeResourceData _ len = RD_NULL <$> getNByteString len
     copyResourceData (RD_NULL bytes) = RD_NULL $ B.copy bytes
 
 instance Show RD_NULL where
@@ -171,9 +171,9 @@ rd_null x = toRData $ RD_NULL x
 newtype RD_PTR = RD_PTR Domain deriving (Eq)
 
 instance ResourceData RD_PTR where
-    resourceDataType   = \_ -> PTR
-    encodeResourceData = \(RD_PTR d) -> putDomain d
-    decodeResourceData = \_ _ -> RD_PTR <$> getDomain
+    resourceDataType _ = PTR
+    encodeResourceData (RD_PTR d) = putDomain d
+    decodeResourceData _ _ = RD_PTR <$> getDomain
     copyResourceData (RD_PTR dom) = RD_PTR $ B.copy dom
 
 instance Show RD_PTR where
@@ -191,12 +191,12 @@ data RD_MX = RD_MX {
   } deriving (Eq)
 
 instance ResourceData RD_MX where
-    resourceDataType   = \_ -> MX
-    encodeResourceData = \RD_MX{..} ->
+    resourceDataType _ = MX
+    encodeResourceData RD_MX{..} =
       mconcat [ put16 mxPreference
               , putDomain mxExchange
               ]
-    decodeResourceData = \_ _ -> RD_MX <$> get16 <*> getDomain
+    decodeResourceData _ _ = RD_MX <$> get16 <*> getDomain
     copyResourceData (RD_MX prf dom) = RD_MX prf $ B.copy dom
 
 instance Show RD_MX where
@@ -211,14 +211,14 @@ rd_mx a b = toRData $ RD_MX a b
 newtype RD_TXT = RD_TXT ByteString deriving (Eq)
 
 instance ResourceData RD_TXT where
-    resourceDataType   = \_ -> TXT
-    encodeResourceData = \(RD_TXT txt0) -> putTXT txt0
+    resourceDataType _ = TXT
+    encodeResourceData (RD_TXT txt0) = putTXT txt0
       where
         putTXT txt = let (!h, !t) = BS.splitAt 255 txt
                      in putByteStringWithLength h <> if BS.null t
                                                      then mempty
                                                      else putTXT t
-    decodeResourceData = \_ len ->
+    decodeResourceData _ len =
       RD_TXT . B.concat <$> sGetMany "TXT RR string" len getstring
         where
           getstring = getInt8 >>= getNByteString
@@ -250,9 +250,9 @@ rd_txt x = toRData $ RD_TXT x
 data RD_RP = RD_RP Mailbox Domain deriving (Eq)
 
 instance ResourceData RD_RP where
-    resourceDataType   = \_ -> RP
-    encodeResourceData = \(RD_RP mbox d) -> putMailbox mbox <> putDomain d
-    decodeResourceData = \_ _ -> RD_RP <$> getMailbox <*> getDomain
+    resourceDataType _ = RP
+    encodeResourceData (RD_RP mbox d) = putMailbox mbox <> putDomain d
+    decodeResourceData _ _ = RD_RP <$> getMailbox <*> getDomain
     copyResourceData (RD_RP mbox dname) = RD_RP (B.copy mbox) (B.copy dname)
 
 instance Show RD_RP where
@@ -268,9 +268,9 @@ rd_rp a b = toRData $ RD_RP a b
 newtype RD_AAAA = RD_AAAA IPv6 deriving (Eq)
 
 instance ResourceData RD_AAAA where
-    resourceDataType   = \_ -> AAAA
-    encodeResourceData = \(RD_AAAA ipv6) -> mconcat $ map putInt8 (fromIPv6b ipv6)
-    decodeResourceData = \_ _ -> RD_AAAA . toIPv6b <$> getNBytes 16
+    resourceDataType _ = AAAA
+    encodeResourceData (RD_AAAA ipv6) = mconcat $ map putInt8 (fromIPv6b ipv6)
+    decodeResourceData _ _ = RD_AAAA . toIPv6b <$> getNBytes 16
     copyResourceData x = x
 
 instance Show RD_AAAA where
@@ -290,17 +290,17 @@ data RD_SRV = RD_SRV {
   } deriving (Eq)
 
 instance ResourceData RD_SRV where
-    resourceDataType   = \_ -> SRV
-    encodeResourceData = \RD_SRV{..} ->
+    resourceDataType _ = SRV
+    encodeResourceData RD_SRV{..} =
       mconcat [ put16 srvPriority
               , put16 srvWeight
               , put16 srvPort
               , putDomain srvTarget
               ]
-    decodeResourceData = \_ _ -> RD_SRV <$> get16
-                                        <*> get16
-                                        <*> get16
-                                        <*> getDomain
+    decodeResourceData _ _ = RD_SRV <$> get16
+                                    <*> get16
+                                    <*> get16
+                                    <*> getDomain
     copyResourceData r@RD_SRV{..} = r { srvTarget = B.copy srvTarget }
 
 instance Show RD_SRV where
@@ -318,9 +318,9 @@ rd_srv a b c d = toRData $ RD_SRV a b c d
 newtype RD_DNAME = RD_DNAME Domain deriving (Eq)
 
 instance ResourceData RD_DNAME where
-    resourceDataType   = \_ -> DNAME
-    encodeResourceData = \(RD_DNAME d) -> putDomain d
-    decodeResourceData = \_ _ -> RD_DNAME <$> getDomain
+    resourceDataType _ = DNAME
+    encodeResourceData (RD_DNAME d) = putDomain d
+    decodeResourceData _ _ = RD_DNAME <$> getDomain
     copyResourceData (RD_DNAME dom) = RD_DNAME $ B.copy dom
 
 instance Show RD_DNAME where
@@ -335,9 +335,9 @@ rd_dname d = toRData $ RD_DNAME d
 newtype RD_OPT = RD_OPT [OData] deriving (Eq)
 
 instance ResourceData RD_OPT where
-    resourceDataType   = \_ -> OPT
-    encodeResourceData = \(RD_OPT options) -> mconcat $ fmap encodeOData options
-    decodeResourceData = \_ len ->
+    resourceDataType _ = OPT
+    encodeResourceData (RD_OPT options) = mconcat $ fmap encodeOData options
+    decodeResourceData _ len =
       RD_OPT <$> sGetMany "EDNS option" len getoption
         where
           getoption = do
@@ -363,14 +363,14 @@ data RD_TLSA = RD_TLSA {
   } deriving (Eq)
 
 instance ResourceData RD_TLSA where
-    resourceDataType   = \_ -> TLSA
-    encodeResourceData = \RD_TLSA{..} ->
+    resourceDataType _ = TLSA
+    encodeResourceData RD_TLSA{..} =
       mconcat [ put8 tlsaUsage
               , put8 tlsaSelector
               , put8 tlsaMatchingType
               , putByteString tlsaAssocData
               ]
-    decodeResourceData = \_ len ->
+    decodeResourceData _ len =
       RD_TLSA <$> get8
               <*> get8
               <*> get8
@@ -393,8 +393,8 @@ rd_tlsa a b c d = toRData $ RD_TLSA a b c d
 data RD_Unknown = RD_Unknown TYPE ByteString deriving (Eq, Show)
 
 instance ResourceData RD_Unknown where
-    resourceDataType   = \(RD_Unknown typ _) -> typ
-    encodeResourceData = \(RD_Unknown _ bytes) -> putByteString bytes
+    resourceDataType (RD_Unknown typ _) = typ
+    encodeResourceData (RD_Unknown _ bytes) = putByteString bytes
     decodeResourceData = undefined -- never used
     copyResourceData (RD_Unknown t x)  = RD_Unknown t $ B.copy x
 
