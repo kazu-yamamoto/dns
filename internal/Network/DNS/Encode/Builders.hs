@@ -19,6 +19,7 @@ import qualified Control.Exception as E
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.CaseInsensitive as CI
 import qualified Data.IP
 import Data.IP (IP(..), fromIPv4, fromIPv6b, makeAddrRange)
 import GHC.Exts (the, groupWith)
@@ -215,7 +216,7 @@ putRData rd = case rd of
         ]
     putCAA flags tag value = mconcat
         [ put8 flags
-        , putByteStringWithLength tag
+        , putByteStringWithLength (CI.original tag)
         , putByteString value
         ]
 

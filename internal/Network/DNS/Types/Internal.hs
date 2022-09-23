@@ -12,6 +12,8 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
+import Data.CaseInsensitive (CI)
+import qualified Data.CaseInsensitive as CI
 import Data.Char (intToDigit)
 import qualified Data.Hourglass as H
 import Data.IP (IP(..), IPv4, IPv6)
@@ -998,7 +1000,7 @@ data RData = RD_A IPv4           -- ^ IPv4 address
                                  -- ^ Child DS (RFC7344)
            | RD_CDNSKEY Word16 Word8 Word8 ByteString
                                  -- ^ Child DNSKEY (RFC7344)
-           | RD_CAA Word8 ByteString ByteString
+           | RD_CAA Word8 (CI ByteString) ByteString
                                  -- ^ CAA (RFC 6844)
            --RD_CSYNC
            | UnknownRData ByteString   -- ^ Unknown resource data
@@ -1078,8 +1080,7 @@ instance Show RData where
           show usage ++ " " ++ show selector ++ " " ++
           show mtype ++ " " ++ _b16encode digest
       showCAA flags tag value =
-          show flags ++ " " ++ show tag ++ " " ++
-          show value
+          show flags ++ " " ++ BS.unpack (CI.original tag) ++ " " ++ show value
       -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
       showOpaque bs = unwords ["\\#", show (BS.length bs), _b16encode bs]
 

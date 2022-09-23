@@ -6,6 +6,7 @@ import qualified Data.IP
 import Data.IP (Addr, IP(..), IPv4, IPv6, toIPv4, toIPv6, makeAddrRange)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.CaseInsensitive as CI
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck (Gen, arbitrary, elements, forAll, frequency, listOf, oneof)
@@ -118,7 +119,7 @@ mkRData dom typ =
         NSEC -> RD_NSEC <$> genDomain <*> genNsecTypes
         NSEC3 -> genNSEC3
         TLSA -> RD_TLSA <$> genWord8 <*> genWord8 <*> genWord8 <*> genByteString
-        CAA -> RD_CAA <$> genWord8 <*> genByteString <*> genByteString
+        CAA -> RD_CAA <$> genWord8 <*> (CI.mk <$> genByteString) <*> genByteString
 
         _ -> pure . RD_TXT $ "Unhandled type " <> BS.pack (show typ)
   where
