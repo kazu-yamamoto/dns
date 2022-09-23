@@ -43,6 +43,7 @@ Library dns-internal
                       , base16-bytestring
                       , base64-bytestring
                       , bytestring
+                      , case-insensitive
                       , containers
                       , cryptonite
                       , hourglass
@@ -113,6 +114,7 @@ Test-Suite spec-tests
                       , QuickCheck >= 2.9
                       , base
                       , bytestring
+                      , case-insensitive
                       , hspec
                       , iproute >= 1.3.2
                       , word8

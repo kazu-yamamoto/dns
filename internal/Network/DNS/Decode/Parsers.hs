@@ -12,6 +12,7 @@ module Network.DNS.Decode.Parsers (
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.CaseInsensitive as CI
 import qualified Data.IP
 import Data.IP (IP(..), toIPv4, toIPv6b, makeAddrRange)
 
@@ -286,7 +287,7 @@ getRData CAA len = do
     flags <- get8
     tag <- getInt8 >>= getNByteString
     tpos <- getPosition
-    RD_CAA flags tag <$> getNByteString (dend - tpos)
+    RD_CAA flags (CI.mk tag) <$> getNByteString (dend - tpos)
 --
 getRData _  len = UnknownRData <$> getNByteString len
 

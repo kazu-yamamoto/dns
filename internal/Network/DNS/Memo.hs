@@ -4,6 +4,7 @@ module Network.DNS.Memo where
 
 import qualified Control.Reaper as R
 import qualified Data.ByteString as B
+import qualified Data.CaseInsensitive as CI
 import Data.Hourglass (Elapsed)
 import Data.OrdPSQ (OrdPSQ)
 import qualified Data.OrdPSQ as PSQ
@@ -82,7 +83,7 @@ copy (RD_RRSIG sig)       = RD_RRSIG $ copysig sig
     copysig s@RDREP_RRSIG{..} =
         s { rrsigZone = B.copy rrsigZone
           , rrsigValue = B.copy rrsigValue }
-copy (RD_CAA f t v)       = RD_CAA f (B.copy t) (B.copy v)
+copy (RD_CAA f t v)       = RD_CAA f (CI.mk (B.copy (CI.original t))) (B.copy v)
 copy (UnknownRData is)    = UnknownRData $ B.copy is
 
 copyOData :: OData -> OData
