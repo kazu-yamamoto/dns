@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 4.1.1
+
+- Adding encoder/decoder for CAA RR.
+
 ## 4.1.0
 
 - Breaking change: GHC 7.x and earlier no longer supported.
