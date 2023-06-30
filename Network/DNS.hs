@@ -8,6 +8,7 @@
 --
 --   Examples:
 --
+--   >>> :set -XOverloadedStrings
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupA resolver "192.0.2.1.nip.io"
 --   Right [192.0.2.1]

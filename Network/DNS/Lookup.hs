@@ -41,11 +41,11 @@
 --   by creating and utilizing a 'ResolvConf' which has a timeout of
 --   one millisecond and a very limited number of retries:
 --
---   >>> let hostname = Data.ByteString.Char8.pack "www.example.com"
+--   >>> let hostname2 = Data.ByteString.Char8.pack "www.example.com"
 --   >>> let badrc = defaultResolvConf { resolvTimeout = 0, resolvRetry = 1 }
 --   >>>
---   >>> rs <- makeResolvSeed badrc
---   >>> withResolver rs $ \resolver -> lookupA resolver hostname
+--   >>> rs2 <- makeResolvSeed badrc
+--   >>> withResolver rs2 $ \resolver -> lookupA resolver hostname2
 --   Left RetryLimitExceeded
 --
 --   As is the convention, successful results will always be wrapped
@@ -80,6 +80,9 @@ import Network.DNS.LookupRaw as DNS
 import Network.DNS.Resolver as DNS
 import Network.DNS.Types.Internal
 
+-- $setup
+-- >>> :set -XOverloadedStrings
+
 ----------------------------------------------------------------
 
 -- | Look up all \'A\' records for the given hostname.
@@ -93,8 +96,8 @@ import Network.DNS.Types.Internal
 --   This function will also follow a CNAME and resolve its target if
 --   one exists for the queried hostname:
 --
---   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupA resolver "www.kame.net"
+--   >>> rs2 <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs2 $ \resolver -> lookupA resolver "www.kame.net"
 --   Right [210.155.141.200]
 --
 lookupA :: Resolver -> Domain -> IO (Either DNSError [IPv4])
@@ -147,8 +150,8 @@ lookupAAAA rlv dom = do
 --
 --   The domain \"mew.org\" does however have a single MX:
 --
---   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupMX resolver "mew.org"
+--   >>> rs2 <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs2 $ \resolver -> lookupMX resolver "mew.org"
 --   Right [("mail.mew.org.",10)]
 --
 --   Also note that all hostnames are returned with a trailing dot to
@@ -157,8 +160,8 @@ lookupAAAA rlv dom = do
 --   However the MX host itself has no need for an MX record, so its MX RRset
 --   is empty.  But, \"no results\" is still a successful result.
 --
---   >>> rs <- makeResolvSeed defaultResolvConf
---   >>> withResolver rs $ \resolver -> lookupMX resolver "mail.mew.org"
+--   >>> rs3 <- makeResolvSeed defaultResolvConf
+--   >>> withResolver rs3 $ \resolver -> lookupMX resolver "mail.mew.org"
 --   Right []
 --
 lookupMX :: Resolver -> Domain -> IO (Either DNSError [(Domain,Int)])
@@ -415,7 +418,7 @@ lookupRDNS rlv ip = lookupPTR rlv dom
 --
 --   >>> rs <- makeResolvSeed defaultResolvConf
 --   >>> withResolver rs $ \resolver -> lookupSRV resolver "_xmpp-server._tcp.jabber.ietf.org"
---   Right [(5,0,5269,"jabber.ietf.org.")]
+--   Right [(5,0,5269,"_dc-srv.6661af51975d._xmpp-server._tcp.jabber.ietf.org.")]
 
 -- Though the "jabber.ietf.orgs" SRV record may prove reasonably stable, as
 -- with anything else published in DNS it is subject to change.  Also, this
