@@ -122,4 +122,4 @@ Test-Suite spec-tests
 
 Source-Repository head
   Type:                 git
-  Location:             git://github.com/kazu-yamamoto/dns.git
+  Location:             https://github.com/kazu-yamamoto/dns.git
