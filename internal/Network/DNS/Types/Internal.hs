@@ -1080,7 +1080,7 @@ instance Show RData where
           show usage ++ " " ++ show selector ++ " " ++
           show mtype ++ " " ++ _b16encode digest
       showCAA flags tag value =
-          show flags ++ " " ++ BS.unpack (CI.original tag) ++ " " ++ show value
+          show flags ++ " " ++ BS.unpack (CI.original tag) ++ " " ++ showTXT value
       -- | Opaque RData: <https://tools.ietf.org/html/rfc3597#section-5>
       showOpaque bs = unwords ["\\#", show (BS.length bs), _b16encode bs]
 
