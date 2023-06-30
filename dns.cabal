@@ -1,5 +1,5 @@
 Name:                   dns
-Version:                4.1.1
+Version:                4.2.0
 Author:                 Kazu Yamamoto <kazu@iij.ad.jp>
 Maintainer:             Kazu Yamamoto <kazu@iij.ad.jp>
 License:                BSD3
@@ -45,7 +45,7 @@ Library dns-internal
                       , bytestring
                       , case-insensitive
                       , containers
-                      , cryptonite
+                      , crypton
                       , hourglass
                       , iproute
                       , mtl
@@ -78,7 +78,7 @@ Library
                       , base64-bytestring
                       , bytestring
                       , containers
-                      , cryptonite
+                      , crypton
                       , hourglass
                       , iproute >= 1.3.2
                       , mtl

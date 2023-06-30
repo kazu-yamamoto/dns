@@ -1,5 +1,9 @@
 # ChangeLog
 
+## 4.2.0
+
+- Switching cryptonite to crypton.
+
 ## 4.1.1
 
 - Adding encoder/decoder for CAA RR.
