@@ -40,7 +40,7 @@ module Network.DNS (
   -- | Encoding a query or response.
 
   , module Network.DNS.Decode
-  -- | Decoding a qurey or response.
+  -- | Decoding a query or response.
 
   , module Network.DNS.IO
   -- | Sending and receiving.
