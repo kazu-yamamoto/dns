@@ -21,7 +21,7 @@ module Network.DNS.Resolver (
   , maximumTTL
   , pruningDelay
   -- * Intermediate data type for resolver
-  , ResolvSeed
+  , ResolvSeed(..)
   , makeResolvSeed
   -- * Type and function for resolver
   , Resolver

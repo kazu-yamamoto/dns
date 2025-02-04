@@ -6,6 +6,7 @@ module Network.DNS.LookupRaw (
   , lookupAuth
   -- * Lookups returning DNS Messages
   , lookupRaw
+  , lookupRawWithRetryAndDuration
   , lookupRawCtl
   , lookupRawCtlRecv
   -- * DNS Message procesing
@@ -245,6 +246,14 @@ lookupRaw :: Resolver   -- ^ Resolver obtained via 'withResolver'
           -> TYPE       -- ^ Query RRtype
           -> IO (Either DNSError DNSMessage)
 lookupRaw rslv dom typ = lookupRawCtl rslv dom typ mempty
+
+-- Drew added this.
+lookupRawWithRetryAndDuration ::
+     Resolver   -- ^ Resolver obtained via 'withResolver'
+  -> Domain     -- ^ Query domain
+  -> TYPE       -- ^ Query RRtype
+  -> IO (Either DNSError (DNSMessage, Int, Word64))
+lookupRawWithRetryAndDuration rslv dom typ = resolveCustom rslv dom typ mempty receive
 
 -- | Similar to 'lookupRaw', but the default values of the RD, AD, CD and DO
 -- flag bits, as well as various EDNS features, can be adjusted via the

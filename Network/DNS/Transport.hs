@@ -4,6 +4,10 @@
 module Network.DNS.Transport (
     Resolver(..)
   , resolve
+    -- Drew added resolveCustom so that MGT TSG could get better
+    -- information about how many retries were performed and how
+    -- long we spend waiting on the DNS request that succeeded.
+  , resolveCustom
   ) where
 
 import Control.Concurrent.Async (async, waitAnyCancel)
@@ -13,6 +17,7 @@ import qualified Data.List.NonEmpty as NE
 import Network.Socket (AddrInfo(..), SockAddr(..), Family(AF_INET, AF_INET6), Socket, SocketType(Stream), close, socket, connect, defaultProtocol)
 import System.IO.Error (annotateIOError)
 import System.Timeout (timeout)
+import GHC.Clock (getMonotonicTimeNSec)
 
 import Network.DNS.IO
 import Network.DNS.Imports
@@ -102,6 +107,28 @@ resolve rlv dom typ qctls rcv
     tm         = resolvTimeout conf
     retry      = resolvRetry conf
 
+resolveCustom :: Resolver -> Domain -> TYPE -> QueryControls -> (Socket -> IO DNSMessage) -> IO (Either DNSError (DNSMessage, Int, Word64))
+resolveCustom rlv dom typ qctls rcv
+  | isIllegal dom = return $ Left IllegalDomain
+  | typ == AXFR   = return $ Left InvalidAXFRLookup
+  | onlyOne       = resolveOneCustom (head nss) (head gens) q tm retry ctls rcv
+  | otherwise     = fail "resolveCustom in mgt fork of dns library: hit unexpected path"
+  where
+    q = case BS.last dom of
+          '.' -> Question dom typ
+          _   -> Question (dom <> ".") typ
+
+    gens = NE.toList $ genIds rlv
+
+    seed    = resolvseed rlv
+    nss     = NE.toList $ nameservers seed
+    onlyOne = length nss == 1
+    ctls    = qctls <> resolvQueryControls (resolvconf $ resolvseed rlv)
+
+    conf       = resolvconf seed
+    tm         = resolvTimeout conf
+    retry      = resolvRetry conf
+
 
 resolveSequential :: [AddrInfo] -> [IO Identifier] -> Rslv1
 resolveSequential nss gs q tm retry ctls rcv = loop nss gs
@@ -125,6 +152,18 @@ resolveOne :: AddrInfo -> IO Identifier -> Rslv1
 resolveOne ai gen q tm retry ctls rcv =
     E.try $ udpTcpLookup gen retry rcv ai q tm ctls
 
+resolveOneCustom ::
+     AddrInfo
+  -> IO Identifier
+  -> Question
+  -> Int -- Timeout
+  -> Int -- Retry
+  -> QueryControls
+  -> (Socket -> IO DNSMessage)
+  -> IO (Either DNSError (DNSMessage, Int, Word64))
+resolveOneCustom ai gen q tm retry ctls rcv =
+    E.try $ udpTcpLookupCustom gen retry rcv ai q tm ctls
+
 ----------------------------------------------------------------
 
 -- UDP attempts must use the same ID and accept delayed answers
@@ -136,9 +175,75 @@ udpTcpLookup gen retry rcv ai q tm ctls = do
     udpLookup ident retry rcv ai q tm ctls `E.catch`
             \TCPFallback -> tcpLookup gen ai q tm ctls
 
+-- Returns the actual number of retries that happened, and returns
+-- the nanosecond latency of the successful attempt (not the total
+-- time spent on all the failed attempts).
+-- Does not fallback to a TCP lookup.
+udpTcpLookupCustom :: 
+     IO Identifier
+  -> Int -- Retry
+  -> (Socket -> IO DNSMessage)
+  -> AddrInfo
+  -> Question
+  -> Int -- Timeout
+  -> QueryControls
+  -> IO (DNSMessage, Int, Word64)
+udpTcpLookupCustom gen retry rcv ai q tm ctls = do
+    ident <- gen
+    udpLookupCustom ident retry rcv ai q tm ctls
+
+udpLookupCustom ::
+     Identifier
+  -> Int -- Retry
+  -> (Socket -> IO DNSMessage)
+  -> AddrInfo
+  -> Question
+  -> Int -- Timeout
+  -> QueryControls
+  -> IO (DNSMessage, Int, Word64)
+udpLookupCustom ident retry rcv ai q tm ctls = do
+    let qry = encodeQuestion ident q ctls
+    E.handle (ioErrorToDNSError ai "udp") $
+      bracket (udpOpen ai) close (loop qry ctls 0 RetryLimitExceeded)
+  where
+    loop qry lctls cnt err sock
+      | cnt == retry = E.throwIO err
+      | otherwise    = do
+          start <- getMonotonicTimeNSec
+          mres <- timeout tm (send sock qry >> getAns sock)
+          case mres of
+              Nothing  -> loop qry lctls (cnt + 1) RetryLimitExceeded sock
+              Just res -> do
+                      let fl = flags $ header res
+                          tc = trunCation fl
+                          rc = rcode fl
+                          eh = ednsHeader res
+                          cs = ednsEnabled FlagClear <> lctls
+                      if tc then E.throwIO TCPFallback
+                      else if rc == FormatErr && eh == NoEDNS && cs /= lctls
+                      then let qry' = encodeQuestion ident q cs
+                            in loop qry' cs cnt RetryLimitExceeded sock
+                      else do
+                        end <- getMonotonicTimeNSec
+                        let duration = end - start
+                        return (res, cnt, duration)
+
+    -- | Closed UDP ports are occasionally re-used for a new query, with
+    -- the nameserver returning an unexpected answer to the wrong socket.
+    -- Such answers should be simply dropped, with the client continuing
+    -- to wait for the right answer, without resending the question.
+    -- Note, this eliminates sequence mismatch as a UDP error condition,
+    -- instead we'll time out if no matching answer arrives.
+    --
+    getAns sock = do
+        resp <- rcv sock
+        if checkResp q ident resp
+        then return resp
+        else getAns sock
+
 ----------------------------------------------------------------
 
-ioErrorToDNSError :: AddrInfo -> String -> IOError -> IO DNSMessage
+ioErrorToDNSError :: AddrInfo -> String -> IOError -> IO x
 ioErrorToDNSError ai protoName ioe = throwIO $ NetworkFailure aioe
   where
     loc = protoName ++ "@" ++ show (addrAddress ai)
